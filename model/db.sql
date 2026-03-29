@@ -8,6 +8,8 @@ CREATE TABLE medicos (
     telefone TEXT,
     especialidade TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL, -- Impede CRM duplicado
+    unidade_fixa_id UUID REFERENCES unidades(id),
+    atendimento_padrao_por_periodo INT DEFAULT 10, -- Base fictícia para previsão
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -26,8 +28,8 @@ CREATE TABLE disponibilidade (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     unidade_id UUID REFERENCES unidades(id) ON DELETE CASCADE,
     data_plantao DATE NOT NULL,
-    turno TEXT NOT NULL, -- 'Manhã', 'Tarde', 'Noite'
-    vagas_totais INT NOT NULL, -- Calculado pela média + desvio padrão
+    turno TEXT NOT NULL, -- 'Manhã', 'Tarde', 'Noite', 'Madrugada'
+    vagas_totais INT NOT NULL, -- Calculado com base nos atendimentos por período
     vagas_ocupadas INT DEFAULT 0,
     status TEXT DEFAULT 'ABERTO', -- 'ABERTO', 'LOTADO', 'CANCELADO'
     
@@ -52,6 +54,10 @@ CREATE TABLE tasy_raw_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     unidade_id UUID REFERENCES unidades(id),
     data_atendimento DATE NOT NULL,
-    atendimento_count INT NOT NULL, -- Quantos pacientes passaram no PS
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    periodo TEXT, -- 'Manhã', 'Tarde', 'Noite', 'Madrugada'. Se ausente, o sistema distribui por pesos fictícios
+    atendimento_count INT NOT NULL, -- Quantos pacientes passaram no período
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    -- Impede histórico duplicado para a mesma unidade/data/período
+    UNIQUE(unidade_id, data_atendimento, periodo)
 );
