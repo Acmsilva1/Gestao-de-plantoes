@@ -69,7 +69,11 @@ if (fs.existsSync(distPath)) {
     });
 }
 
-app.listen(env.port, () => {
-    console.log(`Maestro rodando na porta ${env.port}`);
-    startPredictionScheduler();
-});
+if (!process.env.VERCEL) {
+    app.listen(env.port, () => {
+        console.log(`Maestro rodando na porta ${env.port}`);
+        startPredictionScheduler();
+    });
+}
+
+export default app;

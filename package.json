@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "npm run web:build",
     "dev": "node --watch server.js",
     "start": "node server.js",
     "web:dev": "npm --prefix web run dev -- --host localhost --port 5173 --strictPort",
