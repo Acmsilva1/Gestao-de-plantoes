@@ -10,9 +10,13 @@ const mapDoctorForClient = (doctor) => ({
 });
 
 export const loginWithCrm = async (req, res) => {
-    const { nome, crm, doctorId } = req.body ?? {};
+    const { nome, crm } = req.body ?? {};
 
     try {
+        if (!nome?.trim()) {
+            return res.status(400).json({ error: 'Informe o nome para entrar.' });
+        }
+
         if (!crm?.trim()) {
             return res.status(400).json({ error: 'Informe o CRM para entrar.' });
         }
@@ -27,12 +31,8 @@ export const loginWithCrm = async (req, res) => {
             return res.status(400).json({ error: 'Nome nao confere com o CRM informado.' });
         }
 
-        if (doctorId?.trim() && doctor.id !== doctorId.trim()) {
-            return res.status(400).json({ error: 'ID nao confere com o CRM informado.' });
-        }
-
         res.json({
-            message: 'Login de teste realizado com sucesso.',
+            message: 'Acesso autorizado com sucesso.',
             doctor: mapDoctorForClient(doctor)
         });
     } catch (err) {

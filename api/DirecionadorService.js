@@ -4,6 +4,7 @@ import { generateForecastWindows } from './OrganizerService.js';
 
 const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const PUBLIC_SHIFTS_TTL_MS = 30_000;
+const isReservationHoldTableMissing = (message = '') => /Could not find the table 'public\.reserva_holds'|relation "reserva_holds" does not exist/i.test(message);
 
 const getTodayKey = (referenceDate = new Date()) => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -142,6 +143,71 @@ export const generateUnitForecast = async (req, res) => {
     }
 };
 
+export const holdShift = async (req, res) => {
+    const { id } = req.params;
+    const { medicoId } = req.body ?? {};
+
+    try {
+        if (!medicoId) {
+            return res.status(400).json({ error: 'Selecione um medico para iniciar a reserva.' });
+        }
+
+        const shift = await dbModel.getShiftById(id);
+
+        if (!shift) {
+            return res.status(404).json({ error: 'Plantao nao encontrado.' });
+        }
+
+        if (shift.status !== 'ABERTO' || shift.vagas_ocupadas >= shift.vagas_totais) {
+            return res.status(409).json({ error: 'Plantao indisponivel para confirmacao.' });
+        }
+
+        const hold = await dbModel.acquireShiftHold(id, medicoId);
+
+        res.json({
+            message: 'Vaga bloqueada temporariamente para confirmacao.',
+            hold: {
+                shiftId: id,
+                reservedUntil: hold.reservado_ate
+            }
+        });
+    } catch (err) {
+        if (isReservationHoldTableMissing(err.message)) {
+            return res.status(503).json({
+                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+            });
+        }
+
+        const statusCode = /confirmacao por outro medico|nao encontrado|indisponivel/i.test(err.message) ? 409 : 500;
+        res.status(statusCode).json({ error: err.message });
+    }
+};
+
+export const releaseShiftHold = async (req, res) => {
+    const { id } = req.params;
+    const { medicoId } = req.body ?? {};
+
+    try {
+        if (!medicoId) {
+            return res.status(400).json({ error: 'Selecione um medico para liberar a reserva.' });
+        }
+
+        await dbModel.releaseShiftHold(id, medicoId);
+
+        res.json({
+            message: 'Bloqueio temporario liberado.'
+        });
+    } catch (err) {
+        if (isReservationHoldTableMissing(err.message)) {
+            return res.status(503).json({
+                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+            });
+        }
+
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const selectShift = async (req, res) => {
     const { id } = req.params;
     const { medicoId } = req.body ?? {};
@@ -153,15 +219,19 @@ export const selectShift = async (req, res) => {
 
         const updatedShift = await dbModel.reserveShift(id, medicoId);
         cacheModel.delete(PUBLIC_SHIFTS_CACHE_KEY);
-        const refreshedShifts = await loadPublicShifts();
 
         res.json({
             message: 'Plantao reservado com sucesso.',
-            selectedShift: mapShiftForClient(updatedShift),
-            shifts: refreshedShifts
+            selectedShift: mapShiftForClient(updatedShift)
         });
     } catch (err) {
-        const statusCode = /nao encontrado|indisponivel|sem vagas/i.test(err.message) ? 409 : 500;
+        if (isReservationHoldTableMissing(err.message)) {
+            return res.status(503).json({
+                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+            });
+        }
+
+        const statusCode = /nao encontrado|indisponivel|sem vagas|ja reservou|confirmacao expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
         res.status(statusCode).json({ error: err.message });
     }
 };

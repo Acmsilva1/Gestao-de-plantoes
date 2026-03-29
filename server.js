@@ -10,6 +10,8 @@ import {
     getDoctorCalendar,
     getDoctors,
     getPublicShifts,
+    holdShift,
+    releaseShiftHold,
     selectShift
 } from './api/DirecionadorService.js';
 
@@ -28,6 +30,8 @@ app.post('/api/auth/login', loginWithCrm);
 app.get('/api/medicos', getDoctors);
 app.get('/api/medicos/:medicoId/calendario', getDoctorCalendar);
 app.get('/api/vagas', getPublicShifts);
+app.post('/api/vagas/:id/bloquear', holdShift);
+app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
 app.post('/api/vagas/:id/selecionar', selectShift);
 
 if (fs.existsSync(distPath)) {

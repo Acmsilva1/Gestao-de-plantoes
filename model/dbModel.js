@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { env } from '../config/env.js';
 
 const supabase = createClient(env.supabaseUrl, env.supabaseKey);
+const HOLD_DURATION_SECONDS = 3;
 
 const unwrap = (response, defaultMessage) => {
     if (response.error) {
@@ -133,6 +134,120 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar agendamento');
     },
+    async clearExpiredShiftHolds(shiftId, referenceIso = new Date().toISOString()) {
+        const response = await supabase
+            .from('reserva_holds')
+            .delete()
+            .eq('disponibilidade_id', shiftId)
+            .eq('fila_ativa', true)
+            .lte('reservado_ate', referenceIso)
+            .select('id');
+
+        return unwrap(response, 'Falha ao limpar bloqueios expirados');
+    },
+    async getShiftHold(shiftId) {
+        const response = await supabase
+            .from('reserva_holds')
+            .select('id, disponibilidade_id, medico_id, reservado_ate, fila_ativa')
+            .eq('disponibilidade_id', shiftId)
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao carregar bloqueio temporario');
+    },
+    async acquireShiftHold(shiftId, medicoId, holdDurationSeconds = HOLD_DURATION_SECONDS) {
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const reservedUntilIso = new Date(now.getTime() + holdDurationSeconds * 1000).toISOString();
+
+        await this.clearExpiredShiftHolds(shiftId, nowIso);
+
+        const currentHold = await this.getShiftHold(shiftId);
+
+        if (currentHold && currentHold.medico_id !== medicoId) {
+            if (!currentHold.fila_ativa) {
+                const activateQueueResponse = await supabase
+                    .from('reserva_holds')
+                    .update({
+                        fila_ativa: true,
+                        reservado_ate: reservedUntilIso,
+                        updated_at: nowIso
+                    })
+                    .eq('id', currentHold.id)
+                    .select('id, disponibilidade_id, medico_id, reservado_ate, fila_ativa')
+                    .maybeSingle();
+
+                unwrap(activateQueueResponse, 'Falha ao ativar fila de confirmacao');
+            }
+
+            throw new Error('Plantao em confirmacao por outro medico');
+        }
+
+        if (currentHold && currentHold.medico_id === medicoId) {
+            const updateResponse = await supabase
+                .from('reserva_holds')
+                .update({
+                    updated_at: nowIso
+                })
+                .eq('id', currentHold.id)
+                .select('id, disponibilidade_id, medico_id, reservado_ate, fila_ativa')
+                .maybeSingle();
+
+            return unwrap(updateResponse, 'Falha ao renovar bloqueio temporario');
+        }
+
+        const insertResponse = await supabase
+            .from('reserva_holds')
+            .insert({
+                disponibilidade_id: shiftId,
+                medico_id: medicoId,
+                reservado_ate: reservedUntilIso,
+                fila_ativa: false,
+                updated_at: nowIso
+            })
+            .select('id, disponibilidade_id, medico_id, reservado_ate, fila_ativa')
+            .maybeSingle();
+
+        if (!insertResponse.error) {
+            return insertResponse.data;
+        }
+
+        if (insertResponse.error.code === '23505') {
+            const freshHold = await this.getShiftHold(shiftId);
+
+            if (freshHold?.medico_id === medicoId) {
+                return freshHold;
+            }
+
+            throw new Error('Plantao em confirmacao por outro medico');
+        }
+
+        throw new Error(`Falha ao criar bloqueio temporario: ${insertResponse.error.message}`);
+    },
+    async releaseShiftHold(shiftId, medicoId) {
+        const response = await supabase
+            .from('reserva_holds')
+            .delete()
+            .eq('disponibilidade_id', shiftId)
+            .eq('medico_id', medicoId)
+            .select('id');
+
+        return unwrap(response, 'Falha ao liberar bloqueio temporario');
+    },
+    async ensureShiftHoldOwnership(shiftId, medicoId) {
+        const nowIso = new Date().toISOString();
+        await this.clearExpiredShiftHolds(shiftId, nowIso);
+        const hold = await this.getShiftHold(shiftId);
+
+        if (!hold || hold.medico_id !== medicoId) {
+            throw new Error('TEMPO EXCEDIDO! VAGA INDISPONIVEL!');
+        }
+
+        if (hold.fila_ativa && hold.reservado_ate <= nowIso) {
+            throw new Error('TEMPO EXCEDIDO! VAGA INDISPONIVEL!');
+        }
+
+        return hold;
+    },
     async upsertAvailabilityRows(rows) {
         const response = await supabase
             .from('disponibilidade')
@@ -149,6 +264,8 @@ export const dbModel = {
         if (!currentShift) {
             throw new Error('Plantao nao encontrado');
         }
+
+        await this.ensureShiftHoldOwnership(shiftId, medicoId);
 
         if (medicoId) {
             const existingBooking = await this.getBookingByShiftAndDoctor(shiftId, medicoId);
@@ -204,6 +321,8 @@ export const dbModel = {
 
             unwrap(bookingResponse, 'Falha ao registrar agendamento');
         }
+
+        await this.releaseShiftHold(shiftId, medicoId);
 
         return updatedShift;
     }

@@ -6,6 +6,7 @@ const initialState = {
     loading: false,
     loadingCalendar: false,
     loggingIn: false,
+    modal: null,
     error: '',
     success: '',
     reservandoId: '',
@@ -14,16 +15,45 @@ const initialState = {
     session: null,
     calendar: null,
     nome: '',
-    crm: '',
-    doctorId: '',
-    senha: ''
+    crm: ''
 };
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-const dayFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', timeZone: 'UTC' });
+const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo'
+});
+const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
+const weekdayIndexByShortName = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+};
 
-const getMonthTitle = (month) => monthFormatter.format(new Date(`${month}-01T00:00:00Z`));
+const getMonthAnchorDate = (month) => new Date(`${month}-01T12:00:00-03:00`);
+const getMonthTitle = (month) => monthFormatter.format(getMonthAnchorDate(month));
+const formatDisplayDate = (dateString) => fullDateFormatter.format(new Date(`${dateString}T12:00:00-03:00`)).replace(/\//g, '-');
+
+const parseJsonSafely = async (response) => {
+    const raw = await response.text();
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        throw new Error('A resposta do servidor veio incompleta ou invalida.');
+    }
+};
 
 const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -31,11 +61,13 @@ const shiftMonth = (month, delta) => {
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 };
 
+const getMonthFromDate = (dateString) => dateString.slice(0, 7);
+
 const buildCalendarDays = (month, shifts) => {
     const [year, monthIndex] = month.split('-').map(Number);
-    const firstDay = new Date(Date.UTC(year, monthIndex - 1, 1));
+    const firstDay = getMonthAnchorDate(month);
     const totalDays = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
-    const leadingBlankDays = firstDay.getUTCDay();
+    const leadingBlankDays = weekdayIndexByShortName[weekdayFormatter.format(firstDay)] ?? 0;
     const shiftMap = new Map();
 
     for (const shift of shifts) {
@@ -79,10 +111,10 @@ export default function App() {
 
         try {
             const response = await fetch(`/api/medicos/${doctorId}/calendario?month=${month}`);
-            const data = await response.json();
+            const data = await parseJsonSafely(response);
 
             if (!response.ok) {
-                throw new Error(data.error || 'Nao foi possivel carregar o calendario.');
+                throw new Error(data?.error || 'Nao foi possivel carregar o calendario.');
             }
 
             setState((current) => ({
@@ -126,6 +158,26 @@ export default function App() {
         }
     }, [state.session?.id, state.selectedMonth]);
 
+    const releaseReservationHold = async (shiftId) => {
+        if (!state.session?.id || !shiftId) {
+            return;
+        }
+
+        try {
+            await fetch(`/api/vagas/${shiftId}/bloquear`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    medicoId: state.session.id
+                })
+            });
+        } catch {
+            // A expiração automática no banco continua protegendo a fila.
+        }
+    };
+
     const handleLogin = async (event) => {
         event.preventDefault();
 
@@ -144,15 +196,13 @@ export default function App() {
                 },
                 body: JSON.stringify({
                     nome: state.nome,
-                    crm: state.crm,
-                    doctorId: state.doctorId,
-                    senha: state.senha
+                    crm: state.crm
                 })
             });
-            const data = await response.json();
+            const data = await parseJsonSafely(response);
 
             if (!response.ok) {
-                throw new Error(data.error || 'Falha no login.');
+                throw new Error(data?.error || 'Falha no login.');
             }
 
             const session = {
@@ -167,7 +217,6 @@ export default function App() {
                 ...current,
                 loggingIn: false,
                 session,
-                senha: '',
                 success: data.message
             }));
         } catch (error) {
@@ -193,12 +242,110 @@ export default function App() {
 
         setState((current) => ({
             ...current,
-            reservandoId: shiftId,
             error: '',
-            success: ''
+            success: '',
+            reservandoId: shiftId,
+            modal: {
+                type: 'loading',
+                title: 'Aguardando vaga',
+                message: 'Estamos entrando na fila e bloqueando a vaga temporariamente para voce.'
+            }
         }));
 
         try {
+            const response = await fetch(`/api/vagas/${shiftId}/bloquear`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    medicoId: state.session.id
+                })
+            });
+            const data = await parseJsonSafely(response);
+
+            if (!response.ok) {
+                throw new Error(data?.error || 'Nao foi possivel iniciar a reserva.');
+            }
+
+            setState((current) => ({
+                ...current,
+                modal: {
+                    type: 'confirm-reservation',
+                    shiftId,
+                    reservedUntil: data?.hold?.reservedUntil,
+                    title: 'Confirmar plantao',
+                    message: 'Clique em OK para confirmar a reserva. Se voce fechar esta janela, a vaga volta para a fila.'
+                }
+            }));
+        } catch (error) {
+            if (/confirmacao por outro medico/i.test(error.message)) {
+                setState((current) => ({
+                    ...current,
+                    modal: {
+                        type: 'loading',
+                        title: 'PROCESSANDO',
+                        message: 'A vaga esta sendo confirmada por outro usuario. Aguarde.'
+                    }
+                }));
+
+                window.setTimeout(() => {
+                    loadCalendar(state.session.id, state.selectedMonth);
+                    setState((current) => ({
+                        ...current,
+                        reservandoId: '',
+                        modal: null
+                    }));
+                }, 3000);
+
+                return;
+            }
+
+            releaseReservationHold(shiftId);
+            setState((current) => ({
+                ...current,
+                reservandoId: '',
+                error: error.message,
+                modal: {
+                    type: 'feedback',
+                    variant: 'error',
+                    title: 'Nao foi possivel bloquear a vaga',
+                    message: error.message
+                }
+            }));
+        }
+    };
+
+    const closeModal = () => {
+        const activeModal = state.modal;
+
+        if (activeModal?.type === 'confirm-reservation') {
+            releaseReservationHold(activeModal.shiftId);
+        }
+
+        setState((current) => ({
+            ...current,
+            modal: null,
+            reservandoId: activeModal?.type === 'confirm-reservation' ? '' : current.reservandoId
+        }));
+    };
+
+    const handleConfirmReservation = async () => {
+        if (!state.session?.id || state.modal?.type !== 'confirm-reservation') {
+            return;
+        }
+
+        const shiftId = state.modal.shiftId;
+        try {
+            setState((current) => ({
+                ...current,
+                modal: {
+                    type: 'loading',
+                    title: 'Processando reserva',
+                    message: 'Estamos confirmando sua vez na fila e registrando o agendamento.'
+                }
+            }));
+
             const response = await fetch(`/api/vagas/${shiftId}/selecionar`, {
                 method: 'POST',
                 headers: {
@@ -208,16 +355,22 @@ export default function App() {
                     medicoId: state.session.id
                 })
             });
-            const data = await response.json();
+            const data = await parseJsonSafely(response);
 
             if (!response.ok) {
-                throw new Error(data.error || 'Falha ao reservar plantao.');
+                throw new Error(data?.error || 'Falha ao reservar plantao.');
             }
 
             setState((current) => ({
                 ...current,
                 reservandoId: '',
-                success: data.message
+                success: data.message,
+                modal: {
+                    type: 'feedback',
+                    variant: 'success',
+                    title: 'Reserva confirmada',
+                    message: data.message
+                }
             }));
 
             loadCalendar(state.session.id, state.selectedMonth);
@@ -225,14 +378,25 @@ export default function App() {
             setState((current) => ({
                 ...current,
                 reservandoId: '',
-                error: error.message
+                error: error.message,
+                modal: {
+                    type: 'feedback',
+                    variant: 'error',
+                    title: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'TEMPO EXCEDIDO!' : 'Reserva nao concluida',
+                    message: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'VAGA INDISPONÍVEL!' : error.message
+                }
             }));
         }
     };
 
-    const { loggingIn, loadingCalendar, error, success, reservandoId, selectedMonth, selectedDay, session, calendar, crm, senha } = state;
-    const { nome, doctorId } = state;
+    const { loggingIn, loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, session, calendar, crm } = state;
+    const { nome } = state;
     const calendarDays = buildCalendarDays(selectedMonth, calendar?.shifts || []);
+    const getShiftAlertClasses = (shift) =>
+        shift.vagas <= 0
+            ? 'border border-rose-400/70 bg-rose-500/10 text-rose-100 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_22px_rgba(244,63,94,0.2)] animate-pulse'
+            : 'border border-emerald-400/15 bg-emerald-500/10';
+    const visibleMonth = selectedDay ? getMonthFromDate(selectedDay) : selectedMonth;
     const selectedDayShifts = useMemo(() => {
         if (!selectedDay) {
             return [];
@@ -248,9 +412,7 @@ export default function App() {
                     <header className="mb-12">
                         <p className="mb-3 text-sm uppercase tracking-[0.35em] text-emerald-300/70">Maestro</p>
                         <h1 className="text-5xl font-black tracking-tight text-white">Entrar para acessar seus plantões</h1>
-                        <p className="mt-4 max-w-2xl text-base text-slate-300">
-                            Para testes, o login aceita CRM com conferência opcional de nome e ID. A senha existe na interface, mas não é validada.
-                        </p>
+                        <p className="mt-4 max-w-2xl text-base text-slate-300">Entre apenas com nome e CRM. A autorização de acesso fica sob gestão do perfil administrativo.</p>
                     </header>
 
                     <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -284,34 +446,6 @@ export default function App() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-slate-200" htmlFor="doctor-id">
-                                        ID
-                                    </label>
-                                    <input
-                                        id="doctor-id"
-                                        type="text"
-                                        value={doctorId}
-                                        onChange={(event) => setState((current) => ({ ...current, doctorId: event.target.value }))}
-                                        placeholder="Opcional para teste"
-                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-slate-200" htmlFor="senha">
-                                        Senha
-                                    </label>
-                                    <input
-                                        id="senha"
-                                        type="password"
-                                        value={senha}
-                                        onChange={(event) => setState((current) => ({ ...current, senha: event.target.value }))}
-                                        placeholder="Opcional para teste"
-                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
-                                    />
-                                </div>
-
                                 {error ? (
                                     <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
                                 ) : null}
@@ -329,15 +463,11 @@ export default function App() {
                         <section className="rounded-[2rem] border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(16,185,129,0.16),rgba(15,23,42,0.35))] p-8">
                             <p className="text-xs uppercase tracking-[0.3em] text-emerald-300/70">Teste rápido</p>
                             <h2 className="mt-4 text-3xl font-black text-white">Login sem senha</h2>
-                            <p className="mt-4 text-sm text-slate-200">
-                                Use o CRM de um médico cadastrado. Nome e ID podem ser preenchidos para simular o fluxo final.
-                            </p>
+                            <p className="mt-4 text-sm text-slate-200">Use nome e CRM de um médico cadastrado e autorizado pelo gestor.</p>
                             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/55 p-4 text-sm text-slate-200">
                                 Nome: Dr. André Martins
                                 <br />
                                 CRM: 12345-ES
-                                <br />
-                                ID: 1a3697d4-9f5a-42bc-b52a-c462441a808e
                             </div>
                         </section>
                     </div>
@@ -382,6 +512,7 @@ export default function App() {
                             onClick={() =>
                                 setState((current) => ({
                                     ...current,
+                                    selectedDay: '',
                                     selectedMonth: shiftMonth(current.selectedMonth, -1)
                                 }))
                             }
@@ -389,12 +520,13 @@ export default function App() {
                         >
                             Mês anterior
                         </button>
-                        <div className="min-w-44 text-center text-sm font-semibold capitalize text-slate-200">{getMonthTitle(selectedMonth)}</div>
+                        <div className="min-w-44 text-center text-sm font-semibold capitalize text-slate-200">{getMonthTitle(visibleMonth)}</div>
                         <button
                             type="button"
                             onClick={() =>
                                 setState((current) => ({
                                     ...current,
+                                    selectedDay: '',
                                     selectedMonth: shiftMonth(current.selectedMonth, 1)
                                 }))
                             }
@@ -452,6 +584,7 @@ export default function App() {
                                                 onClick={() =>
                                                     setState((current) => ({
                                                         ...current,
+                                                        selectedMonth: getMonthFromDate(entry.date),
                                                         selectedDay: entry.date
                                                     }))
                                                 }
@@ -459,7 +592,7 @@ export default function App() {
                                             >
                                                 <div className="mb-4 flex items-center justify-between">
                                                     <span className="text-sm font-bold text-white">
-                                                        {dayFormatter.format(new Date(`${selectedMonth}-${String(entry.day).padStart(2, '0')}T00:00:00Z`))}
+                                                        {String(entry.day).padStart(2, '0')}
                                                     </span>
                                                     <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
                                                         {entry.shifts.length} turno{entry.shifts.length === 1 ? '' : 's'}
@@ -473,9 +606,9 @@ export default function App() {
                                                         </div>
                                                     ) : (
                                                         entry.shifts.slice(0, 3).map((shift) => (
-                                                            <div key={shift.id} className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-3">
-                                                                <div className="text-sm font-bold text-emerald-100">{shift.turno}</div>
-                                                                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">
+                                                            <div key={shift.id} className={`rounded-2xl px-3 py-3 ${getShiftAlertClasses(shift)}`}>
+                                                                <div className={`text-sm font-bold ${shift.vagas <= 0 ? 'text-rose-100' : 'text-emerald-100'}`}>{shift.turno}</div>
+                                                                <div className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>
                                                                     {shift.vagas} vagas
                                                                 </div>
                                                             </div>
@@ -494,7 +627,7 @@ export default function App() {
                         <div className="mb-6 flex flex-col gap-4 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
                             <div>
                                 <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">Dia Selecionado</p>
-                                <h2 className="mt-2 text-3xl font-black text-white">{selectedDay}</h2>
+                                <h2 className="mt-2 text-3xl font-black text-white">{formatDisplayDate(selectedDay)}</h2>
                                 <p className="mt-2 text-sm text-slate-400">
                                     Unidade: <span className="text-slate-200">{calendar?.unit?.nome || session.unidadeFixaNome}</span> | Especialidade:{' '}
                                     <span className="text-slate-200">{calendar?.specialty || session.especialidade}</span>
@@ -516,31 +649,41 @@ export default function App() {
 
                         {selectedDayShifts.length === 0 ? (
                             <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-10 text-center text-slate-300">
-                                Não há plantões disponíveis em {selectedDay}.
+                                Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
                             </div>
                         ) : (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {selectedDayShifts.map((shift) => (
                                     <article
                                         key={shift.id}
-                                        className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 hover:border-emerald-400/40"
+                                        className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
+                                            shift.vagas <= 0
+                                                ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)] animate-pulse'
+                                                : 'border-slate-800 hover:border-emerald-400/40'
+                                        }`}
                                     >
                                         <div className="mb-5 flex items-start justify-between gap-3">
                                             <div>
-                                                <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">
+                                                <span
+                                                    className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${
+                                                        shift.vagas <= 0
+                                                            ? 'border border-rose-400/40 bg-rose-500/10 text-rose-200'
+                                                            : 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
+                                                    }`}
+                                                >
                                                     {shift.turno}
                                                 </span>
                                                 <h2 className="mt-4 text-2xl font-bold text-white">{shift.local}</h2>
                                             </div>
-                                            <span className="text-sm text-slate-400">{shift.data}</span>
+                                            <span className="text-sm text-slate-400">{formatDisplayDate(shift.data)}</span>
                                         </div>
 
-                                        <div className="mb-6 rounded-2xl bg-slate-800/70 p-4">
+                                        <div className={`mb-6 rounded-2xl p-4 ${shift.vagas <= 0 ? 'bg-rose-950/30 ring-1 ring-rose-400/30' : 'bg-slate-800/70'}`}>
                                             <p className="text-sm text-slate-400">Especialidade</p>
                                             <p className="mt-2 text-lg font-bold text-white">{shift.especialidade}</p>
                                             <p className="mt-4 text-sm text-slate-400">Vagas disponíveis</p>
-                                            <p className="mt-2 text-3xl font-black text-white">{shift.vagas}</p>
-                                            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">{shift.status}</p>
+                                            <p className={`mt-2 text-3xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
+                                            <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>{shift.status}</p>
                                         </div>
 
                                         <button
@@ -557,6 +700,68 @@ export default function App() {
                         )}
                     </section>
                 )}
+                {modal ? (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-6 backdrop-blur-sm" onClick={closeModal}>
+                        <div className="w-full max-w-md rounded-[2rem] border border-slate-700 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/60" onClick={(event) => event.stopPropagation()}>
+                            <div
+                                className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] ${
+                                    modal.type === 'loading'
+                                        ? 'border border-sky-400/30 bg-sky-500/10 text-sky-200'
+                                        : modal.variant === 'success'
+                                          ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                          : modal.variant === 'warning'
+                                            ? 'border border-amber-400/30 bg-amber-500/10 text-amber-200'
+                                            : modal.type === 'confirm-reservation'
+                                              ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                              : 'border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                                }`}
+                            >
+                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'confirm-reservation' ? 'Confirmação' : 'Processado'}
+                            </div>
+
+                            <h3 className="text-2xl font-black text-white">{modal.title}</h3>
+                            <p className="mt-3 text-sm leading-6 text-slate-300">{modal.message}</p>
+
+                            {modal.type === 'loading' || modal.type === 'confirm-reservation' ? (
+                                <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/55 px-4 py-4">
+                                    <div className={`h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-transparent ${modal.type === 'confirm-reservation' ? 'border-t-emerald-300' : 'border-t-sky-300'}`} />
+                                    <div className="text-sm text-slate-300">
+                                        {modal.type === 'confirm-reservation' ? 'Aguardando seu OK...' : 'Processando sua solicitação...'}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="mt-6 flex gap-3">
+                                {modal.type === 'confirm-reservation' ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={closeModal}
+                                            className="flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmReservation}
+                                            className="flex-1 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
+                                        >
+                                            OK
+                                        </button>
+                                    </>
+                                ) : modal.type !== 'loading' ? (
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="w-full rounded-2xl bg-slate-800 px-4 py-3 text-sm font-bold text-slate-100 transition hover:bg-slate-700"
+                                    >
+                                        Fechar
+                                    </button>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
         </div>
     );

@@ -49,7 +49,21 @@ CREATE TABLE agendamentos (
     UNIQUE(disponibilidade_id, medico_id)
 );
 
--- 5. DADOS BRUTOS (Espelho do Oracle/Tasy para Treino da Predição)
+-- 5. BLOQUEIO TEMPORÁRIO DE RESERVA
+CREATE TABLE reserva_holds (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    disponibilidade_id UUID REFERENCES disponibilidade(id) ON DELETE CASCADE,
+    medico_id UUID REFERENCES medicos(id) ON DELETE CASCADE,
+    reservado_ate TIMESTAMP WITH TIME ZONE NOT NULL,
+    fila_ativa BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    -- Um plantão só pode ficar bloqueado por um médico por vez
+    UNIQUE(disponibilidade_id)
+);
+
+-- 6. DADOS BRUTOS (Espelho do Oracle/Tasy para Treino da Predição)
 CREATE TABLE tasy_raw_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     unidade_id UUID REFERENCES unidades(id),
