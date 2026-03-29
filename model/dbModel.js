@@ -37,7 +37,7 @@ export const dbModel = {
     async getDoctorById(medicoId) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome)')
+            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('id', medicoId)
             .maybeSingle();
 
@@ -46,7 +46,7 @@ export const dbModel = {
     async getDoctorByCrm(crm) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome)')
+            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('crm', crm)
             .maybeSingle();
 
@@ -268,6 +268,30 @@ export const dbModel = {
         await this.ensureShiftHoldOwnership(shiftId, medicoId);
 
         if (medicoId) {
+            // --- NOVA TRAVA DE SEGURANÇA (GUARDRAIL) ---
+            // Verifica se o médico já tem outro plantão (em qualquer unidade) NESSE MESMO DIA E TURNO
+            const conflictResponse = await supabase
+                .from('agendamentos')
+                .select(`
+                    id,
+                    disponibilidade!inner(
+                        data_plantao,
+                        turno,
+                        unidades(nome)
+                    )
+                `)
+                .eq('medico_id', medicoId)
+                .eq('confirmado', true)
+                .eq('disponibilidade.data_plantao', currentShift.data_plantao)
+                .eq('disponibilidade.turno', currentShift.turno)
+                .maybeSingle();
+
+            const conflict = unwrap(conflictResponse, 'Falha ao verificar conflitos de agenda');
+            if (conflict) {
+                const localConflito = conflict.disponibilidade?.unidades?.nome || 'outra unidade';
+                throw new Error(`CONFLITO: Você já possui um plantão em ${localConflito} neste mesmo dia e turno.`);
+            }
+
             const existingBooking = await this.getBookingByShiftAndDoctor(shiftId, medicoId);
 
             if (existingBooking) {
@@ -378,20 +402,22 @@ export const dbModel = {
         return unwrap(response, 'Falha ao carregar lista de médicos e acessos.');
     },
     async saveDoctorAccess(medicoId, unidadesIds, gestorId) {
-        // Limpa os acessos anteriores deste medico:
+        // Limpa os acessos anteriores deste medico
         const deleteResp = await supabase
             .from('medico_acessos_unidade')
             .delete()
             .eq('medico_id', medicoId);
-        
-        unwrap(deleteResp, 'Falha ao redefinir acessos');
+
+        // Ignora erro de delete se a tabela estiver vazia (nenhuma linha para deletar é ok)
+        if (deleteResp.error && !deleteResp.error.message.includes('0 rows')) {
+            throw new Error(`Falha ao redefinir acessos: ${deleteResp.error.message}`);
+        }
 
         if (!unidadesIds || unidadesIds.length === 0) return true;
 
         const rows = unidadesIds.map(uId => ({
             medico_id: medicoId,
-            unidade_id: uId,
-            gestor_id: gestorId
+            unidade_id: uId
         }));
 
         const insertResp = await supabase
@@ -399,5 +425,24 @@ export const dbModel = {
             .insert(rows);
 
         return unwrap(insertResp, 'Falha ao conceder novos acessos');
+    },
+    async getDoctorBookedShifts(medicoId) {
+        const response = await supabase
+            .from('agendamentos')
+            .select(`
+                id,
+                disponibilidade_id,
+                disponibilidade(
+                    id, 
+                    data_plantao, 
+                    turno, 
+                    unidades(nome)
+                )
+            `)
+            .eq('medico_id', medicoId)
+            .eq('confirmado', true)
+            .order('id', { ascending: false });
+
+        return unwrap(response, 'Falha ao recuperar sua agenda de plantões.');
     }
 };

@@ -1,13 +1,31 @@
 import { dbModel } from '../model/dbModel.js';
 
-const mapDoctorForClient = (doctor) => ({
-    id: doctor.id,
-    nome: doctor.nome,
-    crm: doctor.crm,
-    especialidade: doctor.especialidade,
-    unidadeFixaId: doctor.unidade_fixa_id,
-    unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada'
-});
+const mapDoctorForClient = (doctor) => {
+    const baseUnit = {
+        id: doctor.unidade_fixa_id,
+        nome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        tipo: 'BASE'
+    };
+
+    const auxiliaryUnits = (doctor.medico_acessos_unidade || []).map(au => ({
+        id: au.unidade_id,
+        nome: au.unidades?.nome ?? 'Unidade auxiliar',
+        tipo: 'AUXILIAR'
+    }));
+
+    // Remove duplicatas se houver e coloca a base em primeiro
+    const allAuthorized = [baseUnit, ...auxiliaryUnits.filter(au => au.id !== baseUnit.id)];
+
+    return {
+        id: doctor.id,
+        nome: doctor.nome,
+        crm: doctor.crm,
+        especialidade: doctor.especialidade,
+        unidadeFixaId: doctor.unidade_fixa_id,
+        unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        unidadesAutorizadas: allAuthorized
+    };
+};
 
 export const loginWithCrm = async (req, res) => {
     const { nome, crm } = req.body ?? {};

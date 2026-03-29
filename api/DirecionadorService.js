@@ -39,14 +39,32 @@ const mapShiftForClient = (shift) => ({
     status: shift.status
 });
 
-const mapDoctorForClient = (doctor) => ({
-    id: doctor.id,
-    nome: doctor.nome,
-    crm: doctor.crm,
-    especialidade: doctor.especialidade,
-    unidadeFixaId: doctor.unidade_fixa_id,
-    unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada'
-});
+const mapDoctorForClient = (doctor) => {
+    const baseUnit = {
+        id: doctor.unidade_fixa_id,
+        nome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        tipo: 'BASE'
+    };
+
+    const auxiliaryUnits = (doctor.medico_acessos_unidade || []).map(au => ({
+        id: au.unidade_id,
+        nome: au.unidades?.nome ?? 'Unidade auxiliar',
+        tipo: 'AUXILIAR'
+    }));
+
+    // Remove duplicatas e coloca a base em primeiro
+    const allAuthorized = [baseUnit, ...auxiliaryUnits.filter(au => au.id !== baseUnit.id)];
+
+    return {
+        id: doctor.id,
+        nome: doctor.nome,
+        crm: doctor.crm,
+        especialidade: doctor.especialidade,
+        unidadeFixaId: doctor.unidade_fixa_id,
+        unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        unidadesAutorizadas: allAuthorized
+    };
+};
 
 const loadPublicShifts = async () => {
     const cached = cacheModel.get(PUBLIC_SHIFTS_CACHE_KEY);
@@ -83,6 +101,7 @@ export const getDoctors = async (req, res) => {
 export const getDoctorCalendar = async (req, res) => {
     const { medicoId } = req.params;
     const requestedMonth = req.query.month;
+    const requestedUnitId = req.query.unitId;
 
     try {
         const doctor = await dbModel.getDoctorById(medicoId);
@@ -91,13 +110,20 @@ export const getDoctorCalendar = async (req, res) => {
             return res.status(404).json({ error: 'Medico nao encontrado.' });
         }
 
+        const mappedDoctor = mapDoctorForClient(doctor);
         const month = requestedMonth || new Date().toISOString().slice(0, 7);
-        const unidadeId = doctor.unidade_fixa_id;
-        const unidadeNome = doctor.unidades?.nome ?? 'Unidade nao informada';
+        
+        // Verifica se a unidade solicitada é permitida
+        let selectedUnit = mappedDoctor.unidadesAutorizadas.find(ua => ua.id === requestedUnitId);
+        
+        // Se não solicitou ou não tem acesso à solicitada, usa a base
+        if (!selectedUnit) {
+            selectedUnit = mappedDoctor.unidadesAutorizadas.find(ua => ua.tipo === 'BASE');
+        }
 
-        if (!unidadeId) {
+        if (!selectedUnit?.id) {
             return res.json({
-                doctor: mapDoctorForClient(doctor),
+                doctor: mappedDoctor,
                 month,
                 unit: null,
                 specialty: doctor.especialidade,
@@ -105,16 +131,21 @@ export const getDoctorCalendar = async (req, res) => {
             });
         }
 
-        const shifts = filterCurrentAndFutureShifts(await dbModel.getShiftsByUnitAndMonth(unidadeId, month));
+        const shifts = filterCurrentAndFutureShifts(await dbModel.getShiftsByUnitAndMonth(selectedUnit.id, month));
+
+        // Busca agendamentos do medico para marcar no calendario
+        const myBookings = await dbModel.getDoctorBookedShifts(medicoId);
+        const bookedShiftIds = (myBookings || []).map(b => b.disponibilidade_id);
 
         res.json({
-            doctor: mapDoctorForClient(doctor),
+            doctor: mappedDoctor,
             month,
             unit: {
-                id: unidadeId,
-                nome: unidadeNome
+                id: selectedUnit.id,
+                nome: selectedUnit.nome
             },
             specialty: doctor.especialidade,
+            bookedShiftIds,
             shifts: shifts.map((shift) => ({
                 ...mapShiftForClient(shift),
                 especialidade: doctor.especialidade
@@ -122,6 +153,30 @@ export const getDoctorCalendar = async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar calendario do medico.', details: err.message });
+    }
+};
+
+export const getDoctorAgenda = async (req, res) => {
+    const { medicoId } = req.params;
+
+    try {
+        const doctor = await dbModel.getDoctorById(medicoId);
+        if (!doctor) return res.status(404).json({ error: 'Médico não encontrado.' });
+
+        const bookings = await dbModel.getDoctorBookedShifts(medicoId);
+        
+        const mappedAgenda = (bookings || []).map(b => ({
+            id: b.id,
+            disponibilidadeId: b.disponibilidade_id,
+            data: b.disponibilidade?.data_plantao,
+            turno: b.disponibilidade?.turno,
+            unidade: b.disponibilidade?.unidades?.nome,
+            especialidade: doctor.especialidade
+        }));
+
+        res.json(mappedAgenda);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar sua agenda.', details: err.message });
     }
 };
 
@@ -231,7 +286,7 @@ export const selectShift = async (req, res) => {
             });
         }
 
-        const statusCode = /nao encontrado|indisponivel|sem vagas|ja reservou|confirmacao expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
+        const statusCode = /CONFLITO|nao encontrado|indisponivel|sem vagas|ja reservou|confirmacao expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
         res.status(statusCode).json({ error: err.message });
     }
 };

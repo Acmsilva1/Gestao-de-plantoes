@@ -15,6 +15,8 @@ export default function ManagerAccessControl() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
+    const [selectedUnitIdFilter, setSelectedUnitIdFilter] = useState(''); // Estado para o filtro de médicos por unidade
+    
     const [modal, setModal] = useState(null); // Para sucesso ou erro
 
     const fetchData = async () => {
@@ -25,17 +27,37 @@ export default function ManagerAccessControl() {
                 fetch('/api/manager/unidades')
             ]);
             
-            const docsData = await resDocs.json();
-            const unitsData = await resUnits.json();
+            // Safe-parse: evita crash em respostas vazias ou HTML de erro (Unexpected end of JSON input)
+            const parseBody = async (res) => {
+                const text = await res.text();
+                try {
+                    return text ? JSON.parse(text) : null;
+                } catch {
+                    return null;
+                }
+            };
+
+            const docsData = await parseBody(resDocs);
+            const unitsData = await parseBody(resUnits);
             
-            if (!resDocs.ok) throw new Error(docsData.error || 'Erro ao carregar médicos');
-            if (!resUnits.ok) throw new Error(unitsData.error || 'Erro ao carregar unidades');
+            if (!resDocs.ok) {
+                const msg = docsData?.details 
+                    ? `${docsData.error} (${docsData.details})` 
+                    : docsData?.error || `Erro HTTP ${resDocs.status}`;
+                throw new Error(msg);
+            }
+            if (!resUnits.ok) {
+                const msg = unitsData?.details 
+                    ? `${unitsData.error} (${unitsData.details})` 
+                    : unitsData?.error || `Erro HTTP ${resUnits.status}`;
+                throw new Error(msg);
+            }
             
-            setDoctors(docsData);
-            setUnits(unitsData);
+            setDoctors(docsData || []);
+            setUnits(unitsData || []);
             
             // Se já havia um médico selecionado, atualizamos as checkboxes dele
-            if (selectedDoctorId) {
+            if (selectedDoctorId && docsData) {
                 const doc = docsData.find(d => d.id === selectedDoctorId);
                 if (doc) setCheckedUnits(doc.unidadesLiberadas || []);
             }
@@ -83,13 +105,19 @@ export default function ManagerAccessControl() {
                     gestorId: session.id
                 })
             });
-            
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Erro ao salvar acessos');
+
+            // Safe-parse: evita crash em respostas vazias ou HTML de erro
+            let data = {};
+            try {
+                const text = await res.text();
+                if (text) data = JSON.parse(text);
+            } catch {
+                // body não era JSON válido
+            }
+
+            if (!res.ok) throw new Error(data.error || data.details || `Erro HTTP ${res.status}`);
             
             setModal({ type: 'success', title: 'Sucesso', message: 'Permissões do médico foram atualizadas!' });
-            
-            // Recarrega os dados em background para manter consistência
             fetchData();
         } catch (err) {
             setModal({ type: 'error', title: 'Falha', message: err.message });
@@ -135,11 +163,32 @@ export default function ManagerAccessControl() {
                         </div>
 
                         {selectedDoctor && (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                <div className="text-xs uppercase tracking-widest text-slate-500 mb-1">Unidade Fixa Base</div>
-                                <div className="font-semibold text-sky-200">{selectedDoctor.unidadeFixaNome || 'Não informada'}</div>
-                                <div className="mt-3 text-xs uppercase tracking-widest text-slate-500 mb-1">Especialidade</div>
-                                <div className="text-sm text-slate-300">{selectedDoctor.especialidade}</div>
+                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 space-y-4">
+                                <div>
+                                    <div className="text-xs uppercase tracking-widest text-slate-500 mb-1">Unidade Fixa Base</div>
+                                    <div className="font-semibold text-sky-200">{selectedDoctor.unidadeFixaNome || 'Não informada'}</div>
+                                </div>
+                                
+                                <div>
+                                    <div className="text-xs uppercase tracking-widest text-slate-500 mb-1">Especialidade</div>
+                                    <div className="text-sm text-slate-300">{selectedDoctor.especialidade}</div>
+                                </div>
+
+                                {checkedUnits.length > 0 && (
+                                    <div>
+                                        <div className="text-xs uppercase tracking-widest text-emerald-500/80 mb-2">Unidades Auxiliares (Liberadas)</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {checkedUnits.map(uId => {
+                                                const unit = units.find(u => u.id === uId);
+                                                return unit ? (
+                                                    <span key={uId} className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
+                                                        {unit.nome}
+                                                    </span>
+                                                ) : null;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                         
@@ -180,8 +229,10 @@ export default function ManagerAccessControl() {
                         </div>
 
                         <div className={`grid gap-4 sm:grid-cols-2 md:grid-cols-3 transition-opacity ${!selectedDoctorId ? 'opacity-30 pointer-events-none' : ''}`}>
-                            {units.map(unit => {
-                                const isChecked = checkedUnits.includes(unit.id);
+                            {units
+                                .filter(unit => unit.id !== selectedDoctor?.unidadeFixaId)
+                                .map(unit => {
+                                    const isChecked = checkedUnits.includes(unit.id);
                                 return (
                                     <label 
                                         key={unit.id}
@@ -215,6 +266,83 @@ export default function ManagerAccessControl() {
                     </div>
                 </div>
             )}
+
+            {/* Seção de Consulta por Unidade (Tabela Inferior) */}
+            <div className="mt-12 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h3 className="text-2xl font-black text-white">Consulta de Médicos por Unidade</h3>
+                        <p className="mt-1 text-sm text-slate-400">Visualize todos os profissionais vinculados a uma unidade específica.</p>
+                    </div>
+
+                    <div className="w-full md:w-80">
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Filtrar por Unidade</label>
+                        <select
+                            value={selectedUnitIdFilter}
+                            onChange={(e) => setSelectedUnitIdFilter(e.target.value)}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
+                        >
+                            <option value="">-- Selecione uma Unidade --</option>
+                            {units.map(u => (
+                                <option key={u.id} value={u.id}>{u.nome}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {!selectedUnitIdFilter ? (
+                    <div className="flex h-48 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-800 bg-slate-950/30 text-slate-500">
+                        <Search size={40} className="mb-4 opacity-20" />
+                        <p className="text-sm">Selecione uma unidade acima para listar os médicos.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-slate-900/80 text-xs font-bold uppercase tracking-widest text-slate-400 border-b border-slate-800">
+                                    <th className="px-6 py-4">Médico</th>
+                                    <th className="px-6 py-4">CRM</th>
+                                    <th className="px-6 py-4">Especialidade</th>
+                                    <th className="px-6 py-4">Vínculo</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                                {doctors
+                                    .filter(doc => 
+                                        doc.unidadeFixaId === selectedUnitIdFilter || 
+                                        doc.unidadesLiberadas.includes(selectedUnitIdFilter)
+                                    )
+                                    .map(doc => {
+                                        const isBase = doc.unidadeFixaId === selectedUnitIdFilter;
+                                        return (
+                                            <tr key={doc.id} className="group hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-6 py-4 font-semibold text-white group-hover:text-sky-300 transition-colors">{doc.nome}</td>
+                                                <td className="px-6 py-4 text-slate-300 font-mono text-xs">{doc.crm}</td>
+                                                <td className="px-6 py-4 text-slate-400">{doc.especialidade}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                                        isBase 
+                                                            ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30' 
+                                                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                    }`}>
+                                                        <div className={`h-1.5 w-1.5 rounded-full ${isBase ? 'bg-sky-400' : 'bg-emerald-400'}`}></div>
+                                                        {isBase ? 'Base Fixa' : 'Auxiliar'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                            </tbody>
+                        </table>
+                        
+                        {doctors.filter(doc => doc.unidadeFixaId === selectedUnitIdFilter || doc.unidadesLiberadas.includes(selectedUnitIdFilter)).length === 0 && (
+                            <div className="py-12 text-center text-slate-500 italic">
+                                Nenhum médico vinculado a esta unidade no momento.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Modal Popup */}
             {modal && (

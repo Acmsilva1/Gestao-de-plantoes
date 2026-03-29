@@ -8,6 +8,7 @@ import { loginWithCrm } from './api/AuthService.js';
 import { startPredictionScheduler } from './api/SchedulerService.js';
 import {
     getDoctorCalendar,
+    getDoctorAgenda,
     getDoctors,
     getPublicShifts,
     holdShift,
@@ -37,6 +38,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/login', loginWithCrm);
 app.get('/api/medicos', getDoctors);
 app.get('/api/medicos/:medicoId/calendario', getDoctorCalendar);
+app.get('/api/medicos/:medicoId/agenda', getDoctorAgenda);
 app.get('/api/vagas', getPublicShifts);
 app.post('/api/vagas/:id/bloquear', holdShift);
 app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
