@@ -15,9 +15,20 @@ export default function ManagerAccessControl() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
+    const [modal, setModal] = useState(null); // Para sucesso ou erro
+    
     const [selectedUnitIdFilter, setSelectedUnitIdFilter] = useState(''); // Estado para o filtro de médicos por unidade
     
-    const [modal, setModal] = useState(null); // Para sucesso ou erro
+    // Estados para Novo Médico
+    const [isAdding, setIsAdding] = useState(false);
+    const [newDoc, setNewDoc] = useState({
+        nome: '',
+        crm: '',
+        especialidade: '',
+        unidadeFixaId: '',
+        telefone: '',
+        senha: ''
+    });
 
     const fetchData = async () => {
         setLoading(true);
@@ -92,6 +103,78 @@ export default function ManagerAccessControl() {
         );
     };
 
+    const handleCreateDoctor = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const response = await fetch('/api/manager/medicos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newDoc)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar médico.');
+
+            setModal({ type: 'success', title: 'Sucesso', message: 'Médico cadastrado com sucesso!' });
+            setIsAdding(false);
+            setNewDoc({ nome: '', crm: '', especialidade: '', unidadeFixaId: '', telefone: '', senha: '' });
+            fetchData();
+        } catch (err) {
+            setModal({ type: 'error', title: 'Falha', message: err.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteDoctor = async () => {
+        if (!selectedDoctorId) return;
+        if (!confirm('TEM CERTEZA? Isso removerá o médico e todos os seus vínculos do sistema permanentemente.')) return;
+
+        setSaving(true);
+        try {
+            const response = await fetch(`/api/manager/medicos/${selectedDoctorId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error('Falha ao excluir médico.');
+
+            setModal({ type: 'success', title: 'Sucesso', message: 'Médico removido do sistema.' });
+            setSelectedDoctorId('');
+            fetchData();
+        } catch (err) {
+            setModal({ type: 'error', title: 'Falha', message: err.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleUpdateProfile = async () => {
+        if (!selectedDoctorId) return;
+        setSaving(true);
+
+        const docData = doctors.find(d => d.id === selectedDoctorId);
+
+        try {
+            const response = await fetch(`/api/manager/medicos/${selectedDoctorId}/perfil`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nome: docData.nome,
+                    telefone: docData.telefone,
+                    senha: docData.senha
+                })
+            });
+
+            if (!response.ok) throw new Error('Falha ao atualizar perfil do médico.');
+
+            setModal({ type: 'success', title: 'Sucesso', message: 'Dados cadastrais do médico atualizados!' });
+            fetchData(); 
+        } catch (err) {
+            setModal({ type: 'error', title: 'Falha', message: err.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!selectedDoctorId) return;
         
@@ -143,11 +226,40 @@ export default function ManagerAccessControl() {
                 <div className="grid gap-8 lg:grid-cols-[1fr_1.5fr] xl:grid-cols-[350px_1fr]">
                     {/* Painel de Seleção */}
                     <div className="flex flex-col gap-6 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl">
-                        <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-300">
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-300">
                                 <Search size={16} className="text-sky-400" />
                                 Escolha o Médico
                             </label>
+                            <button 
+                                onClick={() => setIsAdding(!isAdding)}
+                                className={`rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${isAdding ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-sky-500/20 text-sky-300 border border-sky-400/20 hover:bg-sky-500/30'}`}
+                            >
+                                {isAdding ? 'Cancelar' : '+ Novo Médico'}
+                            </button>
+                        </div>
+
+                        {isAdding ? (
+                            <form onSubmit={handleCreateDoctor} className="space-y-4 rounded-3xl border border-sky-500/30 bg-sky-500/5 p-5 animate-in slide-in-from-top-2 duration-300">
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-2">Cadastro de Novo Médico</h4>
+                                <input placeholder="Nome Completo" value={newDoc.nome} onChange={e => setNewDoc({...newDoc, nome: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input placeholder="CRM" value={newDoc.crm} onChange={e => setNewDoc({...newDoc, crm: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
+                                    <input placeholder="Especialidade" value={newDoc.especialidade} onChange={e => setNewDoc({...newDoc, especialidade: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
+                                </div>
+                                <select value={newDoc.unidadeFixaId} onChange={e => setNewDoc({...newDoc, unidadeFixaId: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required>
+                                    <option value="">-- Unidade Fixa --</option>
+                                    {units.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                                </select>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input placeholder="Telefone" value={newDoc.telefone} onChange={e => setNewDoc({...newDoc, telefone: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
+                                    <input placeholder="Senha (Mantenha 12345 se padrão)" value={newDoc.senha} onChange={e => setNewDoc({...newDoc, senha: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
+                                </div>
+                                <button type="submit" disabled={saving} className="w-full bg-sky-500 py-2.5 rounded-xl text-slate-950 text-xs font-black uppercase tracking-widest hover:bg-sky-400 transition disabled:opacity-50">
+                                    {saving ? 'Salvando...' : 'Confirmar Cadastro'}
+                                </button>
+                            </form>
+                        ) : (
                             <select
                                 value={selectedDoctorId}
                                 onChange={handleDoctorChange}
@@ -160,9 +272,9 @@ export default function ManagerAccessControl() {
                                     </option>
                                 ))}
                             </select>
-                        </div>
+                        )}
 
-                        {selectedDoctor && (
+                        {selectedDoctor && !isAdding && (
                             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 space-y-4">
                                 <div>
                                     <div className="text-xs uppercase tracking-widest text-slate-500 mb-1">Unidade Fixa Base</div>
@@ -227,6 +339,71 @@ export default function ManagerAccessControl() {
                                 </button>
                             )}
                         </div>
+
+                        {selectedDoctor && (
+                            <div className="mb-8 rounded-[2rem] border border-emerald-500/20 bg-emerald-500/5 p-6 shadow-lg shadow-emerald-950/20">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-2">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        Edição Master de Perfil
+                                    </h4>
+                                    <button
+                                        onClick={handleUpdateProfile}
+                                        disabled={saving}
+                                        className="text-[10px] font-black uppercase tracking-widest text-emerald-100 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-500/30 transition disabled:opacity-50"
+                                    >
+                                        {saving ? 'Salvando...' : 'Salvar Dados Básicos'}
+                                    </button>
+                                </div>
+                                
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Nome Completo</label>
+                                        <input 
+                                            type="text"
+                                            value={selectedDoctor.nome || ''}
+                                            onChange={(e) => {
+                                                const newDoctors = doctors.map(d => d.id === selectedDoctor.id ? { ...d, nome: e.target.value } : d);
+                                                setDoctors(newDoctors);
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Telefone</label>
+                                        <input 
+                                            type="text"
+                                            value={selectedDoctor.telefone || ''}
+                                            onChange={(e) => {
+                                                const newDoctors = doctors.map(d => d.id === selectedDoctor.id ? { ...d, telefone: e.target.value } : d);
+                                                setDoctors(newDoctors);
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Senha Privada</label>
+                                        <input 
+                                            type="text"
+                                            value={selectedDoctor.senha || ''}
+                                            onChange={(e) => {
+                                                const newDoctors = doctors.map(d => d.id === selectedDoctor.id ? { ...d, senha: e.target.value } : d);
+                                                setDoctors(newDoctors);
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={handleDeleteDoctor}
+                                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 py-3 text-[10px] font-black uppercase tracking-widest text-rose-400 transition hover:bg-rose-500/20"
+                                >
+                                    <AlertTriangle size={14} />
+                                    Excluir Médico Definitivamente
+                                </button>
+                            </div>
+                        )}
 
                         <div className={`grid gap-4 sm:grid-cols-2 md:grid-cols-3 transition-opacity ${!selectedDoctorId ? 'opacity-30 pointer-events-none' : ''}`}>
                             {units

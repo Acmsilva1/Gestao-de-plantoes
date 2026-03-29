@@ -10,8 +10,10 @@ const initialState = {
     selectedMonth: new Date().toISOString().slice(0, 7),
     selectedDay: '',
     selectedUnitId: '',
-    bookedShiftIds: [], // IDs dos plantões que o médico já reservou
+    bookedShiftIds: [],
     showAgendaModal: false,
+    showProfileModal: false,
+    showPasswordSuggestion: false,
     myAgenda: [],
     calendar: null
 };
@@ -78,6 +80,112 @@ const buildCalendarDays = (month, shifts) => {
     return days;
 };
 
+const ProfileModal = ({ doctor, onClose, onUpdate }) => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [formData, setFormData] = useState({
+        nome: doctor.nome || '',
+        telefone: doctor.telefone || '',
+        senha: doctor.senha || ''
+    });
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch(`/api/medicos/${doctor.id}/perfil`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Falha ao atualizar perfil.');
+
+            onUpdate(data.doctor);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-lg" onClick={onClose}>
+            <div className="w-full max-w-md rounded-[2.5rem] border border-slate-700 bg-slate-900 p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="mb-8 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
+                        <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <h3 className="text-2xl font-black text-white">Meu Perfil</h3>
+                    <p className="text-sm text-slate-400 mt-2">Mantenha seus dados de contato e acesso atualizados.</p>
+                </div>
+
+                {error && (
+                    <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200 text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSave} className="grid gap-5">
+                    <div>
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Nome Completo</label>
+                        <input
+                            type="text"
+                            value={formData.nome}
+                            onChange={e => setFormData({ ...formData, nome: e.target.value })}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Telefone / WhatsApp</label>
+                        <input
+                            type="text"
+                            value={formData.telefone}
+                            onChange={e => setFormData({ ...formData, telefone: e.target.value })}
+                            placeholder="(27) 99999-9999"
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Senha Privada</label>
+                        <input
+                            type="text" // Texto para ser fácil de ver e trocar conforme instrução "facil de mudar"
+                            value={formData.senha}
+                            onChange={e => setFormData({ ...formData, senha: e.target.value })}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
+                            required
+                        />
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="rounded-2xl bg-emerald-500 py-4 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                        >
+                            {loading ? 'Salvando...' : 'Salvar Dados'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-2xl bg-slate-800 py-4 text-sm font-bold text-slate-300 transition hover:bg-slate-700"
+                        >
+                            Voltar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 export default function DoctorView() {
     const { session, logout } = useAuth();
     const [state, setState] = useState(initialState);
@@ -125,6 +233,11 @@ export default function DoctorView() {
     useEffect(() => {
         if (session?.id) {
             loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
+            
+            // Sugestão de troca de senha se for a padrão
+            if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
+                setState(prev => ({ ...prev, showPasswordSuggestion: true }));
+            }
         }
     }, [session?.id, state.selectedMonth, state.selectedUnitId]);
 
@@ -271,7 +384,7 @@ export default function DoctorView() {
         }
     };
 
-    const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, myAgenda, calendar } = state;
+    const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, showProfileModal, showPasswordSuggestion, myAgenda, calendar } = state;
     const calendarDays = buildCalendarDays(selectedMonth, calendar?.shifts || []);
     
     const getShiftAlertClasses = (shift) => {
@@ -295,6 +408,20 @@ export default function DoctorView() {
 
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
+            {/* Sugestão de Troca de Senha */}
+            {showPasswordSuggestion && (
+                <div className="bg-emerald-500/90 py-2 px-6 flex items-center justify-between text-slate-950 animate-in slide-in-from-top duration-300">
+                    <p className="text-sm font-bold flex items-center gap-2">
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Sua senha ainda é a padrão (12345). Para sua segurança, recomendamos trocá-la agora.
+                    </p>
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setState(prev => ({ ...prev, showProfileModal: true, showPasswordSuggestion: false }))} className="text-xs font-black uppercase underline hover:no-underline">Trocar Agora</button>
+                        <button onClick={() => { setState(prev => ({ ...prev, showPasswordSuggestion: false })); localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-70">Não agora</button>
+                    </div>
+                </div>
+            )}
+
             <div className="mx-auto max-w-7xl px-6 py-10">
                 <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
@@ -345,10 +472,20 @@ export default function DoctorView() {
                             </span>
                         </button>
 
-                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-100 shadow-lg shadow-emerald-950/30">
-                            <div>{session.nome}</div>
-                            <div className="mt-1 text-emerald-200/70">{session.crm}</div>
-                        </div>
+                        <button
+                            onClick={() => setState(prev => ({ ...prev, showProfileModal: true }))}
+                            className="text-left group flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 transition hover:bg-emerald-500/20 shadow-lg shadow-emerald-950/30"
+                        >
+                            <div className="rounded-full bg-emerald-500/20 p-2 group-hover:bg-emerald-500/30 transition">
+                                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div className="font-bold text-emerald-100">{session.nome}</div>
+                                <div className="text-xs text-emerald-200/70">{session.crm}</div>
+                            </div>
+                        </button>
                         <button
                             type="button"
                             onClick={logout}
@@ -428,16 +565,16 @@ export default function DoctorView() {
                                                     <span className="text-xs uppercase tracking-[0.2em] text-slate-500">{entry.shifts.length} turno{entry.shifts.length === 1 ? '' : 's'}</span>
                                                 </div>
 
-                                                <div className="grid gap-2">
+                                                <div className="grid gap-1.5">
                                                     {entry.shifts.length === 0 ? (
                                                         <div className="rounded-2xl border border-dashed border-slate-800 px-3 py-4 text-xs text-slate-500">
                                                             Sem agenda para este dia.
                                                         </div>
                                                     ) : (
-                                                        entry.shifts.slice(0, 3).map((shift) => (
-                                                            <div key={shift.id} className={`rounded-2xl px-3 py-3 ${getShiftAlertClasses(shift)}`}>
-                                                                <div className={`text-sm font-bold ${shift.vagas <= 0 ? 'text-rose-100' : 'text-emerald-100'}`}>{shift.turno}</div>
-                                                                <div className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>
+                                                        entry.shifts.map((shift) => (
+                                                            <div key={shift.id} className={`rounded-xl px-2 py-1.5 ${getShiftAlertClasses(shift)}`}>
+                                                                <div className={`text-[11px] font-bold ${shift.vagas <= 0 ? 'text-rose-100' : 'text-emerald-100'}`}>{shift.turno}</div>
+                                                                <div className={`mt-0.5 text-[9px] uppercase tracking-[0.1em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>
                                                                     {shift.vagas} vagas
                                                                 </div>
                                                             </div>
@@ -528,6 +665,19 @@ export default function DoctorView() {
                         )}
                     </section>
                 )}
+            {/* Modal de Perfil do Médico */}
+            {showProfileModal && (
+                <ProfileModal 
+                    doctor={session} 
+                    onClose={() => setState(p => ({ ...p, showProfileModal: false }))}
+                    onUpdate={(updatedDoc) => {
+                        setState(p => ({ ...p, showProfileModal: false }));
+                        // Atualiza a sessão localmente (depende da sua implementação de AuthContext ter persistência/update)
+                        window.location.reload(); // Forma bruta de atualizar a sessão pro médico ver o novo nome/senha
+                    }}
+                />
+            )}
+
             {/* Modal de Agenda do Médico */}
             {showAgendaModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md" onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}>

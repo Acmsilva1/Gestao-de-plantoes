@@ -25,10 +25,37 @@ export const managerLogin = async (req, res) => {
 
         res.json({
             message: 'Acesso concedido.',
-            manager
+            manager: {
+                id: manager.id,
+                nome: manager.nome,
+                usuario: manager.usuario,
+                senha: manager.senha, // Enviando para que o modal de perfil possa pré-preencher
+                perfil: manager.perfis?.nome || 'GESTOR'
+            }
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro no login de gestor.', details: err.message });
+    }
+};
+
+export const updateManagerProfile = async (req, res) => {
+    const { id } = req.params;
+    const { nome, usuario, senha } = req.body;
+
+    try {
+        const updated = await dbModel.updateManagerProfile(id, { nome, usuario, senha });
+        res.json({
+            message: 'Perfil do gestor atualizado.',
+            manager: {
+                id: updated.id,
+                nome: updated.nome,
+                usuario: updated.usuario,
+                senha: updated.senha,
+                perfil: updated.perfis?.nome || 'GESTOR'
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao atualizar perfil do gestor.', details: err.message });
     }
 };
 
@@ -81,6 +108,10 @@ export const getDashboardMetrics = async (req, res) => {
 
             if (dEntry && v.turno) {
                 const turno = (v.turno || '').toLowerCase();
+                
+                // Soma ao Geral (Total do dia) independente do turno
+                dEntry['Geral'] += v.vagas_totais;
+
                 if (turno.includes('manh')) {
                     dEntry['Manhã'] += v.vagas_totais;
                 } else if (turno.includes('tard')) {
@@ -89,8 +120,6 @@ export const getDashboardMetrics = async (req, res) => {
                     dEntry['Noite'] += v.vagas_totais;
                 } else if (turno.includes('madrug')) {
                     dEntry['Madrugada'] += v.vagas_totais;
-                } else {
-                    dEntry['Geral'] += v.vagas_totais;
                 }
             }
         });
@@ -114,6 +143,8 @@ export const getDoctorAccesses = async (req, res) => {
             id: doc.id,
             nome: doc.nome,
             crm: doc.crm,
+            telefone: doc.telefone || '',
+            senha: doc.senha || '',
             especialidade: doc.especialidade,
             unidadeFixaId: doc.unidade_fixa_id,
             unidadeFixaNome: doc.unidades?.nome,
@@ -140,6 +171,18 @@ export const manageDoctorUnitAccess = async (req, res) => {
         res.json({ message: 'Permissões salvas com sucesso!' });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao salvar acessos.', details: err.message });
+    }
+};
+
+export const updateDoctorProfileByManager = async (req, res) => {
+    const { id } = req.params;
+    const { nome, telefone, senha } = req.body;
+
+    try {
+        const updated = await dbModel.updateDoctorProfile(id, { nome, telefone, senha });
+        res.json({ message: 'Perfil do medico atualizado pelo gestor.', doctor: updated });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao atualizar perfil do medico pelo gestor.', details: err.message });
     }
 };
 
@@ -183,5 +226,34 @@ export const getManagerCalendar = async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar calendário da unidade.', details: err.message });
+    }
+};
+
+export const createDoctor = async (req, res) => {
+    const { nome, crm, especialidade, unidadeFixaId, telefone, senha } = req.body;
+
+    try {
+        if (!nome || !crm || !unidadeFixaId) {
+            return res.status(400).json({ error: 'Nome, CRM e Unidade Fixa são obrigatórios.' });
+        }
+
+        const newDoc = await dbModel.createDoctor({ nome, crm, especialidade, unidadeFixaId, telefone, senha });
+        res.status(201).json({
+            message: 'Médico cadastrado com sucesso!',
+            doctor: newDoc
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao cadastrar médico.', details: err.message });
+    }
+};
+
+export const deleteDoctor = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await dbModel.deleteDoctor(id);
+        res.json({ message: 'Médico removido do sistema com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao excluir médico.', details: err.message });
     }
 };

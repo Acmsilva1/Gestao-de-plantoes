@@ -9,6 +9,7 @@ import { startPredictionScheduler } from './api/SchedulerService.js';
 import {
     getDoctorCalendar,
     getDoctorAgenda,
+    updateDoctorProfile,
     getDoctors,
     getPublicShifts,
     holdShift,
@@ -21,7 +22,11 @@ import {
     getDoctorAccesses,
     manageDoctorUnitAccess,
     getUnitsList,
-    getManagerCalendar
+    getManagerCalendar,
+    updateDoctorProfileByManager,
+    updateManagerProfile,
+    createDoctor,
+    deleteDoctor
 } from './api/ManagerService.js';
 
 const app = express();
@@ -39,6 +44,7 @@ app.post('/api/auth/login', loginWithCrm);
 app.get('/api/medicos', getDoctors);
 app.get('/api/medicos/:medicoId/calendario', getDoctorCalendar);
 app.get('/api/medicos/:medicoId/agenda', getDoctorAgenda);
+app.post('/api/medicos/:medicoId/perfil', updateDoctorProfile);
 app.get('/api/vagas', getPublicShifts);
 app.post('/api/vagas/:id/bloquear', holdShift);
 app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
@@ -51,6 +57,10 @@ app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
 app.get('/api/manager/calendario/:unidadeId', getManagerCalendar);
 app.post('/api/manager/medicos/:id/acessos', manageDoctorUnitAccess);
+app.post('/api/manager/medicos/:id/perfil', updateDoctorProfileByManager);
+app.post('/api/manager/perfil/:id', updateManagerProfile);
+app.post('/api/manager/medicos', createDoctor);
+app.delete('/api/manager/medicos/:id', deleteDoctor);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));

@@ -111,6 +111,14 @@ export default function ManagerDashboard() {
                             <span className="font-bold text-white">{entry.value}</span>
                         </div>
                     ))}
+                    {/* Exibe o Total (Geral) se existir no objeto de dados original */}
+                    {payload[0]?.payload?.Geral !== undefined && (
+                        <div className="mt-2 border-t border-slate-700 pt-2 flex items-center gap-2 text-sm font-bold text-emerald-400">
+                            <div className="h-3 w-3 rounded-sm bg-emerald-400/20 border border-emerald-400" />
+                            <span>Total do Dia:</span>
+                            <span>{payload[0].payload.Geral}</span>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -316,9 +324,7 @@ export default function ManagerDashboard() {
                                             <Bar dataKey="Madrugada" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Madrugada" position="center" fill="#fae8ff" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
-                                            <Bar dataKey="Geral" stackId="a" fill="#94a3b8">
-                                                <LabelList dataKey="Geral" position="center" fill="#0f172a" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
-                                            </Bar>
+                                            {/* Removi o Bar de 'Geral' do stack para não dobrar a altura, mas ele aparece no Tooltip */}
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -353,9 +359,7 @@ export default function ManagerDashboard() {
                                             <Bar dataKey="Madrugada" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Madrugada" position="center" fill="#fae8ff" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
-                                            <Bar dataKey="Geral" stackId="a" fill="#94a3b8">
-                                                <LabelList dataKey="Geral" position="center" fill="#0f172a" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
-                                            </Bar>
+                                            {/* Removi o Bar de 'Geral' do stack para não dobrar a altura, mas ele aparece no Tooltip */}
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>

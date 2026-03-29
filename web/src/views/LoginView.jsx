@@ -8,11 +8,14 @@ export default function LoginView() {
     
     const [activeTab, setActiveTab] = useState('medico'); // 'medico' ou 'gestor'
     
-    const [nome, setNome] = useState('');
     const [crm, setCrm] = useState('');
+    const [senhaMedico, setSenhaMedico] = useState('');
     
     const [usuario, setUsuario] = useState('');
     const [senha, setSenha] = useState('');
+    
+    const [pendingDoctor, setPendingDoctor] = useState(null);
+    const [showConfirmation, setShowConfirmation] = useState(false);
     
     const [loggingIn, setLoggingIn] = useState(false);
     const [error, setError] = useState('');
@@ -26,25 +29,31 @@ export default function LoginView() {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nome, crm })
+                body: JSON.stringify({ crm, senha: senhaMedico })
             });
             const data = await response.json();
 
             if (!response.ok) throw new Error(data.error || 'Falha no login de médico.');
 
-            const sessionInfo = {
-                ...data.doctor,
-                nome: data.doctor.nome,
-                crm
-            };
-
-            login(sessionInfo, false); // isManager = false
-            navigate('/medico');
+            setPendingDoctor(data.doctor);
+            setShowConfirmation(true);
         } catch (err) {
             setError(err.message);
         } finally {
             setLoggingIn(false);
         }
+    };
+
+    const confirmLoginMedico = () => {
+        if (!pendingDoctor) return;
+        
+        const sessionInfo = {
+            ...pendingDoctor,
+            crm
+        };
+
+        login(sessionInfo, false); // isManager = false
+        navigate('/medico');
     };
 
     const handleLoginGestor = async (e) => {
@@ -123,12 +132,12 @@ export default function LoginView() {
                 {activeTab === 'medico' && (
                     <form className="grid gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300" onSubmit={handleLoginMedico}>
                         <div>
-                            <label className="mb-2 block text-sm font-semibold text-slate-200">Nome</label>
+                            <label className="mb-2 block text-sm font-semibold text-slate-200">Senha</label>
                             <input
-                                type="text"
-                                value={nome}
-                                onChange={(e) => setNome(e.target.value)}
-                                placeholder="Dr. André Martins"
+                                type="password"
+                                value={senhaMedico}
+                                onChange={(e) => setSenhaMedico(e.target.value)}
+                                placeholder="Sua senha de acesso"
                                 required
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
                             />
@@ -146,14 +155,14 @@ export default function LoginView() {
                         </div>
                         <button
                             type="submit"
-                            disabled={loggingIn || !nome || !crm}
+                            disabled={loggingIn || !crm || !senhaMedico}
                             className="mt-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 shadow-lg shadow-emerald-500/20"
                         >
                             {loggingIn ? 'Entrando...' : 'Acessar Plantões'}
                         </button>
                         
                         <div className="mt-4 pt-4 border-t border-slate-800 text-center">
-                            <p className="text-xs text-slate-500">Credenciais de Teste: (nome e CRM de algum médico na base)</p>
+                            <p className="text-xs text-slate-500">Credenciais: CRM e senha padrão é 12345</p>
                         </div>
                     </form>
                 )}
@@ -197,6 +206,39 @@ export default function LoginView() {
                     </form>
                 )}
             </div>
+
+            {/* Modal de Confirmação Médico */}
+            {showConfirmation && pendingDoctor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-6 backdrop-blur-md">
+                    <div className="w-full max-w-sm rounded-[2.5rem] border border-emerald-500/30 bg-slate-900 p-8 shadow-2xl text-center animate-in zoom-in duration-300">
+                        <div className="mb-6 flex justify-center">
+                            <div className="rounded-full bg-emerald-500/10 p-5 ring-1 ring-emerald-500/20">
+                                <svg className="h-10 w-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2">Bem-vindo, Dr(a).</h2>
+                        <p className="text-2xl font-black text-emerald-400 mb-6">{pendingDoctor.nome}</p>
+                        <p className="text-sm text-slate-400 mb-8">Confirmamos que este é o seu perfil de acesso?</p>
+                        
+                        <div className="grid gap-3">
+                            <button
+                                onClick={confirmLoginMedico}
+                                className="w-full rounded-2xl bg-emerald-500 px-6 py-4 text-sm font-black text-slate-950 transition hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+                            >
+                                Sim, Acessar Perfil
+                            </button>
+                            <button
+                                onClick={() => { setShowConfirmation(false); setPendingDoctor(null); }}
+                                className="w-full rounded-2xl bg-slate-800 px-6 py-3 text-sm font-bold text-slate-300 transition hover:bg-slate-700"
+                            >
+                                Não, Voltar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

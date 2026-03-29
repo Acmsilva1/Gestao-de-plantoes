@@ -59,6 +59,8 @@ const mapDoctorForClient = (doctor) => {
         id: doctor.id,
         nome: doctor.nome,
         crm: doctor.crm,
+        senha: doctor.senha,
+        telefone: doctor.telefone,
         especialidade: doctor.especialidade,
         unidadeFixaId: doctor.unidade_fixa_id,
         unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada',
@@ -177,6 +179,22 @@ export const getDoctorAgenda = async (req, res) => {
         res.json(mappedAgenda);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar sua agenda.', details: err.message });
+    }
+};
+
+export const updateDoctorProfile = async (req, res) => {
+    const { medicoId } = req.params;
+    const { nome, telefone, senha } = req.body;
+
+    try {
+        const updated = await dbModel.updateDoctorProfile(medicoId, { nome, telefone, senha });
+        
+        res.json({
+            message: 'Perfil atualizado com sucesso.',
+            doctor: mapDoctorForClient(updated)
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao atualizar perfil.', details: err.message });
     }
 };
 

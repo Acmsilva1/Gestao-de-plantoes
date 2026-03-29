@@ -37,7 +37,7 @@ export const dbModel = {
     async getDoctorById(medicoId) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
+            .select('id, nome, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('id', medicoId)
             .maybeSingle();
 
@@ -46,7 +46,7 @@ export const dbModel = {
     async getDoctorByCrm(crm) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
+            .select('id, nome, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('crm', crm)
             .maybeSingle();
 
@@ -351,15 +351,28 @@ export const dbModel = {
         return updatedShift;
     },
     async managerLogin(usuario, senhaUrlPlaintext) {
-        // ATENÇÃO: Simplificação para teste. Em produção use hasher/pgcrypto.
         const response = await supabase
             .from('gestores')
-            .select('id, nome, usuario, perfis(nome)')
+            .select('id, nome, usuario, senha, perfis(nome)')
             .eq('usuario', usuario)
             .eq('senha', senhaUrlPlaintext)
             .maybeSingle();
             
         return unwrap(response, 'Usuário ou senha inválidos.');
+    },
+    async updateManagerProfile(managerId, data) {
+        const response = await supabase
+            .from('gestores')
+            .update({
+                nome: data.nome,
+                usuario: data.usuario,
+                senha: data.senha
+            })
+            .eq('id', managerId)
+            .select('id, nome, usuario, senha, perfis(nome)')
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar perfil do gestor.');
     },
     async getDashboardsDataStraddle(startMonthDate, endMonthDate, unidadeId = null) {
         // Busca turnos/vagas para agregar via js
@@ -396,7 +409,7 @@ export const dbModel = {
     async getDoctorsAccessList() {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
+            .select('id, nome, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
             .order('nome', { ascending: true });
 
         return unwrap(response, 'Falha ao carregar lista de médicos e acessos.');
@@ -444,5 +457,48 @@ export const dbModel = {
             .order('id', { ascending: false });
 
         return unwrap(response, 'Falha ao recuperar sua agenda de plantões.');
+    },
+    async updateDoctorProfile(medicoId, data) {
+        const response = await supabase
+            .from('medicos')
+            .update({
+                nome: data.nome,
+                telefone: data.telefone,
+                senha: data.senha
+            })
+            .eq('id', medicoId)
+            .select()
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar perfil do médico.');
+    },
+    async createDoctor(data) {
+        const response = await supabase
+            .from('medicos')
+            .insert({
+                nome: data.nome,
+                crm: data.crm,
+                especialidade: data.especialidade,
+                unidade_fixa_id: data.unidadeFixaId,
+                telefone: data.telefone,
+                senha: data.senha || '12345'
+            })
+            .select()
+            .single();
+
+        return unwrap(response, 'Falha ao cadastrar novo médico.');
+    },
+    async deleteDoctor(medicoId) {
+        // Limpar agendamentos futuros para evitar orfandade se não for cascade
+        await supabase.from('agendamentos').delete().eq('medico_id', medicoId);
+        // Limpar acessos
+        await supabase.from('medico_acessos_unidade').delete().eq('medico_id', medicoId);
+        
+        const response = await supabase
+            .from('medicos')
+            .delete()
+            .eq('id', medicoId);
+
+        return unwrap(response, 'Falha ao excluir médico do sistema.');
     }
 };
