@@ -19,7 +19,8 @@ import {
     getDashboardMetrics,
     getDoctorAccesses,
     manageDoctorUnitAccess,
-    getUnitsList
+    getUnitsList,
+    getManagerCalendar
 } from './api/ManagerService.js';
 
 const app = express();
@@ -46,6 +47,7 @@ app.post('/api/manager/login', managerLogin);
 app.get('/api/manager/dashboard', getDashboardMetrics);
 app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
+app.get('/api/manager/calendario/:unidadeId', getManagerCalendar);
 app.post('/api/manager/medicos/:id/acessos', manageDoctorUnitAccess);
 
 if (fs.existsSync(distPath)) {

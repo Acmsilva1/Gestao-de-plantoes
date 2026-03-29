@@ -1,9 +1,10 @@
 import React from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, CalendarDays } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerDashboard from '../components/Manager/Dashboard';
 import ManagerAccess from '../components/Manager/AccessControl';
+import CalendarPage from './CalendarPage';
 
 export default function ManagerView() {
     const { session, logout } = useAuth();
@@ -46,6 +47,20 @@ export default function ManagerView() {
                         <Users size={18} />
                         Controle de Acessos
                     </NavLink>
+
+                    <NavLink
+                        to="/gestor/calendario"
+                        className={({ isActive }) => 
+                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                isActive 
+                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                            }`
+                        }
+                    >
+                        <CalendarDays size={18} />
+                        Calendário
+                    </NavLink>
                 </nav>
 
             </aside>
@@ -74,6 +89,7 @@ export default function ManagerView() {
                         <Routes>
                             <Route path="dashboard" element={<ManagerDashboard />} />
                             <Route path="acessos" element={<ManagerAccess />} />
+                            <Route path="calendario" element={<CalendarPage />} />
                             <Route path="*" element={<Navigate to="dashboard" replace />} />
                         </Routes>
                     </div>

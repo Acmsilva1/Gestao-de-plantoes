@@ -42,7 +42,6 @@ export const getDashboardMetrics = async (req, res) => {
         const { startMonthDate, endMonthDate } = getMonthDates(month);
 
         const vacancies = await dbModel.getDashboardsDataStraddle(startMonthDate, endMonthDate, unidadeId);
-        const demands = await dbModel.getDashboardsDemand(startMonthDate, endMonthDate, unidadeId);
 
         const endDay = parseInt(endMonthDate.slice(-2), 10);
         
@@ -62,39 +61,36 @@ export const getDashboardMetrics = async (req, res) => {
             }
         }
 
-        // Aggregation of vacancies
+        // Aggregation of vacancies AND demand (both from disponibilidade — contains predictor forecast)
         (vacancies || []).forEach(v => {
             const dayNum = Number(v.data_plantao.slice(-2));
             const available = Math.max(v.vagas_totais - v.vagas_ocupadas, 0);
             
-            const targetArray = dayNum <= 15 ? vacancies_q1 : vacancies_q2;
-            const entry = targetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
+            const vTargetArray = dayNum <= 15 ? vacancies_q1 : vacancies_q2;
+            const vEntry = vTargetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
             
-            if (entry) {
-                entry.Totais += v.vagas_totais;
-                entry.Ocupadas += v.vagas_ocupadas;
-                entry.Disponíveis += available;
+            if (vEntry) {
+                vEntry.Totais += v.vagas_totais;
+                vEntry.Ocupadas += v.vagas_ocupadas;
+                vEntry.Disponíveis += available;
             }
-        });
 
-        // Aggregation of demands
-        (demands || []).forEach(d => {
-            const dayNum = Number(d.data_atendimento.slice(-2));
-            const targetArray = dayNum <= 15 ? demands_q1 : demands_q2;
-            const entry = targetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
-            
-            if (entry) {
-                const periodoName = (d.periodo || '').toLowerCase();
-                if (periodoName.includes('manh')) {
-                    entry['Manhã'] += d.atendimento_count;
-                } else if (periodoName.includes('tard')) {
-                    entry['Tarde'] += d.atendimento_count;
-                } else if (periodoName.includes('noit')) {
-                    entry['Noite'] += d.atendimento_count;
-                } else if (periodoName.includes('madrug')) {
-                    entry['Madrugada'] += d.atendimento_count;
+            // Also aggregate demand from turno field in disponibilidade
+            const dTargetArray = dayNum <= 15 ? demands_q1 : demands_q2;
+            const dEntry = dTargetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
+
+            if (dEntry && v.turno) {
+                const turno = (v.turno || '').toLowerCase();
+                if (turno.includes('manh')) {
+                    dEntry['Manhã'] += v.vagas_totais;
+                } else if (turno.includes('tard')) {
+                    dEntry['Tarde'] += v.vagas_totais;
+                } else if (turno.includes('noit')) {
+                    dEntry['Noite'] += v.vagas_totais;
+                } else if (turno.includes('madrug')) {
+                    dEntry['Madrugada'] += v.vagas_totais;
                 } else {
-                    entry['Geral'] += d.atendimento_count;
+                    dEntry['Geral'] += v.vagas_totais;
                 }
             }
         });
@@ -153,5 +149,39 @@ export const getUnitsList = async (req, res) => {
         res.json(units);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao listar unidades.', details: err.message });
+    }
+};
+
+export const getManagerCalendar = async (req, res) => {
+    const { unidadeId } = req.params;
+    const { month } = req.query;
+
+    if (!unidadeId) {
+        return res.status(400).json({ error: 'Unidade não informada.' });
+    }
+
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+
+    try {
+        const shifts = await dbModel.getShiftsByUnitAndMonth(unidadeId, targetMonth);
+        const unit = await dbModel.getUnits().then(us => us.find(u => u.id === unidadeId));
+
+        res.json({
+            month: targetMonth,
+            unit: unit || { id: unidadeId, nome: 'Unidade' },
+            shifts: (shifts || []).map(shift => ({
+                id: shift.id,
+                unidadeId: shift.unidade_id,
+                local: shift.unidades?.nome ?? 'Unidade',
+                data: shift.data_plantao,
+                turno: shift.turno,
+                vagas: Math.max(shift.vagas_totais - shift.vagas_ocupadas, 0),
+                vagasTotais: shift.vagas_totais,
+                vagasOcupadas: shift.vagas_ocupadas,
+                status: shift.status
+            }))
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar calendário da unidade.', details: err.message });
     }
 };

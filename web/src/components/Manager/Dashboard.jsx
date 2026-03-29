@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { Calendar, ChevronLeft, ChevronRight, Activity, Users, MapPin, Globe } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Activity, Users, MapPin, Globe, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+
+const POLL_INTERVAL_MS = 30_000; // 30 segundos
 
 const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -13,53 +15,89 @@ const formatMonthHeader = (month) => {
     return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
 };
 
+/** Retorna YYYY-MM do mês atual e próximo (janela do preditor) */
+const getForecastWindow = () => {
+    const now = new Date();
+    const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const next = shiftMonth(current, 1);
+    return { current, next };
+};
+
+const isOutsideForecastWindow = (month) => {
+    const { current, next } = getForecastWindow();
+    return month < current || month > next;
+};
+
 export default function ManagerDashboard() {
     const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedUnit, setSelectedUnit] = useState('all');
     const [units, setUnits] = useState([]);
-    
+
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [silentRefreshing, setSilentRefreshing] = useState(false);
     const [error, setError] = useState('');
+    const [lastUpdated, setLastUpdated] = useState(null);
 
-    // Fetch master unit list
+    const pollTimerRef = useRef(null);
+
+    // Fetch master unit list once
     useEffect(() => {
-        const fetchUnits = async () => {
-            try {
-                const res = await fetch('/api/manager/unidades');
-                if (res.ok) setUnits(await res.json());
-            } catch {}
-        };
-        fetchUnits();
+        fetch('/api/manager/unidades')
+            .then(r => r.ok ? r.json() : [])
+            .then(setUnits)
+            .catch(() => {});
     }, []);
 
-    // Fetch dashboard charts data
-    useEffect(() => {
-        const fetchMetrics = async () => {
+    const fetchMetrics = useCallback(async (silent = false) => {
+        if (silent) {
+            setSilentRefreshing(true);
+        } else {
             setLoading(true);
             setError('');
-            try {
-                const unitParam = selectedUnit !== 'all' ? `&unidadeId=${selectedUnit}` : '';
-                const response = await fetch(`/api/manager/dashboard?month=${month}${unitParam}`);
-                const result = await response.json();
-                
-                if (!response.ok) throw new Error(result.error || 'Falha ao buscar dados');
-                
-                setData(result);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
+        }
+
+        try {
+            const unitParam = selectedUnit !== 'all' ? `&unidadeId=${selectedUnit}` : '';
+            const response = await fetch(`/api/manager/dashboard?month=${month}${unitParam}`);
+            const result = await response.json();
+
+            if (!response.ok) throw new Error(result.error || 'Falha ao buscar dados');
+
+            setData(result);
+            setLastUpdated(new Date());
+        } catch (err) {
+            if (!silent) setError(err.message);
+        } finally {
+            setLoading(false);
+            setSilentRefreshing(false);
+        }
+    }, [month, selectedUnit]);
+
+    // Fetch on mount / filter change (full load)
+    useEffect(() => {
+        fetchMetrics(false);
+    }, [fetchMetrics]);
+
+    // Polling every 30s (silent refresh — no spinner, no flicker)
+    useEffect(() => {
+        const startPolling = () => {
+            pollTimerRef.current = setInterval(() => {
+                fetchMetrics(true);
+            }, POLL_INTERVAL_MS);
         };
 
-        fetchMetrics();
-    }, [month, selectedUnit]);
+        startPolling();
+        return () => clearInterval(pollTimerRef.current);
+    }, [fetchMetrics]);
 
     const chartVacanciesQ1 = data?.vacancies?.q1 || [];
     const chartVacanciesQ2 = data?.vacancies?.q2 || [];
     const chartDemandsQ1   = data?.demands?.q1 || [];
     const chartDemandsQ2   = data?.demands?.q2 || [];
+
+    const outsideForecast = isOutsideForecastWindow(month);
+    const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
@@ -104,7 +142,7 @@ export default function ManagerDashboard() {
                         Visão Nacional (Geral)
                     </button>
 
-                    <div className="flex flex-col gap-1 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+                    <div className="flex flex-col gap-1 overflow-y-auto max-h-[600px] pr-2">
                         {units.map((unit) => (
                             <button
                                 key={unit.id}
@@ -124,15 +162,30 @@ export default function ManagerDashboard() {
 
                 {/* Main Dashboard Area */}
                 <div className="flex-1 flex flex-col min-w-0">
-                    {/* Header / Month Selector */}
-                    <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+                    {/* Header */}
+                    <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
                         <div>
                             <h2 className="text-3xl font-black text-white">
                                 {selectedUnit === 'all' ? 'Análise Nacional' : 'Análise de Unidade'}
                             </h2>
-                            <p className="mt-2 text-sm text-slate-400">Acompanhamento da ocupação e dos turnos dia-a-dia.</p>
+                            <div className="mt-2 flex items-center gap-3">
+                                <p className="text-sm text-slate-400">Ocupação e previsão de demanda dia a dia.</p>
+                                {/* Live indicator */}
+                                {silentRefreshing ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-sky-400">
+                                        <RefreshCw size={12} className="animate-spin" />
+                                        Atualizando...
+                                    </span>
+                                ) : lastUpdated ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                                        <Clock size={11} />
+                                        {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </span>
+                                ) : null}
+                            </div>
                         </div>
 
+                        {/* Month selector */}
                         <div className="flex items-center gap-2 rounded-[2rem] border border-slate-800 bg-slate-900/60 p-2 shadow-inner">
                             <button
                                 onClick={() => setMonth(m => shiftMonth(m, -1))}
@@ -153,6 +206,21 @@ export default function ManagerDashboard() {
                         </div>
                     </div>
 
+                    {/* ⚠️ Out-of-forecast-window banner */}
+                    {outsideForecast && (
+                        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
+                            <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
+                            <div>
+                                <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
+                                <p className="mt-1 text-amber-200/80">
+                                    O preditor cobre apenas <span className="font-semibold capitalize">{formatMonthHeader(forecastCurrent)}</span> e{' '}
+                                    <span className="font-semibold capitalize">{formatMonthHeader(forecastNext)}</span>.
+                                    Os gráficos abaixo estarão zerados ou incompletos.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex h-[400px] items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/40">
                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-500 border-t-transparent shadow-[0_0_15px_rgba(56,189,248,0.5)]"></div>
@@ -166,12 +234,10 @@ export default function ManagerDashboard() {
                             {/* CHART 1: Vagas Q1 */}
                             <div className="flex flex-col rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl transition-all duration-700 hover:scale-[1.01] hover:border-slate-700 animate-in slide-in-from-bottom-5">
                                 <div className="mb-6 flex items-center gap-3">
-                                    <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400">
-                                        <Users size={24} />
-                                    </div>
+                                    <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400"><Users size={24} /></div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Ocupação Diária (1ª Quinzena)</h3>
-                                        <p className="text-xs uppercase tracking-wider text-slate-500">Dias 01 a 15 - Disponíveis vs Ocupadas</p>
+                                        <h3 className="text-xl font-bold text-white">Controle de plantonistas</h3>
+                                        <p className="text-xs uppercase tracking-wider text-slate-500">Primeira quinzena</p>
                                     </div>
                                 </div>
                                 <div className="h-[350px] w-full min-w-0">
@@ -196,12 +262,10 @@ export default function ManagerDashboard() {
                             {/* CHART 2: Vagas Q2 */}
                             <div className="flex flex-col rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl transition-all duration-700 hover:scale-[1.01] hover:border-slate-700 animate-in slide-in-from-bottom-10">
                                 <div className="mb-6 flex items-center gap-3">
-                                    <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400">
-                                        <Users size={24} />
-                                    </div>
+                                    <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400"><Users size={24} /></div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Ocupação Diária (2ª Quinzena)</h3>
-                                        <p className="text-xs uppercase tracking-wider text-slate-500">Dias 16 até o fim do mês</p>
+                                        <h3 className="text-xl font-bold text-white">Controle de plantonistas</h3>
+                                        <p className="text-xs uppercase tracking-wider text-slate-500">Segunda quinzena</p>
                                     </div>
                                 </div>
                                 <div className="h-[350px] w-full min-w-0">
@@ -223,15 +287,13 @@ export default function ManagerDashboard() {
                                 </div>
                             </div>
 
-                            {/* CHART 3: Demanda Q1 (Stacked) */}
+                            {/* CHART 3: Demanda Q1 */}
                             <div className="flex flex-col rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl transition-all duration-700 hover:scale-[1.01] hover:border-slate-700 animate-in slide-in-from-bottom-10">
                                 <div className="mb-6 flex items-center gap-3">
-                                    <div className="rounded-xl bg-amber-500/10 p-3 text-amber-400">
-                                        <Activity size={24} />
-                                    </div>
+                                    <div className="rounded-xl bg-amber-500/10 p-3 text-amber-400"><Activity size={24} /></div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Demanda Projetada (1ª Quinzena)</h3>
-                                        <p className="text-xs uppercase tracking-wider text-slate-500">Previsão por Turno (Dias 01 a 15)</p>
+                                        <h3 className="text-xl font-bold text-white">Demanda projetada</h3>
+                                        <p className="text-xs uppercase tracking-wider text-slate-500">Primeira quinzena</p>
                                     </div>
                                 </div>
                                 <div className="h-[350px] w-full min-w-0">
@@ -262,15 +324,13 @@ export default function ManagerDashboard() {
                                 </div>
                             </div>
 
-                            {/* CHART 4: Demanda Q2 (Stacked) */}
+                            {/* CHART 4: Demanda Q2 */}
                             <div className="flex flex-col rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl transition-all duration-700 hover:scale-[1.01] hover:border-slate-700 animate-in slide-in-from-bottom-10">
                                 <div className="mb-6 flex items-center gap-3">
-                                    <div className="rounded-xl bg-amber-500/10 p-3 text-amber-400">
-                                        <Activity size={24} />
-                                    </div>
+                                    <div className="rounded-xl bg-amber-500/10 p-3 text-amber-400"><Activity size={24} /></div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Demanda Projetada (2ª Quinzena)</h3>
-                                        <p className="text-xs uppercase tracking-wider text-slate-500">Previsão por Turno (Dias 16 ao fim do mês)</p>
+                                        <h3 className="text-xl font-bold text-white">Demanda projetada</h3>
+                                        <p className="text-xs uppercase tracking-wider text-slate-500">Segunda quinzena</p>
                                     </div>
                                 </div>
                                 <div className="h-[350px] w-full min-w-0">

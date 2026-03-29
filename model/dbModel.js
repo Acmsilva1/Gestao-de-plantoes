@@ -341,7 +341,7 @@ export const dbModel = {
         // Busca turnos/vagas para agregar via js
         let query = supabase
             .from('disponibilidade')
-            .select('data_plantao, vagas_totais, vagas_ocupadas')
+            .select('data_plantao, turno, vagas_totais, vagas_ocupadas')
             .gte('data_plantao', startMonthDate)
             .lte('data_plantao', endMonthDate);
 
