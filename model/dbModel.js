@@ -325,5 +325,79 @@ export const dbModel = {
         await this.releaseShiftHold(shiftId, medicoId);
 
         return updatedShift;
+    },
+    async managerLogin(usuario, senhaUrlPlaintext) {
+        // ATENÇÃO: Simplificação para teste. Em produção use hasher/pgcrypto.
+        const response = await supabase
+            .from('gestores')
+            .select('id, nome, usuario, perfis(nome)')
+            .eq('usuario', usuario)
+            .eq('senha', senhaUrlPlaintext)
+            .maybeSingle();
+            
+        return unwrap(response, 'Usuário ou senha inválidos.');
+    },
+    async getDashboardsDataStraddle(startMonthDate, endMonthDate, unidadeId = null) {
+        // Busca turnos/vagas para agregar via js
+        let query = supabase
+            .from('disponibilidade')
+            .select('data_plantao, vagas_totais, vagas_ocupadas')
+            .gte('data_plantao', startMonthDate)
+            .lte('data_plantao', endMonthDate);
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+
+        return unwrap(response, 'Falha ao carregar dados do dashboard de disponibilidade.');
+    },
+    async getDashboardsDemand(startMonthDate, endMonthDate, unidadeId = null) {
+        // Simulando a demanda / atendimentos usando tasy_raw_history
+        let query = supabase
+            .from('tasy_raw_history')
+            .select('data_atendimento, atendimento_count, periodo')
+            .gte('data_atendimento', startMonthDate)
+            .lte('data_atendimento', endMonthDate);
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+
+        return unwrap(response, 'Falha ao carregar dados do dashboard de demanda.');
+    },
+    async getDoctorsAccessList() {
+        const response = await supabase
+            .from('medicos')
+            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
+            .order('nome', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar lista de médicos e acessos.');
+    },
+    async saveDoctorAccess(medicoId, unidadesIds, gestorId) {
+        // Limpa os acessos anteriores deste medico:
+        const deleteResp = await supabase
+            .from('medico_acessos_unidade')
+            .delete()
+            .eq('medico_id', medicoId);
+        
+        unwrap(deleteResp, 'Falha ao redefinir acessos');
+
+        if (!unidadesIds || unidadesIds.length === 0) return true;
+
+        const rows = unidadesIds.map(uId => ({
+            medico_id: medicoId,
+            unidade_id: uId,
+            gestor_id: gestorId
+        }));
+
+        const insertResp = await supabase
+            .from('medico_acessos_unidade')
+            .insert(rows);
+
+        return unwrap(insertResp, 'Falha ao conceder novos acessos');
     }
 };

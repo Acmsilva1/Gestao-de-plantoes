@@ -14,6 +14,13 @@ import {
     releaseShiftHold,
     selectShift
 } from './api/DirecionadorService.js';
+import {
+    managerLogin,
+    getDashboardMetrics,
+    getDoctorAccesses,
+    manageDoctorUnitAccess,
+    getUnitsList
+} from './api/ManagerService.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +40,13 @@ app.get('/api/vagas', getPublicShifts);
 app.post('/api/vagas/:id/bloquear', holdShift);
 app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
 app.post('/api/vagas/:id/selecionar', selectShift);
+
+// --- Rotas do Gestor ---
+app.post('/api/manager/login', managerLogin);
+app.get('/api/manager/dashboard', getDashboardMetrics);
+app.get('/api/manager/medicos', getDoctorAccesses);
+app.get('/api/manager/unidades', getUnitsList);
+app.post('/api/manager/medicos/:id/acessos', manageDoctorUnitAccess);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
