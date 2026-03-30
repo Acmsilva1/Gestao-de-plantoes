@@ -53,12 +53,97 @@ const buildCalendarDays = (month, shifts) => {
     return days;
 };
 
-const getShiftClasses = (shift) =>
-    shift.vagas <= 0
-        ? 'border border-rose-400/60 bg-rose-500/10 text-rose-100'
-        : shift.vagasOcupadas > 0
-            ? 'border border-amber-400/40 bg-amber-500/10 text-amber-100'
-            : 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100';
+const getShiftTone = (shift) => {
+    if (shift.status === 'CANCELADO') {
+        return 'cancelled';
+    }
+
+    if (shift.vagas <= 0) {
+        return 'full';
+    }
+
+    if (shift.vagasOcupadas > 0) {
+        return 'partial';
+    }
+
+    return 'open';
+};
+
+const getShiftClasses = (shift) => {
+    const tone = getShiftTone(shift);
+
+    if (tone === 'cancelled') {
+        return 'border border-slate-600/70 bg-slate-800/70 text-slate-200';
+    }
+
+    if (tone === 'full') {
+        return 'border border-rose-400/70 bg-rose-500/10 text-rose-100 animate-pulse shadow-[0_0_0_1px_rgba(251,113,133,0.2),0_0_18px_rgba(244,63,94,0.16)]';
+    }
+
+    if (tone === 'partial') {
+        return 'border border-amber-400/60 bg-amber-500/10 text-amber-100 animate-pulse shadow-[0_0_0_1px_rgba(251,191,36,0.14),0_0_18px_rgba(245,158,11,0.16)]';
+    }
+
+    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 animate-pulse shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_18px_rgba(16,185,129,0.14)]';
+};
+
+const getDayCardClasses = (shifts) => {
+    const tones = shifts.map(getShiftTone);
+
+    if (tones.includes('full')) {
+        return 'border-rose-400/60 shadow-[0_0_0_1px_rgba(251,113,133,0.18),0_0_24px_rgba(244,63,94,0.14)]';
+    }
+
+    if (tones.includes('partial')) {
+        return 'border-sky-400/50 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_24px_rgba(14,165,233,0.12)]';
+    }
+
+    if (tones.includes('open')) {
+        return 'border-emerald-400/40 shadow-[0_0_0_1px_rgba(52,211,153,0.14),0_0_22px_rgba(16,185,129,0.12)]';
+    }
+
+    if (tones.includes('cancelled')) {
+        return 'border-slate-700 shadow-[0_0_0_1px_rgba(51,65,85,0.2)]';
+    }
+
+    return 'border-slate-800';
+};
+
+const getShiftBadgeClasses = (shift) => {
+    const tone = getShiftTone(shift);
+
+    if (tone === 'cancelled') {
+        return 'border border-slate-600/70 bg-slate-800/80 text-slate-200';
+    }
+
+    if (tone === 'full') {
+        return 'border border-rose-400/40 bg-rose-500/10 text-rose-200 animate-pulse';
+    }
+
+    if (tone === 'partial') {
+        return 'border border-amber-400/40 bg-amber-500/10 text-amber-200 animate-pulse';
+    }
+
+    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 animate-pulse';
+};
+
+const getShiftPanelClasses = (shift) => {
+    const tone = getShiftTone(shift);
+
+    if (tone === 'cancelled') {
+        return 'bg-slate-800/80 ring-1 ring-slate-700/70';
+    }
+
+    if (tone === 'full') {
+        return 'bg-rose-950/30 ring-1 ring-rose-400/30';
+    }
+
+    if (tone === 'partial') {
+        return 'bg-amber-950/20 ring-1 ring-amber-400/25';
+    }
+
+    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15';
+};
 
 export default function ManagerCalendar({ units = [] }) {
     const [calMonth, setCalMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -198,7 +283,7 @@ export default function ManagerCalendar({ units = [] }) {
                                         <button
                                             key={entry.key}
                                             onClick={() => setSelectedDay(entry.date)}
-                                            className="min-h-28 rounded-2xl border border-slate-800 bg-slate-950/40 p-3 text-left transition-all duration-200 hover:border-sky-400/40 hover:bg-sky-500/5"
+                                            className={`min-h-28 rounded-2xl border bg-slate-950/40 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-500/5 ${getDayCardClasses(entry.shifts)}`}
                                         >
                                             <div className="mb-3 flex items-center justify-between">
                                                 <span className="text-sm font-bold text-white">{String(entry.day).padStart(2, '0')}</span>
@@ -260,30 +345,46 @@ export default function ManagerCalendar({ units = [] }) {
                                 <article
                                     key={shift.id}
                                     className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
-                                        shift.vagas <= 0
+                                        getShiftTone(shift) === 'full'
                                             ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)] animate-pulse'
-                                            : 'border-slate-800 hover:border-sky-400/40'
+                                            : getShiftTone(shift) === 'partial'
+                                                ? 'border-amber-400/50 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_0_24px_rgba(245,158,11,0.14)] animate-pulse'
+                                                : getShiftTone(shift) === 'open'
+                                                    ? 'border-emerald-400/30 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_24px_rgba(16,185,129,0.1)]'
+                                                    : 'border-slate-700'
                                     }`}
                                 >
                                     <div className="mb-5 flex items-start justify-between gap-3">
-                                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${
-                                            shift.vagas <= 0
-                                                ? 'border border-rose-400/40 bg-rose-500/10 text-rose-200'
-                                                : 'border border-sky-400/20 bg-sky-500/10 text-sky-300'
-                                        }`}>
+                                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${getShiftBadgeClasses(shift)}`}>
                                             {shift.turno}
                                         </span>
                                         <span className="text-sm text-slate-400">{formatDisplayDate(shift.data)}</span>
                                     </div>
 
-                                    <div className={`mb-5 rounded-2xl p-4 ${shift.vagas <= 0 ? 'bg-rose-950/30 ring-1 ring-rose-400/30' : 'bg-slate-800/70'}`}>
+                                    <div className={`mb-5 rounded-2xl p-4 ${getShiftPanelClasses(shift)}`}>
                                         <p className="text-sm text-slate-400">Vagas disponíveis</p>
-                                        <p className={`mt-2 text-4xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
+                                        <p className={`mt-2 text-4xl font-black ${
+                                            getShiftTone(shift) === 'full'
+                                                ? 'text-rose-200'
+                                                : getShiftTone(shift) === 'partial'
+                                                    ? 'text-amber-100'
+                                                    : getShiftTone(shift) === 'open'
+                                                        ? 'text-emerald-100'
+                                                        : 'text-slate-200'
+                                        }`}>{shift.vagas}</p>
                                         <div className="mt-3 flex gap-4 text-xs text-slate-400">
                                             <span><span className="text-emerald-400 font-bold">{shift.vagasTotais}</span> totais</span>
                                             <span><span className="text-rose-400 font-bold">{shift.vagasOcupadas}</span> ocupadas</span>
                                         </div>
-                                        <p className={`mt-3 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>{shift.status}</p>
+                                        <p className={`mt-3 text-xs uppercase tracking-[0.2em] ${
+                                            getShiftTone(shift) === 'full'
+                                                ? 'text-rose-200/80'
+                                                : getShiftTone(shift) === 'partial'
+                                                    ? 'text-amber-200/80'
+                                                    : getShiftTone(shift) === 'open'
+                                                        ? 'text-emerald-200/70'
+                                                        : 'text-slate-400'
+                                        }`}>{shift.status}</p>
                                     </div>
                                 </article>
                             ))}
