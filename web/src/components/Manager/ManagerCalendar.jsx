@@ -142,7 +142,7 @@ const getShiftPanelClasses = (shift) => {
         return 'bg-amber-950/20 ring-1 ring-amber-400/25 animate-pulse';
     }
 
-    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15 animate-pulse';
+    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15';
 };
 
 export default function ManagerCalendar({ units = [] }) {
