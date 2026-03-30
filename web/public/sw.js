@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'gestao-de-plantoes-static-v6';
+const STATIC_CACHE = 'gestao-de-plantoes-static-v7';
 const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v6';
 const APP_SHELL = [
     '/offline.html',
