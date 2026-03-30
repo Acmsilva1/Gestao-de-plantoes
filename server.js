@@ -85,7 +85,7 @@ if (fs.existsSync(distPath)) {
 
 if (!process.env.VERCEL) {
     app.listen(env.port, () => {
-        console.log(`Maestro rodando na porta ${env.port}`);
+        console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
         if (hasDatabaseEnv()) {
             startPredictionScheduler();
         }
