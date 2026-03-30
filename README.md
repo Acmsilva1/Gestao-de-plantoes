@@ -7,16 +7,14 @@ Aplicação web para gestão de plantões médicos com dois perfis principais:
 
 O projeto roda:
 
-- localmente no `localhost`
-- em produção/preview na `Vercel`
-- como `PWA` instalável no mobile
+- no servidor `Node.js` local ou em máquina própria (API + frontend estático após `npm run build`)
+- como `PWA` instalável no mobile quando acessado por HTTPS em rede confiável
 
 ## Stack
 
 - Backend: `Node.js` + `Express`
 - Frontend: `React` + `Vite`
 - Banco: `Supabase`
-- Deploy: `Vercel`
 - PWA: `manifest.webmanifest` + `service worker`
 
 ## Estrutura
@@ -28,7 +26,6 @@ O projeto roda:
 ├─ model/              # acesso ao banco/cache
 ├─ web/                # frontend React + Vite + PWA
 ├─ server.js           # servidor Express
-├─ vercel.json         # configuração de deploy na Vercel
 └─ package.json        # scripts da raiz
 ```
 
@@ -234,7 +231,7 @@ Regras importantes:
 
 ### Quando a previsão roda
 
-Fora da Vercel, localmente no servidor Node, o scheduler:
+No servidor Node, o scheduler:
 
 - roda uma execução inicial ao subir a aplicação
 - agenda execuções diárias
@@ -246,8 +243,6 @@ O horário diário é controlado por:
 Se não for definido, o padrão é:
 
 - `22`
-
-Na Vercel, esse agendamento automático não roda pelo `app.listen`, porque o ambiente é serverless. Nesse caso, o comportamento esperado é usar a aplicação como API serverless e disparar geração por fluxo controlado do ambiente.
 
 ### Como os dashboards mostram “demanda”
 
@@ -387,7 +382,11 @@ Para testar o frontend buildado:
 npm run web:preview
 ```
 
+Com `web/dist` gerado, `npm run start` (ou `npm run dev`) sobe o Express servindo a API em `/api` e os ficheiros estáticos do PWA a partir de `web/dist`.
+
 ## Rotas principais da API
+
+A entrada no app é por **seleção de perfil no frontend** (sem `POST` de login). A lista de médicos para o seletor vem de `GET /api/medicos` quando o banco está configurado.
 
 ### Saúde
 
@@ -395,7 +394,6 @@ npm run web:preview
 
 ### Médico
 
-- `POST /api/auth/login`
 - `GET /api/medicos`
 - `GET /api/medicos/:medicoId/calendario`
 - `GET /api/medicos/:medicoId/agenda`
@@ -407,7 +405,6 @@ npm run web:preview
 
 ### Gestor
 
-- `POST /api/manager/login`
 - `GET /api/manager/dashboard`
 - `GET /api/manager/medicos`
 - `GET /api/manager/unidades`
@@ -417,33 +414,6 @@ npm run web:preview
 - `POST /api/manager/perfil/:id`
 - `POST /api/manager/medicos`
 - `DELETE /api/manager/medicos/:id`
-
-## Deploy na Vercel
-
-O projeto está preparado para rodar na Vercel com:
-
-- frontend buildado a partir de `web/`
-- backend Express como função Node
-- rotas SPA e assets do PWA configurados em `vercel.json`
-
-### Passo a passo
-
-1. Conecte o repositório à Vercel.
-2. Garanta que o projeto esteja usando a raiz do repositório.
-3. Faça deploy da branch desejada.
-
-### Variáveis na Vercel
-
-Se quiser usar configuração padrão da plataforma, cadastre:
-
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
-- `PREDICTOR_SCHEDULE_HOUR` se necessário
-
-Observação:
-
-- o projeto também consegue ler `.env` da raiz quando esse arquivo faz parte do ambiente de execução
-- para Git Integration da Vercel, o mais confiável continua sendo usar Environment Variables no painel da Vercel
 
 ## PWA
 
@@ -476,13 +446,13 @@ Se o celular continuar abrindo uma versão antiga:
 4. subir `npm run dev:full`
 5. acessar `http://localhost:5173`
 
-### Vercel
+### Servidor próprio (build + Node)
 
-1. subir commit para o GitHub
-2. redeploy na Vercel
-3. verificar `/api/health`
-4. abrir a home
-5. testar instalação do PWA no mobile
+1. definir `.env` no servidor com as mesmas variáveis do ambiente local
+2. `npm install` na raiz e em `web/`
+3. `npm run build`
+4. `npm run start` (ou process manager tipo PM2 apontando para `node server.js`)
+5. verificar `GET /api/health` e abrir a URL pública do serviço
 
 ## Troubleshooting
 
@@ -501,13 +471,13 @@ Normalmente é cache antigo do service worker ou atalho já instalado. Abra o li
 
 Confirme se o deploy novo foi publicado e se o navegador não está usando uma aba/app antigo em modo standalone.
 
-### Build local funciona, mas Vercel não
+### Build ok, mas produção não sobe
 
 Verifique:
 
-- variáveis de ambiente
-- branch correta
-- se `vercel.json` está no commit publicado
+- variáveis de ambiente no servidor
+- se `web/dist` existe após `npm run build`
+- firewall/porta exposta para o `PORT` configurado
 
 ## Scripts úteis
 

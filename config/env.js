@@ -18,5 +18,7 @@ export const hasDatabaseEnv = () => getMissingEnvVars().length === 0;
 export const env = {
     port: Number(process.env.PORT || 3000),
     supabaseUrl: process.env.SUPABASE_URL,
-    supabaseKey: process.env.SUPABASE_KEY
+    supabaseKey: process.env.SUPABASE_KEY,
+    disablePredictorScheduler:
+        process.env.DISABLE_PREDICTOR_SCHEDULER === 'true' || process.env.DISABLE_PREDICTOR_SCHEDULER === '1'
 };

@@ -137,6 +137,95 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar calendario da unidade');
     },
+    async getShiftsByUnitAndMonthWithAssignments(unidadeId, month) {
+        const monthStart = `${month}-01`;
+        const [year, rawMonth] = month.split('-').map(Number);
+        const monthEnd = new Date(Date.UTC(year, rawMonth, 0)).toISOString().slice(0, 10);
+
+        const response = await supabase
+            .from('disponibilidade')
+            .select(`
+                id,
+                unidade_id,
+                data_plantao,
+                turno,
+                vagas_totais,
+                vagas_ocupadas,
+                status,
+                unidades(nome),
+                agendamentos(
+                    id,
+                    medico_id,
+                    confirmado,
+                    medicos(id, nome, especialidade)
+                )
+            `)
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', monthStart)
+            .lte('data_plantao', monthEnd)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar escala da unidade com plantonistas');
+    },
+    async getEscalaByUnitAndMonth(unidadeId, month) {
+        const monthStart = `${month}-01`;
+        const [year, rawMonth] = month.split('-').map(Number);
+        const monthEnd = new Date(Date.UTC(year, rawMonth, 0)).toISOString().slice(0, 10);
+
+        const response = await supabase
+            .from('escala')
+            .select(
+                `
+                id,
+                unidade_id,
+                medico_id,
+                data_plantao,
+                turno,
+                unidades(nome),
+                medicos(id, nome, especialidade)
+            `
+            )
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', monthStart)
+            .lte('data_plantao', monthEnd)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar tabela escala');
+    },
+    async getEscalaAgendaForMedico(medicoId) {
+        const response = await supabase
+            .from('escala')
+            .select('id, data_plantao, turno, unidade_id, unidades(nome)')
+            .eq('medico_id', medicoId)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar agenda do medico na escala');
+    },
+    async getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno) {
+        const response = await supabase
+            .from('escala')
+            .select('medico_id')
+            .eq('unidade_id', unidadeId)
+            .eq('data_plantao', data_plantao)
+            .eq('turno', turno);
+
+        const rows = unwrap(response, 'Falha ao consultar escala do turno');
+        return (rows || []).map((r) => r.medico_id);
+    },
+    async insertEscalaRow({ unidadeId, medicoId, data_plantao, turno }) {
+        const response = await supabase
+            .from('escala')
+            .insert({
+                unidade_id: unidadeId,
+                medico_id: medicoId,
+                data_plantao,
+                turno
+            })
+            .select('id')
+            .single();
+
+        return unwrap(response, 'Falha ao inserir na escala');
+    },
     async getShiftAgendaByUnitAndDate(unidadeId, dataPlantao) {
         const response = await supabase
             .from('disponibilidade')

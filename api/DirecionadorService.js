@@ -6,15 +6,18 @@ const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const PUBLIC_SHIFTS_TTL_MS = 30_000;
 const isReservationHoldTableMissing = (message = '') => /Could not find the table 'public\.reserva_holds'|relation "reserva_holds" does not exist/i.test(message);
 const shiftTurnOrder = { Madrugada: 0, Manhã: 1, Tarde: 2, Noite: 3 };
+const TURNOS_ESCALA = new Set(['Manhã', 'Tarde', 'Noite', 'Madrugada']);
 
-const mapBookingDetails = (booking) => ({
-    tipoPlantao: booking.tipo_plantao || 'COMPLETO',
-    horaInicio: booking.hora_inicio || null,
-    horaFim: booking.hora_fim || null,
-    dataInicioFixo: booking.data_inicio_fixo || null,
-    dataFimFixo: booking.data_fim_fixo || null,
-    grupoSequenciaId: booking.grupo_sequencia_id || null
-});
+const resolveDoctorAuthorizedUnit = async (medicoId, unidadeId) => {
+    const doctor = await dbModel.getDoctorById(medicoId);
+    if (!doctor) return null;
+    const mapped = mapDoctorForClient(doctor);
+    const authorizedIds = new Set((mapped.unidadesAutorizadas || []).map((u) => u.id));
+    if (!unidadeId || !authorizedIds.has(unidadeId)) {
+        return null;
+    }
+    return { doctor, mapped };
+};
 
 const getTodayKey = (referenceDate = new Date()) => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -48,6 +51,57 @@ const mapShiftForClient = (shift) => ({
     vagas: Math.max(shift.vagas_totais - shift.vagas_ocupadas, 0),
     status: shift.status
 });
+
+const mapPlantonistasFromAgendamentos = (agendamentos = []) =>
+    (agendamentos || [])
+        .filter((row) => row.confirmado !== false)
+        .map((row) => ({
+            id: row.medico_id || row.medicos?.id,
+            nome: row.medicos?.nome ?? 'Médico',
+            especialidade: row.medicos?.especialidade ?? ''
+        }))
+        .filter((p) => p.id);
+
+const mapShiftForDoctorCalendar = (shift, doctorEspecialidade) => ({
+    ...mapShiftForClient(shift),
+    especialidade: doctorEspecialidade,
+    plantonistas: mapPlantonistasFromAgendamentos(shift.agendamentos)
+});
+
+const buildShiftsFromEscalaRows = (rows, doctorEspecialidade) => {
+    const byKey = new Map();
+    for (const row of rows || []) {
+        const key = `${row.data_plantao}|${row.turno}`;
+        if (!byKey.has(key)) {
+            byKey.set(key, {
+                id: `escala|${row.unidade_id}|${row.data_plantao}|${row.turno}`,
+                unidade_id: row.unidade_id,
+                unidades: row.unidades,
+                data_plantao: row.data_plantao,
+                turno: row.turno,
+                vagas_totais: 99,
+                vagas_ocupadas: 0,
+                status: 'ESCALA',
+                agendamentos: []
+            });
+        }
+        const group = byKey.get(key);
+        group.agendamentos.push({
+            medico_id: row.medico_id,
+            confirmado: true,
+            medicos: row.medicos
+        });
+        group.vagas_ocupadas = group.agendamentos.length;
+    }
+
+    const list = [...byKey.values()].sort((a, b) => {
+        const byDate = (a.data_plantao || '').localeCompare(b.data_plantao || '');
+        if (byDate !== 0) return byDate;
+        return (shiftTurnOrder[a.turno] ?? 99) - (shiftTurnOrder[b.turno] ?? 99);
+    });
+
+    return list.map((shift) => mapShiftForDoctorCalendar(shift, doctorEspecialidade));
+};
 
 const mapDoctorForClient = (doctor) => {
     const baseUnit = {
@@ -143,11 +197,11 @@ export const getDoctorCalendar = async (req, res) => {
             });
         }
 
-        const shifts = filterCurrentAndFutureShifts(await dbModel.getShiftsByUnitAndMonth(selectedUnit.id, month));
-
-        // Busca agendamentos do medico para marcar no calendario
-        const myBookings = await dbModel.getDoctorBookedShifts(medicoId);
-        const bookedShiftIds = (myBookings || []).map(b => b.disponibilidade_id);
+        const escalaRows = await dbModel.getEscalaByUnitAndMonth(selectedUnit.id, month);
+        const shifts = buildShiftsFromEscalaRows(escalaRows, doctor.especialidade);
+        const bookedShiftIds = shifts
+            .filter((s) => (s.plantonistas || []).some((p) => p.id === medicoId))
+            .map((s) => s.id);
 
         res.json({
             doctor: mappedDoctor,
@@ -158,10 +212,7 @@ export const getDoctorCalendar = async (req, res) => {
             },
             specialty: doctor.especialidade,
             bookedShiftIds,
-            shifts: shifts.map((shift) => ({
-                ...mapShiftForClient(shift),
-                especialidade: doctor.especialidade
-            }))
+            shifts
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar calendario do medico.', details: err.message });
@@ -175,17 +226,22 @@ export const getDoctorAgenda = async (req, res) => {
         const doctor = await dbModel.getDoctorById(medicoId);
         if (!doctor) return res.status(404).json({ error: 'Médico não encontrado.' });
 
-        const bookings = await dbModel.getDoctorBookedShifts(medicoId);
-        
-        const mappedAgenda = (bookings || [])
-            .map(b => ({
-                id: b.id,
-                disponibilidadeId: b.disponibilidade_id,
-                data: b.disponibilidade?.data_plantao,
-                turno: b.disponibilidade?.turno,
-                unidade: b.disponibilidade?.unidades?.nome,
+        const escalaLinhas = await dbModel.getEscalaAgendaForMedico(medicoId);
+
+        const mappedAgenda = (escalaLinhas || [])
+            .map((row) => ({
+                id: row.id,
+                disponibilidadeId: row.id,
+                data: row.data_plantao,
+                turno: row.turno,
+                unidade: row.unidades?.nome,
                 especialidade: doctor.especialidade,
-                ...mapBookingDetails(b)
+                tipoPlantao: 'COMPLETO',
+                horaInicio: null,
+                horaFim: null,
+                dataInicioFixo: null,
+                dataFimFixo: null,
+                grupoSequenciaId: null
             }))
             .sort((left, right) => {
                 const dateCompare = (left.data || '').localeCompare(right.data || '');
@@ -199,6 +255,127 @@ export const getDoctorAgenda = async (req, res) => {
         res.json(mappedAgenda);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar sua agenda.', details: err.message });
+    }
+};
+
+export const postAssumirEscala = async (req, res) => {
+    const { medicoId } = req.params;
+    const { unidadeId, data_plantao, turno } = req.body ?? {};
+
+    try {
+        if (!unidadeId || !data_plantao || !turno) {
+            return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
+        }
+        if (!TURNOS_ESCALA.has(turno)) {
+            return res.status(400).json({ error: 'Turno invalido.' });
+        }
+
+        const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
+        if (!resolved) {
+            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+        }
+
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        if (present.includes(medicoId)) {
+            return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
+        }
+
+        try {
+            await dbModel.insertEscalaRow({
+                unidadeId,
+                medicoId,
+                data_plantao,
+                turno
+            });
+        } catch (insertErr) {
+            if (/duplicate|unique|23505/i.test(String(insertErr.message))) {
+                return res.status(409).json({ error: 'Registro duplicado neste turno.' });
+            }
+            throw insertErr;
+        }
+
+        res.json({ message: 'Turno assumido na escala.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao assumir turno.', details: err.message });
+    }
+};
+
+/** Solicitação ao gestor (sem inserir na escala até aprovação). */
+export const postPedidoAssumirEscala = async (req, res) => {
+    const { medicoId } = req.params;
+    const { unidadeId, data_plantao, turno } = req.body ?? {};
+
+    try {
+        if (!unidadeId || !data_plantao || !turno) {
+            return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
+        }
+        if (!TURNOS_ESCALA.has(turno)) {
+            return res.status(400).json({ error: 'Turno invalido.' });
+        }
+
+        const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
+        if (!resolved) {
+            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+        }
+
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        if (present.includes(medicoId)) {
+            return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
+        }
+        if (present.length > 0) {
+            return res.status(400).json({
+                error: 'Turno ja tem plantonistas na escala. Use troca de plantao ou contacte o gestor.'
+            });
+        }
+
+        res.json({
+            message: 'Solicitacao para assumir o turno enviada ao gestor para confirmacao.'
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao registar solicitacao de assumir.', details: err.message });
+    }
+};
+
+export const postPedidoTrocaEscala = async (req, res) => {
+    const { medicoId } = req.params;
+    const { unidadeId, data_plantao, turno, colegaMedicoId } = req.body ?? {};
+
+    try {
+        if (!unidadeId || !data_plantao || !turno) {
+            return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
+        }
+        if (!colegaMedicoId) {
+            return res.status(400).json({ error: 'Selecione o colega para a troca de plantao.' });
+        }
+        if (colegaMedicoId === medicoId) {
+            return res.status(400).json({ error: 'Selecione um colega diferente de voce.' });
+        }
+        if (!TURNOS_ESCALA.has(turno)) {
+            return res.status(400).json({ error: 'Turno invalido.' });
+        }
+
+        const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
+        if (!resolved) {
+            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+        }
+
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        if (present.length === 0) {
+            return res.status(400).json({ error: 'Turno vazio na escala. Use Assumir.' });
+        }
+        if (present.includes(medicoId)) {
+            return res.status(400).json({ error: 'Voce ja esta neste turno.' });
+        }
+        if (!present.includes(colegaMedicoId)) {
+            return res.status(400).json({ error: 'O colega indicado nao esta locado neste turno.' });
+        }
+
+        res.json({
+            message: 'Pedido em analise com o gestor.',
+            colegaMedicoId
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao registar pedido de troca.', details: err.message });
     }
 };
 

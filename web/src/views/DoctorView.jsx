@@ -1,16 +1,14 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
 
+const UNIT_SHIFT_ORDER = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
+
 const initialState = {
     loadingCalendar: false,
-    modal: null,
     error: '',
-    success: '',
-    reservandoId: '',
     selectedMonth: new Date().toISOString().slice(0, 7),
-    selectedDay: '',
     selectedUnitId: '',
     bookedShiftIds: [],
     showAgendaModal: false,
@@ -18,7 +16,8 @@ const initialState = {
     showPasswordSuggestion: false,
     myAgenda: [],
     calendar: null,
-    bookingConfigs: {}
+    bookingConfigs: {},
+    shiftDetailModal: null
 };
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -64,69 +63,47 @@ const isOutsideForecastWindow = (month) => {
     return month < current || month > next;
 };
 
-const getMonthFromDate = (dateString) => dateString.slice(0, 7);
-
-const buildCalendarDays = (month, shifts) => {
+const buildCalendarDayEntries = (month, shifts) => {
     const [year, monthIndex] = month.split('-').map(Number);
     const firstDay = getMonthAnchorDate(month);
     const totalDays = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
     const leadingBlankDays = weekdayIndexByShortName[weekdayFormatter.format(firstDay)] ?? 0;
-    const shiftMap = new Map();
-
-    for (const shift of shifts) {
-        const day = Number(shift.data.slice(-2));
-        const current = shiftMap.get(day) || [];
-        current.push(shift);
-        shiftMap.set(day, current);
-    }
 
     const days = [];
     for (let index = 0; index < leadingBlankDays; index += 1) {
         days.push({ key: `blank-${index}`, empty: true });
     }
+
     for (let day = 1; day <= totalDays; day += 1) {
+        const date = `${month}-${String(day).padStart(2, '0')}`;
+        const byTurn = Object.fromEntries(UNIT_SHIFT_ORDER.map((t) => [t, null]));
+        for (const shift of shifts) {
+            if (shift.data === date && Object.prototype.hasOwnProperty.call(byTurn, shift.turno)) {
+                byTurn[shift.turno] = shift;
+            }
+        }
+        const turnSlots = UNIT_SHIFT_ORDER.map((turno) => ({ turno, shift: byTurn[turno] }));
         days.push({
             key: `day-${day}`,
+            empty: false,
             day,
-            date: `${month}-${String(day).padStart(2, '0')}`,
-            shifts: shiftMap.get(day) || []
+            date,
+            turnSlots
         });
     }
     return days;
 };
 
-const bookingTypeOptions = [
-    { id: 'COMPLETO', label: 'Completo', description: 'Finaliza o agendamento para o turno inteiro.' },
-    { id: 'PARCIAL', label: 'Parcial', description: 'Seleciona um horario de inicio e fim dentro do dia.' },
-    { id: 'FIXO', label: 'Fixo', description: 'Replica o agendamento em dias sequenciais, com horario inteiro ou parcial.' }
-];
-
-const getDefaultBookingForm = (shift) => ({
-    bookingType: 'COMPLETO',
-    partialStartTime: '07:00',
-    partialEndTime: '13:00',
-    fixedEndDate: shift?.data || '',
-    fixedMode: 'COMPLETO',
-    fixedStartTime: '07:00',
-    fixedEndTime: '13:00'
-});
-
 const getBookingConfigStorageKey = (doctorId) => `doctor_booking_configs_${doctorId}`;
 
 const loadBookingConfigs = (doctorId) => {
     if (!doctorId || typeof window === 'undefined') return {};
-
     try {
         const raw = window.localStorage.getItem(getBookingConfigStorageKey(doctorId));
         return raw ? JSON.parse(raw) : {};
     } catch {
         return {};
     }
-};
-
-const saveBookingConfigs = (doctorId, nextConfigs) => {
-    if (!doctorId || typeof window === 'undefined') return;
-    window.localStorage.setItem(getBookingConfigStorageKey(doctorId), JSON.stringify(nextConfigs));
 };
 
 const buildBookingConfigLabel = (config) => {
@@ -151,11 +128,12 @@ const buildAgendaBookingLabel = (agendaItem, fallbackConfig) => {
     }
 
     if (agendaItem?.tipoPlantao === 'FIXO') {
-        const rangeLabel = agendaItem.dataInicioFixo && agendaItem.dataFimFixo
-            ? `${formatDisplayDate(agendaItem.dataInicioFixo)} até ${formatDisplayDate(agendaItem.dataFimFixo)}`
-            : agendaItem.dataFimFixo
-              ? `até ${formatDisplayDate(agendaItem.dataFimFixo)}`
-              : 'Sequência fixa';
+        const rangeLabel =
+            agendaItem.dataInicioFixo && agendaItem.dataFimFixo
+                ? `${formatDisplayDate(agendaItem.dataInicioFixo)} até ${formatDisplayDate(agendaItem.dataFimFixo)}`
+                : agendaItem.dataFimFixo
+                  ? `até ${formatDisplayDate(agendaItem.dataFimFixo)}`
+                  : 'Sequência fixa';
 
         if (agendaItem.horaInicio && agendaItem.horaFim) {
             return `Fixo parcial • ${rangeLabel} • ${agendaItem.horaInicio.slice(0, 5)} às ${agendaItem.horaFim.slice(0, 5)}`;
@@ -165,6 +143,23 @@ const buildAgendaBookingLabel = (agendaItem, fallbackConfig) => {
     }
 
     return buildBookingConfigLabel(fallbackConfig) || 'Completo';
+};
+
+const isMyTurn = (shift, medicoId, bookedShiftIds) => {
+    if (!shift || !medicoId) return false;
+    if (bookedShiftIds.includes(shift.id)) return true;
+    return (shift.plantonistas || []).some((p) => p.id === medicoId);
+};
+
+const turnButtonClass = (shift, medicoId, bookedShiftIds) => {
+    const mine = isMyTurn(shift, medicoId, bookedShiftIds);
+    if (mine) {
+        return 'border-sky-400/80 bg-sky-500/25 text-sky-100 shadow-[0_0_12px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/40';
+    }
+    if (shift) {
+        return 'border-emerald-500/35 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/50';
+    }
+    return 'border-dashed border-slate-600/80 bg-slate-950/40 text-slate-500 hover:border-slate-500';
 };
 
 const ProfileModal = ({ doctor, onClose, onUpdate }) => {
@@ -201,7 +196,7 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-lg" onClick={onClose}>
-            <div className="w-full max-w-md rounded-[2.5rem] border border-slate-700 bg-slate-900 p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-md rounded-[2.5rem] border border-slate-700 bg-slate-900 p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="mb-8 text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
                         <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -209,13 +204,11 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                         </svg>
                     </div>
                     <h3 className="text-2xl font-black text-white">Meu Perfil</h3>
-                    <p className="text-sm text-slate-400 mt-2">Mantenha seus dados de contato e acesso atualizados.</p>
+                    <p className="mt-2 text-sm text-slate-400">Mantenha seus dados de contato e acesso atualizados.</p>
                 </div>
 
                 {error && (
-                    <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200 text-center">
-                        {error}
-                    </div>
+                    <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-center text-sm text-rose-200">{error}</div>
                 )}
 
                 <form onSubmit={handleSave} className="grid gap-5">
@@ -224,7 +217,7 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                         <input
                             type="text"
                             value={formData.nome}
-                            onChange={e => setFormData({ ...formData, nome: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                             className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
                             required
                         />
@@ -234,7 +227,7 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                         <input
                             type="text"
                             value={formData.telefone}
-                            onChange={e => setFormData({ ...formData, telefone: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                             placeholder="(27) 99999-9999"
                             className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
                             required
@@ -243,9 +236,9 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                     <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Senha Privada</label>
                         <input
-                            type="text" // Texto para ser fácil de ver e trocar conforme instrução "facil de mudar"
+                            type="text"
                             value={formData.senha}
-                            onChange={e => setFormData({ ...formData, senha: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
                             className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
                             required
                         />
@@ -273,13 +266,335 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
     );
 };
 
+const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, onSuccess }) => {
+    const [busy, setBusy] = useState(false);
+    const [actionError, setActionError] = useState('');
+    const [colegaParaTrocaId, setColegaParaTrocaId] = useState(null);
+    const [confirmTrocaOpen, setConfirmTrocaOpen] = useState(false);
+    const [confirmAssumirOpen, setConfirmAssumirOpen] = useState(false);
+    const [pedidoGestorSucesso, setPedidoGestorSucesso] = useState(false);
+
+    const { date, turno, shift, unidadeId } = modal || {};
+    const list = shift?.plantonistas || [];
+    const colleagues = list.filter((p) => p.id !== medicoId);
+
+    const isMine = isMyTurn(shift, medicoId, bookedShiftIds);
+    const showAssumir = Boolean(modal && unidadeId) && (!shift || (shift && list.length === 0 && !isMine));
+    const showTroca = Boolean(modal && shift && list.length > 0 && !isMine);
+
+    useEffect(() => {
+        if (!modal) return;
+        setActionError('');
+        setConfirmTrocaOpen(false);
+        setConfirmAssumirOpen(false);
+        setPedidoGestorSucesso(false);
+        const cols = (modal.shift?.plantonistas || []).filter((p) => p.id !== medicoId);
+        setColegaParaTrocaId(cols.length === 1 ? cols[0].id : null);
+    }, [modal, medicoId]);
+
+    if (!modal) return null;
+
+    const enviarPedidoAssumir = async () => {
+        setActionError('');
+        setBusy(true);
+        try {
+            const response = await fetch(`/api/medicos/${medicoId}/escala/pedido-assumir`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    unidadeId,
+                    data_plantao: date,
+                    turno
+                })
+            });
+            const data = await parseJsonSafely(response);
+            if (!response.ok) {
+                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+            }
+            setConfirmAssumirOpen(false);
+            setPedidoGestorSucesso(true);
+        } catch (err) {
+            setActionError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const enviarPedidoTroca = async () => {
+        if (!colegaParaTrocaId) {
+            setActionError('Selecione o colega com quem pretende solicitar a troca.');
+            return;
+        }
+        setActionError('');
+        setBusy(true);
+        try {
+            const response = await fetch(`/api/medicos/${medicoId}/escala/pedido-troca`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    unidadeId,
+                    data_plantao: date,
+                    turno,
+                    colegaMedicoId: colegaParaTrocaId
+                })
+            });
+            const data = await parseJsonSafely(response);
+            if (!response.ok) {
+                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+            }
+            setConfirmTrocaOpen(false);
+            setPedidoGestorSucesso(true);
+        } catch (err) {
+            setActionError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const fecharAposPedidoGestor = () => {
+        setPedidoGestorSucesso(false);
+        onSuccess?.();
+        onClose();
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-md"
+            onClick={onClose}
+            role="presentation"
+        >
+            <div
+                className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-700 bg-slate-900 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="shift-detail-title"
+            >
+                {confirmAssumirOpen ? (
+                    <div
+                        className="absolute inset-0 z-[1] flex items-center justify-center rounded-[2rem] bg-slate-950/85 px-4 backdrop-blur-sm"
+                        role="presentation"
+                        onClick={() => !busy && setConfirmAssumirOpen(false)}
+                    >
+                        <div
+                            className="w-full max-w-sm rounded-2xl border border-emerald-500/35 bg-slate-900 p-6 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                            role="alertdialog"
+                            aria-labelledby="confirm-assumir-title"
+                            aria-describedby="confirm-assumir-desc"
+                        >
+                            <h4 id="confirm-assumir-title" className="text-lg font-black text-white">
+                                Confirmar assumir turno
+                            </h4>
+                            <p id="confirm-assumir-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
+                                Será enviada uma <span className="font-semibold text-emerald-200">solicitação ao gestor</span> da regional para confirmar
+                                que você assume este turno vago. Deseja enviar?
+                            </p>
+                            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => setConfirmAssumirOpen(false)}
+                                    className="rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Não
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={enviarPedidoAssumir}
+                                    className="rounded-xl border border-emerald-500/50 bg-emerald-500/25 px-4 py-3 text-sm font-black text-emerald-50 transition hover:bg-emerald-500/35 disabled:opacity-50"
+                                >
+                                    {busy ? 'A enviar...' : 'Sim'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : confirmTrocaOpen ? (
+                    <div
+                        className="absolute inset-0 z-[1] flex items-center justify-center rounded-[2rem] bg-slate-950/85 px-4 backdrop-blur-sm"
+                        role="presentation"
+                        onClick={() => !busy && setConfirmTrocaOpen(false)}
+                    >
+                        <div
+                            className="w-full max-w-sm rounded-2xl border border-amber-500/35 bg-slate-900 p-6 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                            role="alertdialog"
+                            aria-labelledby="confirm-troca-title"
+                            aria-describedby="confirm-troca-desc"
+                        >
+                            <h4 id="confirm-troca-title" className="text-lg font-black text-white">
+                                Confirmar troca de plantão
+                            </h4>
+                            <p id="confirm-troca-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
+                                O gestor da regional precisa <span className="font-semibold text-amber-200">autorizar</span> esta troca com o colega
+                                selecionado. Deseja enviar o pedido?
+                            </p>
+                            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => setConfirmTrocaOpen(false)}
+                                    className="rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Não
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={enviarPedidoTroca}
+                                    className="rounded-xl border border-amber-500/50 bg-amber-500/25 px-4 py-3 text-sm font-black text-amber-50 transition hover:bg-amber-500/35 disabled:opacity-50"
+                                >
+                                    {busy ? 'A enviar...' : 'Sim'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">Detalhe do turno</p>
+                        <h3 id="shift-detail-title" className="mt-2 text-2xl font-black capitalize text-white">
+                            {formatDisplayDate(date)}
+                        </h3>
+                        <p className="mt-1 text-lg font-bold text-slate-200">{turno}</p>
+                        <p className="mt-2 text-sm text-slate-400">
+                            Unidade: <span className="font-semibold text-slate-200">{shift?.local || unitNome || '—'}</span>
+                        </p>
+                        {shift ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                                Estado: <span className="text-slate-400">{shift.status || '—'}</span>
+                                {typeof shift.vagas === 'number' ? (
+                                    <>
+                                        {' '}
+                                        · Vagas livres: <span className="text-slate-400">{shift.vagas}</span>
+                                    </>
+                                ) : null}
+                            </p>
+                        ) : null}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="shrink-0 rounded-2xl bg-slate-800 p-3 text-slate-400 transition hover:text-white"
+                        aria-label="Fechar"
+                    >
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                    {pedidoGestorSucesso ? (
+                        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-6 text-center">
+                            <p className="text-base font-bold text-emerald-100">Em análise com o gestor, aguarde retorno.</p>
+                            <button
+                                type="button"
+                                onClick={fecharAposPedidoGestor}
+                                className="mt-5 w-full rounded-2xl bg-emerald-500 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    ) : !shift ? (
+                        <p className="text-sm leading-relaxed text-slate-400">
+                            Sem registo de escala para este turno neste sistema (vaga em aberto ou ainda não publicada).
+                        </p>
+                    ) : list.length === 0 ? (
+                        <p className="text-sm text-slate-400">Nenhum plantonista locado neste turno.</p>
+                    ) : (
+                        <>
+                            {showTroca ? (
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wider text-amber-200/90">
+                                    Selecione o colega para solicitar troca de plantão (módulo médico)
+                                </p>
+                            ) : null}
+                            <ul className="space-y-3">
+                                {list.map((p) => {
+                                    const mine = p.id === medicoId;
+                                    const selectable = showTroca && !mine;
+                                    const selected = colegaParaTrocaId === p.id;
+                                    return (
+                                        <li key={p.id}>
+                                            <button
+                                                type="button"
+                                                disabled={!selectable}
+                                                onClick={() => selectable && setColegaParaTrocaId(p.id)}
+                                                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                                                    mine
+                                                        ? 'border-sky-400/40 bg-sky-500/15 text-sky-50'
+                                                        : selected && selectable
+                                                          ? 'border-amber-400/70 bg-amber-500/20 text-amber-50 ring-2 ring-amber-400/40'
+                                                          : selectable
+                                                            ? 'border-slate-700/80 bg-slate-950/50 text-slate-200 hover:border-amber-500/40'
+                                                            : 'border-slate-700/80 bg-slate-950/50 text-slate-200'
+                                                } ${selectable ? 'cursor-pointer' : 'cursor-default'}`}
+                                            >
+                                                <div className="font-bold">{p.nome}</div>
+                                                {p.especialidade ? <div className="mt-1 text-sm text-slate-400">{p.especialidade}</div> : null}
+                                                {mine ? (
+                                                    <div className="mt-2 text-xs font-bold uppercase tracking-wider text-sky-300">Seu plantão</div>
+                                                ) : selectable && selected ? (
+                                                    <div className="mt-2 text-xs font-bold uppercase tracking-wider text-amber-200">Selecionado para troca</div>
+                                                ) : null}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </>
+                    )}
+                </div>
+
+                {!pedidoGestorSucesso && (showAssumir || showTroca) ? (
+                    <div className="border-t border-slate-800 p-4">
+                        {actionError ? (
+                            <p className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{actionError}</p>
+                        ) : null}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                            {showAssumir ? (
+                                <button
+                                    type="button"
+                                    disabled={busy || !unidadeId}
+                                    onClick={() => {
+                                        setActionError('');
+                                        setConfirmAssumirOpen(true);
+                                    }}
+                                    className="flex-1 rounded-2xl border border-emerald-500/50 bg-emerald-500/20 py-3 text-sm font-black text-emerald-100 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                                >
+                                    Assumir
+                                </button>
+                            ) : null}
+                            {showTroca ? (
+                                <button
+                                    type="button"
+                                    disabled={busy || !unidadeId || !colegaParaTrocaId || colleagues.length === 0}
+                                    onClick={() => {
+                                        setActionError('');
+                                        setConfirmTrocaOpen(true);
+                                    }}
+                                    className="flex-1 rounded-2xl border border-amber-500/50 bg-amber-500/15 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50"
+                                >
+                                    Troca de plantão
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
+};
+
 export default function DoctorView() {
     const { session, logout } = useAuth();
     const [state, setState] = useState(initialState);
 
     const loadCalendar = async (doctorId, month, unitId = '') => {
         if (!doctorId) return;
-        
+
         setState((current) => ({ ...current, loadingCalendar: true, error: '' }));
 
         try {
@@ -288,6 +603,18 @@ export default function DoctorView() {
             const data = await parseJsonSafely(response);
 
             if (!response.ok) {
+                if (response.status === 404) {
+                    try {
+                        window.sessionStorage.setItem(
+                            'login-notice',
+                            'Sessão antiga: o médico guardado já não existe na base. Entre de novo e escolha um perfil da lista.'
+                        );
+                    } catch {
+                        /* ignore */
+                    }
+                    logout();
+                    return;
+                }
                 const msg = data?.details ? `${data.error} (${data.details})` : data?.error || 'Nao foi possivel carregar o calendario.';
                 throw new Error(msg);
             }
@@ -297,7 +624,7 @@ export default function DoctorView() {
                 loadingCalendar: false,
                 calendar: data,
                 bookedShiftIds: data?.bookedShiftIds || [],
-                selectedDay: ''
+                shiftDetailModal: null
             }));
         } catch (error) {
             setState((current) => ({ ...current, loadingCalendar: false, error: error.message }));
@@ -310,7 +637,7 @@ export default function DoctorView() {
             const response = await fetch(`/api/medicos/${session.id}/agenda`);
             const data = await parseJsonSafely(response);
             if (response.ok) {
-                setState(prev => ({ ...prev, myAgenda: data || [], showAgendaModal: true }));
+                setState((prev) => ({ ...prev, myAgenda: data || [], showAgendaModal: true }));
             }
         } catch (err) {
             console.error('Erro ao buscar agenda:', err);
@@ -320,10 +647,9 @@ export default function DoctorView() {
     useEffect(() => {
         if (session?.id) {
             loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
-            
-            // Sugestão de troca de senha se for a padrão
+
             if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
-                setState(prev => ({ ...prev, showPasswordSuggestion: true }));
+                setState((prev) => ({ ...prev, showPasswordSuggestion: true }));
             }
         }
     }, [session?.id, state.selectedMonth, state.selectedUnitId]);
@@ -336,390 +662,55 @@ export default function DoctorView() {
         }));
     }, [session?.id]);
 
-    const persistBookingConfigEntries = (entries) => {
-        if (!session?.id || !entries || Object.keys(entries).length === 0) return;
+    const {
+        loadingCalendar,
+        error,
+        selectedMonth,
+        selectedUnitId,
+        bookedShiftIds,
+        showAgendaModal,
+        showProfileModal,
+        showPasswordSuggestion,
+        myAgenda,
+        calendar,
+        bookingConfigs,
+        shiftDetailModal
+    } = state;
 
-        setState((current) => {
-            const nextConfigs = {
-                ...current.bookingConfigs,
-                ...entries
-            };
-            saveBookingConfigs(session.id, nextConfigs);
-            return {
-                ...current,
-                bookingConfigs: nextConfigs
-            };
-        });
-    };
-
-    const findShiftById = (shiftId) => (state.calendar?.shifts || []).find((shift) => shift.id === shiftId);
-
-    const releaseReservationHold = async (shiftId) => {
-        if (!session?.id || !shiftId) return;
-
-        try {
-            await fetch(`/api/vagas/${shiftId}/bloquear`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medicoId: session.id })
-            });
-        } catch {}
-    };
-
-    const handleSelectShift = async (shiftId) => {
-        if (!session?.id) return;
-
-        setState((current) => ({
-            ...current,
-            error: '',
-            success: '',
-            reservandoId: shiftId,
-            modal: {
-                type: 'loading',
-                title: 'Aguardando vaga',
-                message: 'Estamos entrando na fila e bloqueando a vaga temporariamente para voce.'
-            }
-        }));
-
-        try {
-            const response = await fetch(`/api/vagas/${shiftId}/bloquear`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medicoId: session.id })
-            });
-            const data = await parseJsonSafely(response);
-
-            if (!response.ok) throw new Error(data?.error || 'Nao foi possivel iniciar a reserva.');
-
-            const shift = findShiftById(shiftId);
-
-            setState((current) => ({
-                ...current,
-                modal: {
-                    type: 'select-shift-type',
-                    shiftId,
-                    shift,
-                    reservedUntil: data?.hold?.reservedUntil,
-                    title: 'Tipo de plantao',
-                    message: 'Escolha se o plantao sera completo, parcial ou fixo antes de finalizar a reserva.',
-                    form: getDefaultBookingForm(shift)
-                }
-            }));
-        } catch (error) {
-            if (/confirmacao por outro medico/i.test(error.message)) {
-                setState((current) => ({
-                    ...current,
-                    modal: {
-                        type: 'loading',
-                        title: 'PROCESSANDO',
-                        message: 'A vaga esta sendo confirmada por outro usuario. Aguarde.'
-                    }
-                }));
-
-                window.setTimeout(() => {
-                    loadCalendar(session.id, state.selectedMonth);
-                    setState((current) => ({ ...current, reservandoId: '', modal: null }));
-                }, 3000);
-                return;
-            }
-
-            releaseReservationHold(shiftId);
-            setState((current) => ({
-                ...current,
-                reservandoId: '',
-                error: error.message,
-                modal: {
-                    type: 'feedback',
-                    variant: 'error',
-                    title: 'Nao foi possivel bloquear a vaga',
-                    message: error.message
-                }
-            }));
-        }
-    };
-
-    const closeModal = () => {
-        const activeModal = state.modal;
-        if (activeModal?.type === 'loading') {
-            return;
-        }
-        if (activeModal?.shiftId && activeModal?.type !== 'feedback' && activeModal?.type !== 'loading') {
-            releaseReservationHold(activeModal.shiftId);
-        }
-        setState((current) => ({
-            ...current,
-            modal: null,
-            reservandoId: activeModal?.shiftId ? '' : current.reservandoId
-        }));
-    };
-
-    const updateBookingForm = (field, value) => {
-        setState((current) => {
-            if (!current.modal?.form) return current;
-
-            return {
-                ...current,
-                modal: {
-                    ...current.modal,
-                    form: {
-                        ...current.modal.form,
-                        [field]: value
-                    }
-                }
-            };
-        });
-    };
-
-    const buildReservationPayload = (form) => {
-        if (form.bookingType === 'PARCIAL') {
-            return {
-                bookingType: 'PARCIAL',
-                startTime: form.partialStartTime,
-                endTime: form.partialEndTime
-            };
-        }
-
-        if (form.bookingType === 'FIXO') {
-            return {
-                bookingType: 'FIXO',
-                fixedMode: form.fixedMode,
-                fixedEndDate: form.fixedEndDate,
-                startTime: form.fixedMode === 'PARCIAL' ? form.fixedStartTime : null,
-                endTime: form.fixedMode === 'PARCIAL' ? form.fixedEndTime : null
-            };
-        }
-
-        return {
-            bookingType: 'COMPLETO'
-        };
-    };
-
-    const validateReservationForm = (modalState) => {
-        const form = modalState?.form;
-        const shift = modalState?.shift;
-
-        if (!form || !shift) {
-            return 'Plantao selecionado invalido.';
-        }
-
-        if (form.bookingType === 'PARCIAL') {
-            if (!form.partialStartTime || !form.partialEndTime) {
-                return 'Selecione o horario inicial e final do plantao parcial.';
-            }
-
-            if (form.partialStartTime >= form.partialEndTime) {
-                return 'O horario final precisa ser maior que o horario inicial.';
-            }
-        }
-
-        if (form.bookingType === 'FIXO') {
-            if (!form.fixedEndDate) {
-                return 'Selecione a data final do plantao fixo.';
-            }
-
-            if (form.fixedEndDate < shift.data) {
-                return 'A data final do plantao fixo nao pode ser anterior ao dia selecionado.';
-            }
-
-            if (form.fixedMode === 'PARCIAL') {
-                if (!form.fixedStartTime || !form.fixedEndTime) {
-                    return 'Selecione o horario inicial e final do plantao fixo parcial.';
-                }
-
-                if (form.fixedStartTime >= form.fixedEndTime) {
-                    return 'O horario final do plantao fixo precisa ser maior que o horario inicial.';
-                }
-            }
-        }
-
-        return '';
-    };
-
-    const reserveSingleShift = async (shiftId, payload, acquireHold = false) => {
-        if (acquireHold) {
-            const holdResponse = await fetch(`/api/vagas/${shiftId}/bloquear`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medicoId: session.id })
-            });
-            const holdData = await parseJsonSafely(holdResponse);
-
-            if (!holdResponse.ok) {
-                throw new Error(holdData?.error || 'Nao foi possivel bloquear uma das vagas da sequencia.');
-            }
-        }
-
-        const response = await fetch(`/api/vagas/${shiftId}/selecionar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ medicoId: session.id, ...payload })
-        });
-        const data = await parseJsonSafely(response);
-
-        if (!response.ok) {
-            if (acquireHold) {
-                await releaseReservationHold(shiftId);
-            }
-            throw new Error(data?.error || 'Falha ao reservar plantao.');
-        }
-
-        return data;
-    };
-
-    const handleConfirmReservation = async () => {
-        if (!session?.id || state.modal?.type !== 'select-shift-type') return;
-
-        const shiftId = state.modal.shiftId;
-        const shift = state.modal.shift;
-        const validationError = validateReservationForm(state.modal);
-
-        if (validationError) {
-            setState((current) => ({
-                ...current,
-                error: validationError
-            }));
-            return;
-        }
-
-        const payload = buildReservationPayload(state.modal.form);
-        const sequenceGroupId =
-            payload.bookingType === 'FIXO'
-                ? (globalThis.crypto?.randomUUID?.() ?? `fixed-${Date.now()}-${session.id}`)
-                : null;
-
-        const payloadWithSequence = sequenceGroupId
-            ? { ...payload, sequenceGroupId }
-            : payload;
-        try {
-            setState((current) => ({
-                ...current,
-                modal: {
-                    type: 'loading',
-                    title: 'Processando reserva',
-                    message: payloadWithSequence.bookingType === 'FIXO'
-                        ? 'Estamos aplicando a sequencia fixa de plantao nos dias selecionados.'
-                        : 'Estamos confirmando sua vez na fila e registrando o agendamento.'
-                }
-            }));
-
-            let successMessage = 'Plantao reservado com sucesso.';
-            const savedConfigs = {};
-
-            if (payloadWithSequence.bookingType === 'FIXO') {
-                const sequenceShifts = (state.calendar?.shifts || [])
-                    .filter((calendarShift) =>
-                        calendarShift.turno === shift.turno &&
-                        calendarShift.data >= shift.data &&
-                        calendarShift.data <= payloadWithSequence.fixedEndDate
-                    )
-                    .sort((left, right) => left.data.localeCompare(right.data));
-
-                if (sequenceShifts.length === 0) {
-                    throw new Error('Nenhum plantao sequencial foi encontrado para o periodo informado.');
-                }
-
-                const bookedIds = [];
-                const failedDates = [];
-
-                for (const [index, targetShift] of sequenceShifts.entries()) {
-                    try {
-                        await reserveSingleShift(targetShift.id, payloadWithSequence, index !== 0);
-                        bookedIds.push(targetShift.id);
-                        savedConfigs[targetShift.id] = {
-                            bookingType: 'FIXO',
-                            fixedMode: payloadWithSequence.fixedMode,
-                            fixedEndDate: payloadWithSequence.fixedEndDate,
-                            startTime: payloadWithSequence.startTime,
-                            endTime: payloadWithSequence.endTime
-                        };
-                    } catch (reservationError) {
-                        failedDates.push(`${formatDisplayDate(targetShift.data)} (${reservationError.message})`);
-                    }
-                }
-
-                if (bookedIds.length === 0) {
-                    throw new Error(failedDates[0] || 'Nao foi possivel reservar a sequencia fixa.');
-                }
-
-                successMessage = failedDates.length > 0
-                    ? `Sequencia fixa aplicada em ${bookedIds.length} dia(s). Algumas datas nao puderam ser reservadas: ${failedDates.join('; ')}`
-                    : `Sequencia fixa aplicada com sucesso em ${bookedIds.length} dia(s).`;
-            } else {
-                const data = await reserveSingleShift(shiftId, payloadWithSequence, false);
-                successMessage = data?.message || 'Plantao reservado com sucesso.';
-                savedConfigs[shiftId] = {
-                    bookingType: payloadWithSequence.bookingType,
-                    startTime: payloadWithSequence.startTime,
-                    endTime: payloadWithSequence.endTime
-                };
-            }
-
-            persistBookingConfigEntries(savedConfigs);
-
-            setState((current) => ({
-                ...current,
-                reservandoId: '',
-                success: successMessage,
-                modal: {
-                    type: 'feedback',
-                    variant: 'success',
-                    title: 'Reserva confirmada',
-                    message: successMessage
-                }
-            }));
-
-            loadCalendar(session.id, state.selectedMonth);
-        } catch (error) {
-            setState((current) => ({
-                ...current,
-                reservandoId: '',
-                error: error.message,
-                modal: {
-                    type: 'feedback',
-                    variant: 'error',
-                    title: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'TEMPO EXCEDIDO!' : 'Reserva nao concluida',
-                    message: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'VAGA INDISPONÍVEL!' : error.message
-                }
-            }));
-        }
-    };
-
-    const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, showProfileModal, showPasswordSuggestion, myAgenda, calendar, bookingConfigs } = state;
-    const calendarDays = buildCalendarDays(selectedMonth, calendar?.shifts || []);
+    const calendarDays = buildCalendarDayEntries(selectedMonth, calendar?.shifts || []);
     const outsideForecast = isOutsideForecastWindow(selectedMonth);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
-    
-    const getShiftAlertClasses = (shift) => {
-        const isMine = bookedShiftIds.includes(shift.id);
-        if (isMine) {
-            return 'border border-sky-400 bg-sky-500/20 text-sky-100 shadow-[0_0_15px_rgba(56,189,248,0.4)] ';
-        }
-        return shift.vagas <= 0
-            ? 'border border-rose-400/70 bg-rose-500/10 text-rose-100 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_22px_rgba(244,63,94,0.2)] '
-            : 'border border-emerald-400/15 bg-emerald-500/10';
-    };
-            
-    const visibleMonth = selectedDay ? getMonthFromDate(selectedDay) : selectedMonth;
-    
-    const selectedDayShifts = useMemo(() => {
-        if (!selectedDay) return [];
-        return (calendar?.shifts || []).filter((shift) => shift.data === selectedDay);
-    }, [calendar, selectedDay]);
 
     if (!session) return null;
 
+    const unitNomeCalendario = calendar?.unit?.nome || session.unidadeFixaNome;
+
     return (
         <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
-            {/* Sugestão de Troca de Senha */}
             {showPasswordSuggestion && (
                 <div className="flex flex-col gap-3 bg-emerald-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p className="flex items-start gap-2 text-sm font-bold sm:items-center">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
                         Sua senha ainda é a padrão (12345). Para sua segurança, recomendamos trocá-la agora.
                     </p>
                     <div className="flex flex-wrap items-center gap-4">
-                        <button onClick={() => setState(prev => ({ ...prev, showProfileModal: true, showPasswordSuggestion: false }))} className="text-xs font-black uppercase underline hover:no-underline">Trocar Agora</button>
-                        <button onClick={() => { setState(prev => ({ ...prev, showPasswordSuggestion: false })); localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-70">Não agora</button>
+                        <button
+                            onClick={() => setState((prev) => ({ ...prev, showProfileModal: true, showPasswordSuggestion: false }))}
+                            className="text-xs font-black uppercase underline hover:no-underline"
+                        >
+                            Trocar Agora
+                        </button>
+                        <button
+                            onClick={() => {
+                                setState((prev) => ({ ...prev, showPasswordSuggestion: false }));
+                                localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true');
+                            }}
+                            className="text-xs font-bold opacity-70"
+                        >
+                            Não agora
+                        </button>
                     </div>
                 </div>
             )}
@@ -728,33 +719,37 @@ export default function DoctorView() {
                 <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
                         <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
-                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Agenda mensal de plantões</h1>
-                        
+                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Escala da unidade</h1>
+                        <p className="mt-1 max-w-xl text-sm text-slate-400">
+                            Visualize o mês com os quatro turnos por dia (<span className="font-semibold text-slate-300">manhã, tarde, noite, madrugada</span>).
+                            Toque num turno para ver detalhes e plantonistas. Seus plantões aparecem em destaque.
+                        </p>
+
                         <div className="mt-4 flex flex-wrap items-center gap-4">
-                            <div className="text-xs text-slate-400 uppercase tracking-widest font-bold">Unidade Atual:</div>
-                            
+                            <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Unidade</div>
+
                             {(session?.unidadesAutorizadas || []).length > 1 ? (
-                                <select 
+                                <select
                                     value={selectedUnitId || session.unidadeFixaId}
-                                    onChange={(e) => setState(prev => ({ ...prev, selectedUnitId: e.target.value, selectedDay: '' }))}
+                                    onChange={(e) => setState((prev) => ({ ...prev, selectedUnitId: e.target.value, shiftDetailModal: null }))}
                                     className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2 text-sm font-bold text-emerald-100 outline-none transition focus:border-emerald-400 focus:bg-emerald-500/10"
                                 >
-                                    {(session.unidadesAutorizadas || []).map(ua => (
+                                    {(session.unidadesAutorizadas || []).map((ua) => (
                                         <option key={ua.id} value={ua.id} className="bg-slate-900 text-white">
                                             {ua.nome} {ua.tipo === 'BASE' ? '(Fixa)' : '(Auxiliar)'}
                                         </option>
                                     ))}
                                 </select>
                             ) : (
-                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-100 italic">
+                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-bold italic text-emerald-100">
                                     {session.unidadeFixaNome}
                                 </div>
                             )}
 
-                            <div className="h-4 w-px bg-slate-800 mx-2 hidden md:block"></div>
+                            <div className="mx-2 hidden h-4 w-px bg-slate-800 md:block" />
 
                             <div className="text-sm text-slate-300">
-                                Especialidade: <span className="font-bold text-emerald-300">{session.especialidade}</span>
+                                Sua especialidade: <span className="font-bold text-emerald-300">{session.especialidade}</span>
                             </div>
                         </div>
                     </div>
@@ -763,22 +758,27 @@ export default function DoctorView() {
                         <button
                             type="button"
                             onClick={fetchMyAgenda}
-                            title="Ver minha agenda"
-                            className="group relative flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 p-4 transition hover:bg-slate-800 hover:border-emerald-400/40"
+                            title="Ver meus plantões na agenda"
+                            className="group relative flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 p-4 transition hover:border-emerald-400/40 hover:bg-slate-800"
                         >
-                            <svg className="h-6 w-6 text-emerald-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            <svg className="h-6 w-6 text-emerald-400 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                                />
                             </svg>
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-slate-950">
+                            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-slate-950">
                                 {bookedShiftIds.length}
                             </span>
                         </button>
 
                         <button
-                            onClick={() => setState(prev => ({ ...prev, showProfileModal: true }))}
-                            className="text-left group flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 transition hover:bg-emerald-500/20 shadow-lg shadow-emerald-950/30"
+                            onClick={() => setState((prev) => ({ ...prev, showProfileModal: true }))}
+                            className="group flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-left shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-500/20"
                         >
-                            <div className="rounded-full bg-emerald-500/20 p-2 group-hover:bg-emerald-500/30 transition">
+                            <div className="rounded-full bg-emerald-500/20 p-2 transition group-hover:bg-emerald-500/30">
                                 <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
@@ -799,447 +799,217 @@ export default function DoctorView() {
                 </header>
 
                 <section className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
-                    <div className="text-sm text-slate-300">Selecione o mês e clique no dia desejado para ver os plantões disponíveis.</div>
-
+                    <div className="text-sm text-slate-300">Navegue pelo mês. A escala é definida pelo gestor da regional; pedidos de troca virão depois.</div>
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
-                            onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, -1) }))}
+                            onClick={() => setState((current) => ({ ...current, selectedMonth: shiftMonth(current.selectedMonth, -1), shiftDetailModal: null }))}
                             className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
                             Mês anterior
                         </button>
-                        <div className="min-w-0 flex-1 text-center text-sm font-semibold capitalize text-slate-200 sm:min-w-44">{getMonthTitle(visibleMonth)}</div>
+                        <div className="min-w-0 flex-1 text-center text-sm font-semibold capitalize text-slate-200 sm:min-w-44">{getMonthTitle(selectedMonth)}</div>
                         <button
                             type="button"
-                            onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, 1) }))}
+                            onClick={() => setState((current) => ({ ...current, selectedMonth: shiftMonth(current.selectedMonth, 1), shiftDetailModal: null }))}
                             className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
                             Próximo mês
                         </button>
-                        </div>
+                    </div>
                 </section>
 
                 {outsideForecast && (
                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
                         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
                         <div>
-                            <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
+                            <p className="font-bold text-amber-300">Mês fora da janela automática de previsão</p>
                             <p className="mt-1 text-amber-200/80">
-                                O preditor cobre apenas <span className="font-semibold capitalize">{getMonthTitle(forecastCurrent)}</span> e{' '}
-                                <span className="font-semibold capitalize">{getMonthTitle(forecastNext)}</span>.
-                                O calendário abaixo pode ficar vazio ou incompleto.
+                                O gerador automático cobre <span className="font-semibold capitalize">{getMonthTitle(forecastCurrent)}</span> e{' '}
+                                <span className="font-semibold capitalize">{getMonthTitle(forecastNext)}</span>. Meses distantes podem ter menos registos de
+                                disponibilidade até a escala ser lançada.
                             </p>
                         </div>
                     </div>
                 )}
 
-                {success && <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{success}</div>}
                 {error && <div className="mb-6 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
 
-                {!selectedDay ? (
-                    <section className="rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl shadow-slate-950/40">
-                        <div className="mb-6 flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
-                            <div>
-                                <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">Calendário</p>
-                                <h2 className="mt-2 text-3xl font-black text-white">{session.nome}</h2>
-                                <p className="mt-2 text-sm text-slate-400">
-                                    Unidade: <span className="text-slate-200">{calendar?.unit?.nome || session.unidadeFixaNome}</span> | Especialidade:{' '}
-                                    <span className="text-slate-200">{calendar?.specialty || session.especialidade}</span>
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                                {(calendar?.shifts || []).length} plantões no mês
-                            </div>
+                <section className="rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl shadow-slate-950/40">
+                    <div className="mb-6 flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">Calendário mensal</p>
+                            <h2 className="mt-2 text-2xl font-black text-white md:text-3xl">{session.nome}</h2>
+                            <p className="mt-2 text-sm text-slate-400">
+                                Unidade: <span className="text-slate-200">{unitNomeCalendario}</span>
+                            </p>
                         </div>
-
-                        {loadingCalendar ? (
-                            <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando calendário...</div>
-                        ) : (
-                            <>
-                                <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">
-                                    {weekdayLabels.map((label) => (
-                                        <div key={label} className="px-2 py-3 text-center text-xs font-bold uppercase tracking-[0.25em] text-slate-500">
-                                            {label}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-                                    {calendarDays.map((entry) =>
-                                        entry.empty ? (
-                                            <div key={entry.key} className="hidden rounded-3xl border border-transparent md:block" />
-                                        ) : (
-                                            <button
-                                                key={entry.key}
-                                                type="button"
-                                                onClick={() => setState((current) => ({ ...current, selectedMonth: getMonthFromDate(entry.date), selectedDay: entry.date }))}
-                                                className="min-h-40 rounded-3xl border border-slate-800 bg-slate-950/50 p-4 text-left transition hover:border-emerald-400/40"
-                                            >
-                                                <div className="mb-4 flex items-center justify-between">
-                                                    <span className="text-sm font-bold text-white">{String(entry.day).padStart(2, '0')}</span>
-                                                    <span className="text-xs uppercase tracking-[0.2em] text-slate-500">{entry.shifts.length} turno{entry.shifts.length === 1 ? '' : 's'}</span>
-                                                </div>
-
-                                                <div className="grid gap-1.5">
-                                                    {entry.shifts.length === 0 ? (
-                                                        <div className="rounded-2xl border border-dashed border-slate-800 px-3 py-4 text-xs text-slate-500">
-                                                            Sem agenda para este dia.
-                                                        </div>
-                                                    ) : (
-                                                        entry.shifts.map((shift) => (
-                                                            <div key={shift.id} className={`rounded-xl px-2 py-1.5 ${getShiftAlertClasses(shift)}`}>
-                                                                <div className={`text-[11px] font-bold ${shift.vagas <= 0 ? 'text-rose-100' : 'text-emerald-100'}`}>{shift.turno}</div>
-                                                                <div className={`mt-0.5 text-[9px] uppercase tracking-[0.1em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>
-                                                                    {shift.vagas} vagas
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            </button>
-                                        )
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </section>
-                ) : (
-                    <section className="rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl shadow-slate-950/40">
-                        <div className="mb-6 flex flex-col gap-4 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
-                            <div>
-                                <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">Dia Selecionado</p>
-                                <h2 className="mt-2 text-3xl font-black text-white">{formatDisplayDate(selectedDay)}</h2>
-                                <p className="mt-2 text-sm text-slate-400">
-                                    Unidade: <span className="text-slate-200">{calendar?.unit?.nome || session.unidadeFixaNome}</span> | Especialidade:{' '}
-                                    <span className="text-slate-200">{calendar?.specialty || session.especialidade}</span>
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setState((current) => ({ ...current, selectedDay: '' }))}
-                                className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
-                            >
-                                Voltar ao calendário
-                            </button>
-                        </div>
-
-                        {selectedDayShifts.length === 0 ? (
-                            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-10 text-center text-slate-300">
-                                Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
-                            </div>
-                        ) : (
-                            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                {selectedDayShifts.map((shift) => (
-                                    <article
-                                        key={shift.id}
-                                        className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
-                                            shift.vagas <= 0
-                                                ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)] '
-                                                : bookedShiftIds.includes(shift.id)
-                                                    ? 'border-sky-400 shadow-[0_0_30px_rgba(56,189,248,0.3)] '
-                                                    : 'border-slate-800 hover:border-emerald-400/40'
-                                        }`}
-                                    >
-                                        <div className="mb-5 flex items-start justify-between gap-3">
-                                            <div>
-                                                <span
-                                                    className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${
-                                                        bookedShiftIds.includes(shift.id)
-                                                            ? 'border border-sky-400/40 bg-sky-500/10 text-sky-200'
-                                                            : shift.vagas <= 0
-                                                                ? 'border border-rose-400/40 bg-rose-500/10 text-rose-200'
-                                                                : 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
-                                                    }`}
-                                                >
-                                                    {shift.turno} {bookedShiftIds.includes(shift.id) && '• MEU PLANTÃO'}
-                                                </span>
-                                                <h2 className="mt-4 text-2xl font-bold text-white">{shift.local}</h2>
-                                            </div>
-                                            <span className="text-sm text-slate-400">{formatDisplayDate(shift.data)}</span>
-                                        </div>
-
-                                        <div className={`mb-6 rounded-2xl p-4 ${shift.vagas <= 0 ? 'bg-rose-950/30 ring-1 ring-rose-400/30' : 'bg-slate-800/70'}`}>
-                                            <p className="text-sm text-slate-400">Especialidade</p>
-                                            <p className="mt-2 text-lg font-bold text-white">{shift.especialidade}</p>
-                                            <p className="mt-4 text-sm text-slate-400">Vagas disponíveis</p>
-                                            <p className={`mt-2 text-3xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
-                                            <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-emerald-200/70'}`}>{shift.status}</p>
-                                            {bookedShiftIds.includes(shift.id) && bookingConfigs[shift.id] ? (
-                                                <p className="mt-3 text-xs text-sky-200/90">{buildBookingConfigLabel(bookingConfigs[shift.id])}</p>
-                                            ) : null}
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSelectShift(shift.id)}
-                                            disabled={reservandoId === shift.id || shift.vagas <= 0}
-                                            className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-                                        >
-                                            {reservandoId === shift.id ? 'Reservando...' : 'Aceitar plantão'}
-                                        </button>
-                                    </article>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-            {/* Modal de Perfil do Médico */}
-            {showProfileModal && (
-                <ProfileModal 
-                    doctor={session} 
-                    onClose={() => setState(p => ({ ...p, showProfileModal: false }))}
-                    onUpdate={(updatedDoc) => {
-                        setState(p => ({ ...p, showProfileModal: false }));
-                        // Atualiza a sessão localmente (depende da sua implementação de AuthContext ter persistência/update)
-                        window.location.reload(); // Forma bruta de atualizar a sessão pro médico ver o novo nome/senha
-                    }}
-                />
-            )}
-
-            {/* Modal de Agenda do Médico */}
-            {showAgendaModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md" onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}>
-                    <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-400 mb-1">Meus Agendamentos</p>
-                                <h3 className="text-3xl font-black text-white">Sua agenda de plantões</h3>
-                            </div>
-                            <button 
-                                onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}
-                                className="p-3 rounded-2xl bg-slate-800 text-slate-400 hover:text-white transition"
-                            >
-                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-                            {myAgenda.length === 0 ? (
-                                <div className="py-20 text-center">
-                                    <div className="inline-flex p-6 rounded-full bg-slate-800/50 mb-6">
-                                        <svg className="h-12 w-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                                    </div>
-                                    <h4 className="text-xl font-bold text-slate-300">Nenhum plantão reservado</h4>
-                                    <p className="text-slate-500 mt-2">Os plantões que você aceitar aparecerão aqui.</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
-                                    <table className="min-w-[640px] w-full text-left">
-                                        <thead>
-                                            <tr className="bg-slate-900 border-b border-slate-800 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                                <th className="px-6 py-4">Data</th>
-                                                <th className="px-6 py-4">Unidade</th>
-                                                <th className="px-6 py-4">Turno</th>
-                                                <th className="px-6 py-4">Tipo</th>
-                                                <th className="px-6 py-4">Especialidade</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800/50">
-                                            {myAgenda.map(item => (
-                                                <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
-                                                    <td className="px-6 py-4 font-mono text-sm text-emerald-400">{formatDisplayDate(item.data)}</td>
-                                                    <td className="px-6 py-4 font-bold text-white">{item.unidade}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="inline-flex rounded-lg bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 text-[10px] font-black uppercase text-sky-400">
-                                                            {item.turno}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-xs text-slate-300">
-                                                        {buildAgendaBookingLabel(item, bookingConfigs[item.disponibilidadeId])}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-slate-400 group-hover:text-slate-200">{item.especialidade}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                        <div className="flex flex-wrap gap-3 text-xs">
+                            <span className="inline-flex items-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/15 px-3 py-2 text-sky-100">
+                                <span className="h-2 w-2 rounded-full bg-sky-400" />
+                                Seu plantão
+                            </span>
+                            <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-emerald-100">
+                                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                                Ocupado
+                            </span>
+                            <span className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-600 px-3 py-2 text-slate-400">
+                                Vazio
+                            </span>
                         </div>
                     </div>
-                </div>
-            )}
 
-                {modal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-6 backdrop-blur-sm" onClick={closeModal}>
-                        <div className="w-full max-w-xl rounded-[2rem] border border-slate-700 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/60" onClick={(event) => event.stopPropagation()}>
-                            <div
-                                className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] ${
-                                    modal.type === 'loading'
-                                        ? 'border border-sky-400/30 bg-sky-500/10 text-sky-200'
-                                        : modal.variant === 'success'
-                                          ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-                                          : modal.variant === 'warning'
-                                            ? 'border border-amber-400/30 bg-amber-500/10 text-amber-200'
-                                            : modal.type === 'select-shift-type'
-                                              ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-                                              : 'border border-rose-400/30 bg-rose-500/10 text-rose-200'
-                                }`}
-                            >
-                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'select-shift-type' ? 'Configuração' : 'Processado'}
+                    {loadingCalendar ? (
+                        <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando escala...</div>
+                    ) : (
+                        <>
+                            <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">
+                                {weekdayLabels.map((label) => (
+                                    <div key={label} className="px-2 py-3 text-center text-xs font-bold uppercase tracking-[0.25em] text-slate-500">
+                                        {label}
+                                    </div>
+                                ))}
                             </div>
 
-                            <h3 className="text-2xl font-black text-white">{modal.title}</h3>
-                            <p className="mt-3 text-sm leading-6 text-slate-300">{modal.message}</p>
-
-                            {modal.type === 'select-shift-type' ? (
-                                <div className="mt-6 space-y-4">
-                                    <div className="grid gap-3">
-                                        {bookingTypeOptions.map((option) => (
-                                            <button
-                                                key={option.id}
-                                                type="button"
-                                                onClick={() => updateBookingForm('bookingType', option.id)}
-                                                className={`rounded-2xl border px-4 py-4 text-left transition ${
-                                                    modal.form.bookingType === option.id
-                                                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.12)]'
-                                                        : 'border-slate-700 bg-slate-950/40 hover:border-slate-500'
-                                                }`}
-                                            >
-                                                <div className="text-sm font-black text-white">{option.label}</div>
-                                                <div className="mt-1 text-xs text-slate-400">{option.description}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {modal.form.bookingType === 'PARCIAL' ? (
-                                        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                            <div>
-                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
-                                                <input
-                                                    type="time"
-                                                    value={modal.form.partialStartTime}
-                                                    onChange={(event) => updateBookingForm('partialStartTime', event.target.value)}
-                                                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
-                                                />
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+                                {calendarDays.map((entry) =>
+                                    entry.empty ? (
+                                        <div key={entry.key} className="hidden rounded-3xl border border-transparent md:block" />
+                                    ) : (
+                                        <div
+                                            key={entry.key}
+                                            className="flex min-h-[12rem] flex-col rounded-3xl border border-slate-800 bg-slate-950/50 p-3 md:min-h-[15rem]"
+                                        >
+                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                <span className="text-sm font-bold text-white">{String(entry.day).padStart(2, '0')}</span>
+                                                <span className="text-[10px] uppercase tracking-wider text-slate-500">{formatDisplayDate(entry.date)}</span>
                                             </div>
-                                            <div>
-                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora fim</label>
-                                                <input
-                                                    type="time"
-                                                    value={modal.form.partialEndTime}
-                                                    onChange={(event) => updateBookingForm('partialEndTime', event.target.value)}
-                                                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
-                                                />
+
+                                            <div className="flex flex-1 flex-col gap-1.5">
+                                                {entry.turnSlots.map(({ turno, shift }) => (
+                                                    <button
+                                                        key={`${entry.date}-${turno}`}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setState((prev) => ({
+                                                                ...prev,
+                                                                shiftDetailModal: {
+                                                                    date: entry.date,
+                                                                    turno,
+                                                                    shift: shift ?? null,
+                                                                    unidadeId: selectedUnitId || session.unidadeFixaId
+                                                                }
+                                                            }))
+                                                        }
+                                                        className={`flex min-h-[2.25rem] w-full items-center justify-center rounded-xl border px-2 py-2 text-center text-[11px] font-bold leading-tight transition sm:text-xs ${turnButtonClass(shift, session.id, bookedShiftIds)}`}
+                                                    >
+                                                        {turno}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
-                                    ) : null}
+                                    )
+                                )}
+                            </div>
+                        </>
+                    )}
+                </section>
 
-                                    {modal.form.bookingType === 'FIXO' ? (
-                                        <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                            <div>
-                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Período em dias</label>
-                                                <div className="grid gap-3 md:grid-cols-2">
-                                                    <div>
-                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">De</label>
-                                                        <input
-                                                            type="date"
-                                                            value={modal.shift?.data || ''}
-                                                            disabled
-                                                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-400 outline-none"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">Até</label>
-                                                        <input
-                                                            type="date"
-                                                            min={modal.shift?.data}
-                                                            value={modal.form.fixedEndDate}
-                                                            onChange={(event) => updateBookingForm('fixedEndDate', event.target.value)}
-                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
+                {showProfileModal && (
+                    <ProfileModal
+                        doctor={session}
+                        onClose={() => setState((p) => ({ ...p, showProfileModal: false }))}
+                        onUpdate={() => {
+                            setState((p) => ({ ...p, showProfileModal: false }));
+                            window.location.reload();
+                        }}
+                    />
+                )}
 
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updateBookingForm('fixedMode', 'COMPLETO')}
-                                                    className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-                                                        modal.form.fixedMode === 'COMPLETO'
-                                                            ? 'border-emerald-400 bg-emerald-500/10 text-emerald-100'
-                                                            : 'border-slate-700 bg-slate-900 text-slate-300'
-                                                    }`}
-                                                >
-                                                    Fixo completo
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updateBookingForm('fixedMode', 'PARCIAL')}
-                                                    className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-                                                        modal.form.fixedMode === 'PARCIAL'
-                                                            ? 'border-emerald-400 bg-emerald-500/10 text-emerald-100'
-                                                            : 'border-slate-700 bg-slate-900 text-slate-300'
-                                                    }`}
-                                                >
-                                                    Fixo parcial
-                                                </button>
-                                            </div>
+                <ShiftDetailModal
+                    modal={shiftDetailModal}
+                    unitNome={unitNomeCalendario}
+                    medicoId={session.id}
+                    bookedShiftIds={bookedShiftIds}
+                    onClose={() => setState((p) => ({ ...p, shiftDetailModal: null }))}
+                    onSuccess={() => {
+                        loadCalendar(session.id, selectedMonth, selectedUnitId);
+                        setState((p) => ({ ...p, shiftDetailModal: null }));
+                    }}
+                />
 
-                                            {modal.form.fixedMode === 'PARCIAL' ? (
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
-                                                        <input
-                                                            type="time"
-                                                            value={modal.form.fixedStartTime}
-                                                            onChange={(event) => updateBookingForm('fixedStartTime', event.target.value)}
-                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora fim</label>
-                                                        <input
-                                                            type="time"
-                                                            value={modal.form.fixedEndTime}
-                                                            onChange={(event) => updateBookingForm('fixedEndTime', event.target.value)}
-                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : null}
+                {showAgendaModal && (
+                    <div
+                        className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md"
+                        onClick={() => setState((p) => ({ ...p, showAgendaModal: false }))}
+                    >
+                        <div
+                            className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                                <div>
+                                    <p className="mb-1 text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">Meus plantões</p>
+                                    <h3 className="text-3xl font-black text-white">Agenda locada para você</h3>
+                                </div>
+                                <button
+                                    onClick={() => setState((p) => ({ ...p, showAgendaModal: false }))}
+                                    className="rounded-2xl bg-slate-800 p-3 text-slate-400 transition hover:text-white"
+                                >
+                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+                                {myAgenda.length === 0 ? (
+                                    <div className="py-20 text-center">
+                                        <div className="mb-6 inline-flex rounded-full bg-slate-800/50 p-6">
+                                            <svg className="h-12 w-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                                                />
+                                            </svg>
                                         </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
-
-                            {modal.type === 'loading' ? (
-                                <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/55 px-4 py-4">
-                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-sky-300" />
-                                    <div className="text-sm text-slate-300">
-                                        Processando sua solicitação...
+                                        <h4 className="text-xl font-bold text-slate-300">Nenhum plantão na sua agenda</h4>
+                                        <p className="mt-2 text-slate-500">Quando a escala regional o locar, os turnos aparecerão aqui.</p>
                                     </div>
-                                </div>
-                            ) : null}
-
-                            <div className="mt-6 flex gap-3">
-                                {modal.type === 'select-shift-type' ? (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={closeModal}
-                                            className="flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleConfirmReservation}
-                                            className="flex-1 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
-                                        >
-                                            Finalizar agendamento
-                                        </button>
-                                    </>
-                                ) : modal.type !== 'loading' ? (
-                                    <button
-                                        type="button"
-                                        onClick={closeModal}
-                                        className="w-full rounded-2xl bg-slate-800 px-4 py-3 text-sm font-bold text-slate-100 transition hover:bg-slate-700"
-                                    >
-                                        Fechar
-                                    </button>
-                                ) : null}
+                                ) : (
+                                    <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
+                                        <table className="min-w-[640px] w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-slate-800 bg-slate-900 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                                    <th className="px-6 py-4">Data</th>
+                                                    <th className="px-6 py-4">Unidade</th>
+                                                    <th className="px-6 py-4">Turno</th>
+                                                    <th className="px-6 py-4">Tipo</th>
+                                                    <th className="px-6 py-4">Especialidade</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/50">
+                                                {myAgenda.map((item) => (
+                                                    <tr key={item.id} className="group transition-colors hover:bg-slate-800/30">
+                                                        <td className="px-6 py-4 font-mono text-sm text-emerald-400">{formatDisplayDate(item.data)}</td>
+                                                        <td className="px-6 py-4 font-bold text-white">{item.unidade}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="inline-flex rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-black uppercase text-sky-400">
+                                                                {item.turno}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs text-slate-300">
+                                                            {buildAgendaBookingLabel(item, bookingConfigs[item.disponibilidadeId])}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-400 group-hover:text-slate-200">{item.especialidade}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1248,5 +1018,3 @@ export default function DoctorView() {
         </div>
     );
 }
-
-

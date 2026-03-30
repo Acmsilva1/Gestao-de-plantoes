@@ -4,11 +4,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { env, getMissingEnvVars, hasDatabaseEnv } from './config/env.js';
-import { loginWithCrm } from './api/AuthService.js';
 import { startPredictionScheduler, triggerPredictionCycle } from './api/SchedulerService.js';
 import {
     getDoctorCalendar,
     getDoctorAgenda,
+    postAssumirEscala,
+    postPedidoAssumirEscala,
+    postPedidoTrocaEscala,
     updateDoctorProfile,
     getDoctors,
     getPublicShifts,
@@ -18,7 +20,6 @@ import {
     selectShift
 } from './api/DirecionadorService.js';
 import {
-    managerLogin,
     getDashboardMetrics,
     getDoctorAccesses,
     manageDoctorUnitAccess,
@@ -57,10 +58,12 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-app.post('/api/auth/login', loginWithCrm);
 app.get('/api/medicos', getDoctors);
 app.get('/api/medicos/:medicoId/calendario', getDoctorCalendar);
 app.get('/api/medicos/:medicoId/agenda', getDoctorAgenda);
+app.post('/api/medicos/:medicoId/escala/assumir', postAssumirEscala);
+app.post('/api/medicos/:medicoId/escala/pedido-assumir', postPedidoAssumirEscala);
+app.post('/api/medicos/:medicoId/escala/pedido-troca', postPedidoTrocaEscala);
 app.post('/api/medicos/:medicoId/perfil', updateDoctorProfile);
 app.get('/api/vagas', getPublicShifts);
 app.post('/api/vagas/:id/bloquear', holdShift);
@@ -68,7 +71,6 @@ app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
 app.post('/api/vagas/:id/selecionar', selectShift);
 
 // --- Rotas do Gestor ---
-app.post('/api/manager/login', managerLogin);
 app.get('/api/manager/dashboard', getDashboardMetrics);
 app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
@@ -90,13 +92,26 @@ if (fs.existsSync(distPath)) {
     });
 }
 
-if (!process.env.VERCEL) {
-    app.listen(env.port, () => {
-        console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
-        if (hasDatabaseEnv()) {
-            startPredictionScheduler();
-        }
-    });
-}
+const server = app.listen(env.port, () => {
+    console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
+    if (hasDatabaseEnv() && !env.disablePredictorScheduler) {
+        startPredictionScheduler();
+    } else if (hasDatabaseEnv() && env.disablePredictorScheduler) {
+        console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) — módulo médico / sem predição');
+    }
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(
+            `[ERRO] Porta ${env.port} ja esta em uso (outro Node/servidor ou instancia antiga).\n` +
+                `  - Encerre o processo que usa essa porta, ou\n` +
+                `  - Defina outra porta no .env, por exemplo: PORT=3001`
+        );
+    } else {
+        console.error('[ERRO] ao abrir o servidor:', err.message);
+    }
+    process.exit(1);
+});
 
 export default app;
