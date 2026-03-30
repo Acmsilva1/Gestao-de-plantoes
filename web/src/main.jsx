@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import './index.css';
 
 const PWA_VERSION = 'gestao-de-plantoes-v6';
 const PWA_RESET_KEY = 'gestao-de-plantoes-pwa-version';

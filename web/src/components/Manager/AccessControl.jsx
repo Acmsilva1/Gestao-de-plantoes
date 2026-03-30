@@ -244,7 +244,7 @@ export default function ManagerAccessControl() {
                             <form onSubmit={handleCreateDoctor} className="space-y-4 rounded-3xl border border-sky-500/30 bg-sky-500/5 p-5 animate-in slide-in-from-top-2 duration-300">
                                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-2">Cadastro de Novo Médico</h4>
                                 <input placeholder="Nome Completo" value={newDoc.nome} onChange={e => setNewDoc({...newDoc, nome: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <input placeholder="CRM" value={newDoc.crm} onChange={e => setNewDoc({...newDoc, crm: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
                                     <input placeholder="Especialidade" value={newDoc.especialidade} onChange={e => setNewDoc({...newDoc, especialidade: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
                                 </div>
@@ -252,7 +252,7 @@ export default function ManagerAccessControl() {
                                     <option value="">-- Unidade Fixa --</option>
                                     {units.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                                 </select>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <input placeholder="Telefone" value={newDoc.telefone} onChange={e => setNewDoc({...newDoc, telefone: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
                                     <input placeholder="Senha (Mantenha 12345 se padrão)" value={newDoc.senha} onChange={e => setNewDoc({...newDoc, senha: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
                                 </div>
@@ -446,7 +446,7 @@ export default function ManagerAccessControl() {
             )}
 
             {/* Seção de Consulta por Unidade (Tabela Inferior) */}
-            <div className="mt-12 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700">
+            <div className="mt-12 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-4 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700 sm:p-8">
                 <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h3 className="text-2xl font-black text-white">Consulta de Médicos por Unidade</h3>
@@ -474,8 +474,8 @@ export default function ManagerAccessControl() {
                         <p className="text-sm">Selecione uma unidade acima para listar os médicos.</p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50">
-                        <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/50">
+                        <table className="min-w-[720px] w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-slate-900/80 text-xs font-bold uppercase tracking-widest text-slate-400 border-b border-slate-800">
                                     <th className="px-6 py-4">Médico</th>

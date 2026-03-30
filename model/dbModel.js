@@ -38,8 +38,17 @@ const unwrap = (response, defaultMessage) => {
 
 export const dbModel = {
     async getUnits() {
-        const response = await supabase.from('unidades').select('id, nome').order('nome', { ascending: true });
+        const response = await supabase.from('unidades').select('id, nome, endereco').order('nome', { ascending: true });
         return unwrap(response, 'Falha ao carregar unidades');
+    },
+    async getUnitById(unidadeId) {
+        const response = await supabase
+            .from('unidades')
+            .select('id, nome, endereco')
+            .eq('id', unidadeId)
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao carregar unidade');
     },
     async getDoctors() {
         const response = await supabase

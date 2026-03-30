@@ -1,0 +1,40 @@
+{
+  "analise_feriados": {
+    "descricao": "Estrutura provisoria para analise de feriados. Substituir pelos dados reais do ETL quando estiver pronto.",
+    "fallbackRegiao": "geral",
+    "regras": [
+      {
+        "nome": "placeholder_ano_novo",
+        "escopo": "nacional",
+        "regioes": ["geral"],
+        "datas": ["2026-01-01"],
+        "metricas": {
+          "Manhã": {
+            "meanPatientsMultiplier": 1,
+            "stdDevPatientsMultiplier": 1,
+            "predictedPatientsMultiplier": 1,
+            "neededDoctorsMultiplier": 1
+          },
+          "Tarde": {
+            "meanPatientsMultiplier": 1,
+            "stdDevPatientsMultiplier": 1,
+            "predictedPatientsMultiplier": 1,
+            "neededDoctorsMultiplier": 1
+          },
+          "Noite": {
+            "meanPatientsMultiplier": 1,
+            "stdDevPatientsMultiplier": 1,
+            "predictedPatientsMultiplier": 1,
+            "neededDoctorsMultiplier": 1
+          },
+          "Madrugada": {
+            "meanPatientsMultiplier": 1,
+            "stdDevPatientsMultiplier": 1,
+            "predictedPatientsMultiplier": 1,
+            "neededDoctorsMultiplier": 1
+          }
+        }
+      }
+    ]
+  }
+}

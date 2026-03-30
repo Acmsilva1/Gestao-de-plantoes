@@ -167,6 +167,29 @@ Então a regra real usada para gerar a necessidade de um plantão em uma data es
 
 Isso faz o sistema respeitar diferenças de comportamento entre dias úteis e fim de semana.
 
+### Como os feriados entram na previsão
+
+Agora o preditor consulta primeiro o arquivo `model/analise_feriados.json` antes de definir a necessidade do plantão.
+
+A lógica atual:
+
+- identifica a `data real` do plantão sendo gerado
+- resolve a `região` da unidade a partir do contexto disponível da unidade
+- procura uma regra compatível no bloco `analise_feriados`
+- se encontrar, aplica uma consulta/perfil específico de feriado sobre a base calculada
+- se não encontrar, mantém a heurística padrão por dia da semana + período
+
+Formato provisório aceito pelo arquivo:
+
+- `datas`: datas exatas no formato `YYYY-MM-DD`
+- `datasRecorrentes`: recorrência anual no formato `MM-DD`
+- `regioes`: lista de chaves que combinem com a região/nome/endereço da unidade
+- `metricas`: multiplicadores por período (`Manhã`, `Tarde`, `Noite`, `Madrugada`)
+
+Observação:
+
+- o nome `analise_feriados` foi mantido no JSON apenas como marcador temporário até a entrada do ETL real
+
 ### Como os plantões são gerados
 
 O organizador cria uma grade completa para:

@@ -1,8 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export const SHIFT_PERIODS = ['Manh\u00e3', 'Tarde', 'Noite', 'Madrugada'];
 export const DEFAULT_PATIENTS_PER_DOCTOR = 10;
 export const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6];
 export const WEEKDAY_LABELS = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
 export const FORECAST_HISTORY_WINDOW_DAYS = 60;
+const HOLIDAY_ANALYSIS_FILE_NAME = 'analise_feriados.json';
 
 const PERIOD_WEIGHTS = {
     'Manh\u00e3': 0.32,
@@ -12,8 +17,169 @@ const PERIOD_WEIGHTS = {
 };
 
 const SAFETY_FACTOR = 1.15;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const HOLIDAY_ANALYSIS_FILE_PATH = path.resolve(__dirname, '..', 'model', HOLIDAY_ANALYSIS_FILE_NAME);
+let holidayAnalysisCache = null;
+let holidayAnalysisCacheMtimeMs = null;
 
 const getWeekdayIndex = (dateString) => new Date(`${dateString}T00:00:00Z`).getUTCDay();
+const normalizeComparableText = (value = '') =>
+    String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
+const safeParseJsonFile = (filePath) => {
+    try {
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return null;
+        }
+
+        throw new Error(`Falha ao carregar ${HOLIDAY_ANALYSIS_FILE_NAME}: ${error.message}`);
+    }
+};
+
+const getHolidayAnalysisConfig = () => {
+    try {
+        const fileStat = fs.statSync(HOLIDAY_ANALYSIS_FILE_PATH);
+
+        if (!holidayAnalysisCache || holidayAnalysisCacheMtimeMs !== fileStat.mtimeMs) {
+            holidayAnalysisCache = safeParseJsonFile(HOLIDAY_ANALYSIS_FILE_PATH)?.analise_feriados || {
+                fallbackRegiao: 'geral',
+                regras: []
+            };
+            holidayAnalysisCacheMtimeMs = fileStat.mtimeMs;
+        }
+
+        return holidayAnalysisCache;
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return {
+                fallbackRegiao: 'geral',
+                regras: []
+            };
+        }
+
+        throw new Error(`Falha ao inspecionar ${HOLIDAY_ANALYSIS_FILE_NAME}: ${error.message}`);
+    }
+};
+
+const cloneDemandSnapshot = (demand = {}) => ({
+    meanPatients: Number(demand.meanPatients ?? 0),
+    stdDevPatients: Number(demand.stdDevPatients ?? 0),
+    predictedPatients: Number(demand.predictedPatients ?? 1),
+    neededDoctors: Number(demand.neededDoctors ?? 1)
+});
+
+const applyMetricMultiplier = (value, multiplier = 1, minimum = 0) => {
+    const numericValue = Number(value ?? 0);
+    const numericMultiplier = Number(multiplier ?? 1);
+    const multiplied = Math.round(numericValue * numericMultiplier);
+    return Math.max(multiplied, minimum);
+};
+
+const buildComparableTokens = (values = []) =>
+    values
+        .flatMap((value) => String(value || '').split(/[\s,;/\-|]+/))
+        .map(normalizeComparableText)
+        .filter(Boolean);
+
+const resolveUnitRegionContext = (unit = {}) => {
+    const regionTokens = buildComparableTokens([unit.regiao, unit.region, unit.cidade, unit.city, unit.uf, unit.state, unit.nome, unit.endereco]);
+    const preferredRegion = normalizeComparableText(unit.regiao || unit.region || unit.cidade || unit.city || unit.uf || unit.state || unit.nome || 'geral');
+
+    return {
+        preferredRegion,
+        regionTokens
+    };
+};
+
+const doesRuleMatchDate = (rule, date) => {
+    const exactDates = Array.isArray(rule.datas) ? rule.datas : [];
+    if (exactDates.includes(date)) {
+        return true;
+    }
+
+    const monthDay = date.slice(5);
+    const recurringDates = Array.isArray(rule.datasRecorrentes) ? rule.datasRecorrentes : [];
+    return recurringDates.includes(monthDay);
+};
+
+const doesRuleMatchRegion = (rule, unitRegionContext) => {
+    const holidayAnalysisConfig = getHolidayAnalysisConfig();
+    const configuredRegions = (Array.isArray(rule.regioes) ? rule.regioes : [])
+        .map(normalizeComparableText)
+        .filter(Boolean);
+
+    if (configuredRegions.length === 0) {
+        return true;
+    }
+
+    return configuredRegions.some((region) => {
+        if (region === normalizeComparableText(holidayAnalysisConfig.fallbackRegiao || 'geral')) {
+            return true;
+        }
+
+        return unitRegionContext.regionTokens.includes(region) || unitRegionContext.preferredRegion === region;
+    });
+};
+
+const getHolidayRuleForDate = (date, unit = {}) => {
+    const holidayAnalysisConfig = getHolidayAnalysisConfig();
+    const unitRegionContext = resolveUnitRegionContext(unit);
+    const matchedRule = (holidayAnalysisConfig.regras || []).find((rule) => doesRuleMatchDate(rule, date) && doesRuleMatchRegion(rule, unitRegionContext));
+
+    if (!matchedRule) {
+        return null;
+    }
+
+    return {
+        ...matchedRule,
+        matchedRegion: unitRegionContext.preferredRegion || normalizeComparableText(holidayAnalysisConfig.fallbackRegiao || 'geral')
+    };
+};
+
+const applyHolidayMetricsToDemand = (baseDemand, holidayRule, period, patientsPerDoctor = DEFAULT_PATIENTS_PER_DOCTOR) => {
+    const periodMetrics = holidayRule?.metricas?.[period];
+
+    if (!periodMetrics) {
+        return cloneDemandSnapshot(baseDemand);
+    }
+
+    const nextMeanPatients = applyMetricMultiplier(baseDemand.meanPatients, periodMetrics.meanPatientsMultiplier, 0);
+    const nextStdDevPatients = applyMetricMultiplier(baseDemand.stdDevPatients, periodMetrics.stdDevPatientsMultiplier, 0);
+    const predictedPatientsBase = Math.max(1, Math.ceil(nextMeanPatients + nextStdDevPatients * SAFETY_FACTOR));
+    const nextPredictedPatients = Math.max(
+        1,
+        applyMetricMultiplier(
+            periodMetrics.predictedPatientsBase ?? predictedPatientsBase,
+            periodMetrics.predictedPatientsMultiplier,
+            1
+        )
+    );
+    const nextNeededDoctors = Math.max(
+        1,
+        applyMetricMultiplier(
+            periodMetrics.neededDoctorsBase ?? baseDemand.neededDoctors,
+            periodMetrics.neededDoctorsMultiplier,
+            1
+        )
+    );
+
+    return {
+        meanPatients: nextMeanPatients,
+        stdDevPatients: nextStdDevPatients,
+        predictedPatients: nextPredictedPatients,
+        neededDoctors: Math.max(nextNeededDoctors, Math.ceil(nextPredictedPatients / patientsPerDoctor)),
+        holidayName: holidayRule.nome,
+        holidayScope: holidayRule.escopo || 'regional'
+    };
+};
 
 export const getHistoryWindowStartDate = (referenceDate = new Date(), windowDays = FORECAST_HISTORY_WINDOW_DAYS) => {
     const reference = new Date(referenceDate);
@@ -182,11 +348,26 @@ export const calculateDemandProfile = (history, patientsPerDoctor = DEFAULT_PATI
         historyRowsConsidered: historyByPeriod.length,
         patientsPerDoctor,
         demandByPeriod,
-        demandByWeekday
+        demandByWeekday,
+        holidayAnalysisFile: HOLIDAY_ANALYSIS_FILE_NAME
     };
 };
 
-export const getDemandForDateAndPeriod = (demandProfile, date, period) => {
+export const getDemandForDateAndPeriod = (demandProfile, date, period, unit = null) => {
     const weekdayIndex = getWeekdayIndex(date);
-    return demandProfile.demandByWeekday?.[weekdayIndex]?.[period] || demandProfile.demandByPeriod?.[period] || { neededDoctors: 1 };
+    const baseDemand = cloneDemandSnapshot(
+        demandProfile.demandByWeekday?.[weekdayIndex]?.[period] || demandProfile.demandByPeriod?.[period] || { neededDoctors: 1 }
+    );
+    const holidayRule = getHolidayRuleForDate(date, unit || {});
+
+    if (!holidayRule) {
+        return baseDemand;
+    }
+
+    return {
+        ...applyHolidayMetricsToDemand(baseDemand, holidayRule, period, demandProfile.patientsPerDoctor),
+        holidayApplied: true,
+        holidayDate: date,
+        holidayMatchedRegion: holidayRule.matchedRegion
+    };
 };

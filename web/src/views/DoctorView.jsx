@@ -423,26 +423,26 @@ export default function DoctorView() {
     if (!session) return null;
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
+        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
             {/* Sugestão de Troca de Senha */}
             {showPasswordSuggestion && (
-                <div className="bg-emerald-500/90 py-2 px-6 flex items-center justify-between text-slate-950 animate-in slide-in-from-top duration-300">
-                    <p className="text-sm font-bold flex items-center gap-2">
+                <div className="flex flex-col gap-3 bg-emerald-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p className="flex items-start gap-2 text-sm font-bold sm:items-center">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         Sua senha ainda é a padrão (12345). Para sua segurança, recomendamos trocá-la agora.
                     </p>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4">
                         <button onClick={() => setState(prev => ({ ...prev, showProfileModal: true, showPasswordSuggestion: false }))} className="text-xs font-black uppercase underline hover:no-underline">Trocar Agora</button>
                         <button onClick={() => { setState(prev => ({ ...prev, showPasswordSuggestion: false })); localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-70">Não agora</button>
                     </div>
                 </div>
             )}
 
-            <div className="mx-auto max-w-7xl px-6 py-10">
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
                 <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
                         <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
-                        <h1 className="text-4xl font-black tracking-tight text-white">Agenda mensal de plantões</h1>
+                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Agenda mensal de plantões</h1>
                         
                         <div className="mt-4 flex flex-wrap items-center gap-4">
                             <div className="text-xs text-slate-400 uppercase tracking-widest font-bold">Unidade Atual:</div>
@@ -519,15 +519,15 @@ export default function DoctorView() {
                         <button
                             type="button"
                             onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, -1) }))}
-                            className="rounded-2xl bg-slate-800 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700"
+                            className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
                             Mês anterior
                         </button>
-                        <div className="min-w-44 text-center text-sm font-semibold capitalize text-slate-200">{getMonthTitle(visibleMonth)}</div>
+                        <div className="min-w-0 flex-1 text-center text-sm font-semibold capitalize text-slate-200 sm:min-w-44">{getMonthTitle(visibleMonth)}</div>
                         <button
                             type="button"
                             onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, 1) }))}
-                            className="rounded-2xl bg-slate-800 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700"
+                            className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
                             Próximo mês
                         </button>
@@ -571,7 +571,7 @@ export default function DoctorView() {
                             <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando calendário...</div>
                         ) : (
                             <>
-                                <div className="mb-4 grid grid-cols-7 gap-3">
+                                <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">
                                     {weekdayLabels.map((label) => (
                                         <div key={label} className="px-2 py-3 text-center text-xs font-bold uppercase tracking-[0.25em] text-slate-500">
                                             {label}
@@ -711,8 +711,8 @@ export default function DoctorView() {
             {/* Modal de Agenda do Médico */}
             {showAgendaModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md" onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}>
-                    <div className="w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-8">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-400 mb-1">Meus Agendamentos</p>
                                 <h3 className="text-3xl font-black text-white">Sua agenda de plantões</h3>
@@ -725,7 +725,7 @@ export default function DoctorView() {
                             </button>
                         </div>
                         
-                        <div className="flex-1 overflow-y-auto p-8">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
                             {myAgenda.length === 0 ? (
                                 <div className="py-20 text-center">
                                     <div className="inline-flex p-6 rounded-full bg-slate-800/50 mb-6">
@@ -735,8 +735,8 @@ export default function DoctorView() {
                                     <p className="text-slate-500 mt-2">Os plantões que você aceitar aparecerão aqui.</p>
                                 </div>
                             ) : (
-                                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/30">
-                                    <table className="w-full text-left">
+                                <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
+                                    <table className="min-w-[640px] w-full text-left">
                                         <thead>
                                             <tr className="bg-slate-900 border-b border-slate-800 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                 <th className="px-6 py-4">Data</th>

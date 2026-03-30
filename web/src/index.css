@@ -1,0 +1,26 @@
+html,
+body,
+#root {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    overscroll-behavior-x: none;
+}
+
+img,
+svg,
+canvas,
+video {
+    max-width: 100%;
+}

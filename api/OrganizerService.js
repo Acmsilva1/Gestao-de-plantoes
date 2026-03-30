@@ -5,14 +5,18 @@ import { buildMonthShiftPlan, calculateDemandProfile, getDemandForDateAndPeriod,
 const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const buildAvailabilityKey = (row) => `${row.unidade_id}|${row.data_plantao}|${row.turno}`;
 
-const buildAvailabilityRows = (unidadeId, demandProfile, monthPlan) => {
-    return monthPlan.shifts.map((shift) => ({
-        unidade_id: unidadeId,
-        data_plantao: shift.dataPlantao,
-        turno: shift.turno,
-        vagas_totais: getDemandForDateAndPeriod(demandProfile, shift.dataPlantao, shift.turno).neededDoctors,
-        status: 'ABERTO'
-    }));
+const buildAvailabilityRows = (unidadeId, demandProfile, monthPlan, unitContext) => {
+    return monthPlan.shifts.map((shift) => {
+        const demandForShift = getDemandForDateAndPeriod(demandProfile, shift.dataPlantao, shift.turno, unitContext);
+
+        return {
+            unidade_id: unidadeId,
+            data_plantao: shift.dataPlantao,
+            turno: shift.turno,
+            vagas_totais: demandForShift.neededDoctors,
+            status: 'ABERTO'
+        };
+    });
 };
 
 const resolveStatusForForecast = (existingRow, desiredRow) => {
@@ -61,14 +65,15 @@ const getRowsToSync = (existingRows, desiredRows) => {
 };
 
 export const generateForecastWindows = async (unidadeId) => {
+    const unit = await dbModel.getUnitById(unidadeId);
     const history = await dbModel.getHistory(unidadeId, getHistoryWindowStartDate());
     const demandProfile = calculateDemandProfile(history);
     const { current, next } = getForecastMonthReferences();
     const currentMonthPlan = buildMonthShiftPlan(current);
     const nextMonthPlan = buildMonthShiftPlan(next);
     const allDesiredRows = [
-        ...buildAvailabilityRows(unidadeId, demandProfile, currentMonthPlan),
-        ...buildAvailabilityRows(unidadeId, demandProfile, nextMonthPlan)
+        ...buildAvailabilityRows(unidadeId, demandProfile, currentMonthPlan, unit),
+        ...buildAvailabilityRows(unidadeId, demandProfile, nextMonthPlan, unit)
     ];
     const forecastRangeStart = `${current.monthKey}-01`;
     const forecastRangeEnd = `${next.monthKey}-${String(nextMonthPlan.shifts.length / 4).padStart(2, '0')}`;
@@ -82,6 +87,7 @@ export const generateForecastWindows = async (unidadeId) => {
 
     return {
         unidadeId,
+        unit,
         currentMonth: current.monthKey,
         nextMonth: next.monthKey,
         patientsPerDoctor: demandProfile.patientsPerDoctor,

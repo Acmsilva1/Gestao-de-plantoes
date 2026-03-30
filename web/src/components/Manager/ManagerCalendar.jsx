@@ -118,7 +118,7 @@ export default function ManagerCalendar({ units = [] }) {
                 <button onClick={() => setCalMonth(m => shiftMonth(m, -1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
                     <ChevronLeft size={16} />
                 </button>
-                <span className="min-w-36 text-center text-sm font-bold capitalize text-white px-2">
+                <span className="min-w-0 flex-1 px-2 text-center text-sm font-bold capitalize text-white sm:min-w-36">
                     {getMonthTitle(calMonth)}
                 </span>
                 <button onClick={() => setCalMonth(m => shiftMonth(m, 1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
@@ -129,7 +129,7 @@ export default function ManagerCalendar({ units = [] }) {
     );
 
     return (
-        <section className="rounded-[2rem] border border-slate-700/60 bg-slate-900/60 p-8 shadow-2xl shadow-slate-950/40 animate-in fade-in duration-500">
+        <section className="rounded-[2rem] border border-slate-700/60 bg-slate-900/60 p-4 shadow-2xl shadow-slate-950/40 animate-in fade-in duration-500 sm:p-8">
 
             {/* ═══ CALENDAR VIEW ═══ */}
             {!selectedDay ? (
@@ -182,7 +182,7 @@ export default function ManagerCalendar({ units = [] }) {
                         </div>
                     ) : (
                         <>
-                            <div className="mb-3 grid grid-cols-7 gap-2">
+                            <div className="mb-3 hidden grid-cols-7 gap-2 md:grid">
                                 {weekdayLabels.map(label => (
                                     <div key={label} className="py-2 text-center text-xs font-bold uppercase tracking-widest text-slate-600">
                                         {label}

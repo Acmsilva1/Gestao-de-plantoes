@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Users, LogOut, CalendarDays, ShieldCheck, Lock, UserCog } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerDashboard from '../components/Manager/Dashboard';
@@ -115,7 +115,6 @@ const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
 
 export default function ManagerView() {
     const { session, logout } = useAuth();
-    const location = useLocation();
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
 
@@ -126,15 +125,15 @@ export default function ManagerView() {
     }, [session?.id, session?.senha]);
 
     return (
-        <div className="flex min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.15),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
+        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.15),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100 lg:flex">
             {/* Suggestion Banner */}
             {showPasswordSuggestion && (
-                <div className="fixed top-0 left-0 right-0 z-[60] bg-sky-500/90 py-2.5 px-10 flex items-center justify-between text-slate-950 animate-in slide-in-from-top duration-300 backdrop-blur-sm">
-                    <p className="text-sm font-black flex items-center gap-2">
+                <div className="fixed inset-x-0 top-0 z-[60] flex flex-col gap-3 bg-sky-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p className="flex items-start gap-2 text-sm font-black sm:items-center">
                         <ShieldCheck size={18} />
                         Sua conta de gestor ainda usa a senha padrão. Recomendamos alterá-la imediatamente para segurança do sistema.
                     </p>
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                         <button onClick={() => { setShowProfileModal(true); setShowPasswordSuggestion(false); }} className="text-xs font-black uppercase underline hover:no-underline">Mudar Senha</button>
                         <button onClick={() => { setShowPasswordSuggestion(false); localStorage.setItem(`hide_manager_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-60">Mais tarde</button>
                     </div>
@@ -142,13 +141,13 @@ export default function ManagerView() {
             )}
 
             {/* Sidebar */}
-            <aside className="w-64 flex flex-col border-r border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 shadow-2xl shadow-slate-950/40">
-                <div className="mb-10">
+            <aside className="w-full border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:w-64 lg:min-w-64 lg:border-b-0 lg:border-r lg:p-6">
+                <div className="mb-4 lg:mb-10">
                     <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">GESTÃO DE PLANTÕES</p>
                     <h1 className="text-2xl font-black tracking-tight text-white">Central do Gestor</h1>
                 </div>
 
-                <nav className="flex-1 flex flex-col gap-3">
+                <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-1 lg:flex-col">
                     <NavLink
                         to="/gestor/dashboard"
                         className={({ isActive }) => 
@@ -195,12 +194,12 @@ export default function ManagerView() {
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex flex-1 flex-col overflow-y-auto">
-                <header className="sticky top-0 z-20 flex items-center justify-end border-b border-slate-800 bg-slate-900/60 px-10 py-5 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
+            <main className="min-w-0 flex flex-1 flex-col overflow-y-auto">
+                <header className="sticky top-0 z-20 flex flex-col items-stretch gap-3 border-b border-slate-800 bg-slate-900/60 px-4 py-4 backdrop-blur-md sm:flex-row sm:items-center sm:justify-end sm:px-6 lg:px-10 lg:py-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <button
                             onClick={() => setShowProfileModal(true)}
-                            className="group flex items-center gap-3 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 py-3 transition hover:bg-sky-500/20 text-right shadow-lg shadow-sky-950/30"
+                            className="group flex items-center gap-3 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-left transition hover:bg-sky-500/20 shadow-lg shadow-sky-950/30 sm:px-5 sm:text-right"
                         >
                             <div className="rounded-full bg-sky-500/20 p-2 group-hover:bg-sky-500/30 transition">
                                 <UserCog size={18} className="text-sky-400" />
@@ -221,7 +220,7 @@ export default function ManagerView() {
                     </div>
                 </header>
 
-                <div className="p-10">
+                <div className="px-4 py-6 sm:px-6 lg:p-10">
                     <div className="mx-auto max-w-6xl">
                         <Routes>
                             <Route path="dashboard" element={<ManagerDashboard />} />
