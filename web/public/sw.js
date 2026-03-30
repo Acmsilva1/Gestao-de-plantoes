@@ -1,6 +1,13 @@
-const STATIC_CACHE = 'maestro-static-v1';
-const RUNTIME_CACHE = 'maestro-runtime-v1';
-const APP_SHELL = ['/', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const STATIC_CACHE = 'gestao-de-plantoes-static-v3';
+const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v3';
+const APP_SHELL = [
+    '/',
+    '/offline.html',
+    '/manifest.webmanifest?v=20260329-gestao-de-plantoes',
+    '/icons/icon-192.png',
+    '/icons/icon-512.png',
+    '/icons/icon-maskable-512.png'
+];
 
 self.addEventListener('install', event => {
     event.waitUntil(
@@ -20,6 +27,12 @@ self.addEventListener('activate', event => {
         )
     );
     self.clients.claim();
+});
+
+self.addEventListener('message', event => {
+    if (event.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('fetch', event => {
@@ -52,13 +65,14 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    event.respondWith(
-        caches.match(request).then(cachedResponse => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
+    if (url.pathname === '/manifest.webmanifest' || url.pathname === '/sw.js') {
+        event.respondWith(fetch(request, { cache: 'no-store' }));
+        return;
+    }
 
-            return fetch(request).then(response => {
+    event.respondWith(
+        fetch(request)
+            .then(response => {
                 if (!response || response.status !== 200 || response.type !== 'basic') {
                     return response;
                 }
@@ -66,7 +80,7 @@ self.addEventListener('fetch', event => {
                 const copy = response.clone();
                 caches.open(RUNTIME_CACHE).then(cache => cache.put(request, copy));
                 return response;
-            });
-        })
+            })
+            .catch(() => caches.match(request))
     );
 });

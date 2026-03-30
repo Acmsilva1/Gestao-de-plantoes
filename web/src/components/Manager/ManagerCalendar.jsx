@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
@@ -15,6 +15,18 @@ const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
     const date = new Date(Date.UTC(year, monthIndex - 1 + delta, 1));
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const getForecastWindow = () => {
+    const now = new Date();
+    const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const next = shiftMonth(current, 1);
+    return { current, next };
+};
+
+const isOutsideForecastWindow = (month) => {
+    const { current, next } = getForecastWindow();
+    return month < current || month > next;
 };
 
 const buildCalendarDays = (month, shifts) => {
@@ -84,6 +96,8 @@ export default function ManagerCalendar({ units = [] }) {
     }, [calData, selectedDay]);
 
     const selectedUnitName = units.find(u => u.id === calUnit)?.nome || '';
+    const outsideForecast = isOutsideForecastWindow(calMonth);
+    const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
 
     /* ——— Controls shown only in calendar view ——— */
     const CalendarControls = (
@@ -145,6 +159,20 @@ export default function ManagerCalendar({ units = [] }) {
                             <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-1 text-xs font-bold text-amber-300">
                                 {calData.shifts.filter(s => s.vagas > 0).length} com vagas
                             </span>
+                        </div>
+                    )}
+
+                    {outsideForecast && (
+                        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
+                            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
+                            <div>
+                                <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
+                                <p className="mt-1 text-amber-200/80">
+                                    O preditor cobre apenas <span className="font-semibold capitalize">{getMonthTitle(forecastCurrent)}</span> e{' '}
+                                    <span className="font-semibold capitalize">{getMonthTitle(forecastNext)}</span>.
+                                    O calendário abaixo pode ficar vazio ou incompleto.
+                                </p>
+                            </div>
                         </div>
                     )}
 
