@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const shiftTypeOptions = ['Todos', 'Madrugada', 'Manhã', 'Tarde', 'Noite'];
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
 const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
@@ -131,6 +132,7 @@ export default function ManagerCalendar({ units = [] }) {
     const [calData, setCalData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [selectedDay, setSelectedDay] = useState(null);
+    const [shiftTypeFilter, setShiftTypeFilter] = useState('Todos');
 
     useEffect(() => {
         if (units.length > 0 && !calUnit) setCalUnit(units[0].id);
@@ -150,15 +152,29 @@ export default function ManagerCalendar({ units = [] }) {
         fetchCal();
     }, [calUnit, calMonth]);
 
+    useEffect(() => {
+        setShiftTypeFilter('Todos');
+    }, [calMonth]);
+
+    const visibleShifts = useMemo(() => {
+        const shifts = calData?.shifts || [];
+
+        if (shiftTypeFilter === 'Todos') {
+            return shifts;
+        }
+
+        return shifts.filter((shift) => shift.turno === shiftTypeFilter);
+    }, [calData, shiftTypeFilter]);
+
     const calendarDays = useMemo(
-        () => buildCalendarDays(calMonth, calData?.shifts || []),
-        [calMonth, calData]
+        () => buildCalendarDays(calMonth, visibleShifts),
+        [calMonth, visibleShifts]
     );
 
     const selectedDayShifts = useMemo(() => {
         if (!selectedDay) return [];
-        return (calData?.shifts || []).filter(s => s.data === selectedDay);
-    }, [calData, selectedDay]);
+        return visibleShifts.filter(s => s.data === selectedDay);
+    }, [selectedDay, visibleShifts]);
 
     const selectedUnitName = units.find(u => u.id === calUnit)?.nome || '';
     const outsideForecast = isOutsideForecastWindow(calMonth);
@@ -176,6 +192,18 @@ export default function ManagerCalendar({ units = [] }) {
                 >
                     {units.map(u => (
                         <option key={u.id} value={u.id} className="bg-slate-900">{u.nome}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
+                <Eye size={14} className="text-amber-300 shrink-0" />
+                <select
+                    value={shiftTypeFilter}
+                    onChange={e => setShiftTypeFilter(e.target.value)}
+                    className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
+                >
+                    {shiftTypeOptions.map(option => (
+                        <option key={option} value={option} className="bg-slate-900">{option}</option>
                     ))}
                 </select>
             </div>
@@ -216,13 +244,13 @@ export default function ManagerCalendar({ units = [] }) {
                     {calData && (
                         <div className="mb-6 flex flex-wrap gap-3">
                             <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
-                                {calData.shifts.length} plantões no mês
+                                {visibleShifts.length} plantões no mês
                             </span>
                             <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-4 py-1 text-xs font-bold text-rose-300">
-                                {calData.shifts.filter(s => s.vagas <= 0).length} esgotados
+                                {visibleShifts.filter(s => s.vagas <= 0).length} esgotados
                             </span>
                             <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-1 text-xs font-bold text-amber-300">
-                                {calData.shifts.filter(s => s.vagas > 0).length} com vagas
+                                {visibleShifts.filter(s => s.vagas > 0).length} com vagas
                             </span>
                         </div>
                     )}
