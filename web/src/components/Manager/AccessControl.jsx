@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Users, CheckCircle, Search, Save, AlertTriangle } from 'lucide-react';
 import { readApiResponse } from '../../utils/api';
@@ -10,7 +10,7 @@ export default function ManagerAccessControl() {
     const [units, setUnits] = useState([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState('');
     
-    // Lista de IDs das unidades atualmente "checadas" para o médico selecionado
+    // Lista de IDs das unidades atualmente "checadas" para o mÃ©dico selecionado
     const [checkedUnits, setCheckedUnits] = useState([]);
     
     const [loading, setLoading] = useState(true);
@@ -18,9 +18,9 @@ export default function ManagerAccessControl() {
     
     const [modal, setModal] = useState(null); // Para sucesso ou erro
     
-    const [selectedUnitIdFilter, setSelectedUnitIdFilter] = useState(''); // Estado para o filtro de médicos por unidade
+    const [selectedUnitIdFilter, setSelectedUnitIdFilter] = useState(''); // Estado para o filtro de mÃ©dicos por unidade
     
-    // Estados para Novo Médico
+    // Estados para Novo MÃ©dico
     const [isAdding, setIsAdding] = useState(false);
     const [newDoc, setNewDoc] = useState({
         nome: '',
@@ -68,7 +68,7 @@ export default function ManagerAccessControl() {
             setDoctors(docsData || []);
             setUnits(unitsData || []);
             
-            // Se já havia um médico selecionado, atualizamos as checkboxes dele
+            // Se jÃ¡ havia um mÃ©dico selecionado, atualizamos as checkboxes dele
             if (selectedDoctorId && docsData) {
                 const doc = docsData.find(d => d.id === selectedDoctorId);
                 if (doc) setCheckedUnits(doc.unidadesLiberadas || []);
@@ -114,9 +114,9 @@ export default function ManagerAccessControl() {
                 body: JSON.stringify(newDoc)
             });
             const data = await readApiResponse(response);
-            if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar médico.');
+            if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar mÃ©dico.');
 
-            setModal({ type: 'success', title: 'Sucesso', message: 'Médico cadastrado com sucesso!' });
+            setModal({ type: 'success', title: 'Sucesso', message: 'MÃ©dico cadastrado com sucesso!' });
             setIsAdding(false);
             setNewDoc({ nome: '', crm: '', especialidade: '', unidadeFixaId: '', telefone: '', senha: '' });
             fetchData();
@@ -129,16 +129,16 @@ export default function ManagerAccessControl() {
 
     const handleDeleteDoctor = async () => {
         if (!selectedDoctorId) return;
-        if (!confirm('TEM CERTEZA? Isso removerá o médico e todos os seus vínculos do sistema permanentemente.')) return;
+        if (!confirm('TEM CERTEZA? Isso removerÃ¡ o mÃ©dico e todos os seus vÃ­nculos do sistema permanentemente.')) return;
 
         setSaving(true);
         try {
             const response = await fetch(`/api/manager/medicos/${selectedDoctorId}`, {
                 method: 'DELETE'
             });
-            if (!response.ok) throw new Error('Falha ao excluir médico.');
+            if (!response.ok) throw new Error('Falha ao excluir mÃ©dico.');
 
-            setModal({ type: 'success', title: 'Sucesso', message: 'Médico removido do sistema.' });
+            setModal({ type: 'success', title: 'Sucesso', message: 'MÃ©dico removido do sistema.' });
             setSelectedDoctorId('');
             fetchData();
         } catch (err) {
@@ -165,9 +165,9 @@ export default function ManagerAccessControl() {
                 })
             });
 
-            if (!response.ok) throw new Error('Falha ao atualizar perfil do médico.');
+            if (!response.ok) throw new Error('Falha ao atualizar perfil do mÃ©dico.');
 
-            setModal({ type: 'success', title: 'Sucesso', message: 'Dados cadastrais do médico atualizados!' });
+            setModal({ type: 'success', title: 'Sucesso', message: 'Dados cadastrais do mÃ©dico atualizados!' });
             fetchData(); 
         } catch (err) {
             setModal({ type: 'error', title: 'Falha', message: err.message });
@@ -196,12 +196,12 @@ export default function ManagerAccessControl() {
                 const text = await res.text();
                 if (text) data = JSON.parse(text);
             } catch {
-                // body não era JSON válido
+                // body nÃ£o era JSON vÃ¡lido
             }
 
             if (!res.ok) throw new Error(data.error || data.details || `Erro HTTP ${res.status}`);
             
-            setModal({ type: 'success', title: 'Sucesso', message: 'Permissões do médico foram atualizadas!' });
+            setModal({ type: 'success', title: 'Sucesso', message: 'PermissÃµes do mÃ©dico foram atualizadas!' });
             fetchData();
         } catch (err) {
             setModal({ type: 'error', title: 'Falha', message: err.message });
@@ -216,7 +216,7 @@ export default function ManagerAccessControl() {
         <div className="animate-in fade-in zoom-in-95 duration-500 pb-10">
             <div className="mb-8">
                 <h2 className="text-3xl font-black text-white">Controle de Acessos</h2>
-                <p className="mt-2 text-sm text-slate-400">Gerencie em quais unidades cada médico pode visualizar e selecionar plantões.</p>
+                <p className="mt-2 text-sm text-slate-400">Gerencie em quais unidades cada mÃ©dico pode visualizar e selecionar plantÃµes.</p>
             </div>
 
             {loading && doctors.length === 0 ? (
@@ -225,24 +225,24 @@ export default function ManagerAccessControl() {
                 </div>
             ) : (
                 <div className="grid gap-8 lg:grid-cols-[1fr_1.5fr] xl:grid-cols-[350px_1fr]">
-                    {/* Painel de Seleção */}
+                    {/* Painel de SeleÃ§Ã£o */}
                     <div className="flex flex-col gap-6 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl">
                         <div className="flex items-center justify-between">
                             <label className="flex items-center gap-2 text-sm font-bold text-slate-300">
                                 <Search size={16} className="text-sky-400" />
-                                Escolha o Médico
+                                Escolha o MÃ©dico
                             </label>
                             <button 
                                 onClick={() => setIsAdding(!isAdding)}
                                 className={`rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${isAdding ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-sky-500/20 text-sky-300 border border-sky-400/20 hover:bg-sky-500/30'}`}
                             >
-                                {isAdding ? 'Cancelar' : '+ Novo Médico'}
+                                {isAdding ? 'Cancelar' : '+ Novo MÃ©dico'}
                             </button>
                         </div>
 
                         {isAdding ? (
                             <form onSubmit={handleCreateDoctor} className="space-y-4 rounded-3xl border border-sky-500/30 bg-sky-500/5 p-5 animate-in slide-in-from-top-2 duration-300">
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-2">Cadastro de Novo Médico</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-2">Cadastro de Novo MÃ©dico</h4>
                                 <input placeholder="Nome Completo" value={newDoc.nome} onChange={e => setNewDoc({...newDoc, nome: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <input placeholder="CRM" value={newDoc.crm} onChange={e => setNewDoc({...newDoc, crm: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" required />
@@ -254,7 +254,7 @@ export default function ManagerAccessControl() {
                                 </select>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <input placeholder="Telefone" value={newDoc.telefone} onChange={e => setNewDoc({...newDoc, telefone: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
-                                    <input placeholder="Senha (Mantenha 12345 se padrão)" value={newDoc.senha} onChange={e => setNewDoc({...newDoc, senha: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
+                                    <input placeholder="Senha (Mantenha 12345 se padrÃ£o)" value={newDoc.senha} onChange={e => setNewDoc({...newDoc, senha: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
                                 </div>
                                 <button type="submit" disabled={saving} className="w-full bg-sky-500 py-2.5 rounded-xl text-slate-950 text-xs font-black uppercase tracking-widest hover:bg-sky-400 transition disabled:opacity-50">
                                     {saving ? 'Salvando...' : 'Confirmar Cadastro'}
@@ -279,7 +279,7 @@ export default function ManagerAccessControl() {
                             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 space-y-4">
                                 <div>
                                     <div className="text-xs uppercase tracking-widest text-slate-500 mb-1">Unidade Fixa Base</div>
-                                    <div className="font-semibold text-sky-200">{selectedDoctor.unidadeFixaNome || 'Não informada'}</div>
+                                    <div className="font-semibold text-sky-200">{selectedDoctor.unidadeFixaNome || 'NÃ£o informada'}</div>
                                 </div>
                                 
                                 <div>
@@ -308,20 +308,20 @@ export default function ManagerAccessControl() {
                         {!selectedDoctorId && (
                             <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/30 p-6 text-center text-slate-500">
                                 <Users size={32} className="mb-3 opacity-50" />
-                                <p className="text-xs">Selecione um médico acima para gerenciar os módulos de acesso.</p>
+                                <p className="text-xs">Selecione um mÃ©dico acima para gerenciar os mÃ³dulos de acesso.</p>
                             </div>
                         )}
                     </div>
 
-                    {/* Módulos de Unidades */}
+                    {/* MÃ³dulos de Unidades */}
                     <div className="flex flex-col rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl min-h-[400px]">
                         <div className="mb-6 flex items-center justify-between border-b border-slate-800 pb-4">
                             <div>
                                 <h3 className="text-xl font-bold text-white">Unidades Liberadas</h3>
                                 <p className="text-sm text-slate-400 mt-1">
                                     {selectedDoctorId 
-                                        ? `Selecione as unidades que ${selectedDoctor?.nome} terá permissão para ver.`
-                                        : 'Aguardando seleção de médico...'}
+                                        ? `Selecione as unidades que ${selectedDoctor?.nome} terÃ¡ permissÃ£o para ver.`
+                                        : 'Aguardando seleÃ§Ã£o de mÃ©dico...'}
                                 </p>
                             </div>
                             
@@ -345,15 +345,15 @@ export default function ManagerAccessControl() {
                             <div className="mb-8 rounded-[2rem] border border-emerald-500/20 bg-emerald-500/5 p-6 shadow-lg shadow-emerald-950/20">
                                 <div className="mb-4 flex items-center justify-between">
                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-2">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                        Edição Master de Perfil
+                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 " />
+                                        EdiÃ§Ã£o Master de Perfil
                                     </h4>
                                     <button
                                         onClick={handleUpdateProfile}
                                         disabled={saving}
                                         className="text-[10px] font-black uppercase tracking-widest text-emerald-100 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-500/30 transition disabled:opacity-50"
                                     >
-                                        {saving ? 'Salvando...' : 'Salvar Dados Básicos'}
+                                        {saving ? 'Salvando...' : 'Salvar Dados BÃ¡sicos'}
                                     </button>
                                 </div>
                                 
@@ -401,7 +401,7 @@ export default function ManagerAccessControl() {
                                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 py-3 text-[10px] font-black uppercase tracking-widest text-rose-400 transition hover:bg-rose-500/20"
                                 >
                                     <AlertTriangle size={14} />
-                                    Excluir Médico Definitivamente
+                                    Excluir MÃ©dico Definitivamente
                                 </button>
                             </div>
                         )}
@@ -445,12 +445,12 @@ export default function ManagerAccessControl() {
                 </div>
             )}
 
-            {/* Seção de Consulta por Unidade (Tabela Inferior) */}
+            {/* SeÃ§Ã£o de Consulta por Unidade (Tabela Inferior) */}
             <div className="mt-12 rounded-[2rem] border border-slate-800 bg-slate-900/75 p-4 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700 sm:p-8">
                 <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <h3 className="text-2xl font-black text-white">Consulta de Médicos por Unidade</h3>
-                        <p className="mt-1 text-sm text-slate-400">Visualize todos os profissionais vinculados a uma unidade específica.</p>
+                        <h3 className="text-2xl font-black text-white">Consulta de MÃ©dicos por Unidade</h3>
+                        <p className="mt-1 text-sm text-slate-400">Visualize todos os profissionais vinculados a uma unidade especÃ­fica.</p>
                     </div>
 
                     <div className="w-full md:w-80">
@@ -471,17 +471,17 @@ export default function ManagerAccessControl() {
                 {!selectedUnitIdFilter ? (
                     <div className="flex h-48 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-800 bg-slate-950/30 text-slate-500">
                         <Search size={40} className="mb-4 opacity-20" />
-                        <p className="text-sm">Selecione uma unidade acima para listar os médicos.</p>
+                        <p className="text-sm">Selecione uma unidade acima para listar os mÃ©dicos.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/50">
                         <table className="min-w-[720px] w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-slate-900/80 text-xs font-bold uppercase tracking-widest text-slate-400 border-b border-slate-800">
-                                    <th className="px-6 py-4">Médico</th>
+                                    <th className="px-6 py-4">MÃ©dico</th>
                                     <th className="px-6 py-4">CRM</th>
                                     <th className="px-6 py-4">Especialidade</th>
-                                    <th className="px-6 py-4">Vínculo</th>
+                                    <th className="px-6 py-4">VÃ­nculo</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/50">
@@ -515,7 +515,7 @@ export default function ManagerAccessControl() {
                         
                         {doctors.filter(doc => doc.unidadeFixaId === selectedUnitIdFilter || doc.unidadesLiberadas.includes(selectedUnitIdFilter)).length === 0 && (
                             <div className="py-12 text-center text-slate-500 italic">
-                                Nenhum médico vinculado a esta unidade no momento.
+                                Nenhum mÃ©dico vinculado a esta unidade no momento.
                             </div>
                         )}
                     </div>
@@ -549,3 +549,4 @@ export default function ManagerAccessControl() {
         </div>
     );
 }
+

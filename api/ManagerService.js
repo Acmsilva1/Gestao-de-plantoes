@@ -261,6 +261,12 @@ export const getManagerAgenda = async (req, res) => {
                 .map((booking) => ({
                     agendamentoId: booking.id,
                     medicoId: booking.medico_id,
+                    tipoPlantao: booking.tipo_plantao || 'COMPLETO',
+                    horaInicio: booking.hora_inicio || null,
+                    horaFim: booking.hora_fim || null,
+                    dataInicioFixo: booking.data_inicio_fixo || null,
+                    dataFimFixo: booking.data_fim_fixo || null,
+                    grupoSequenciaId: booking.grupo_sequencia_id || null,
                     nome: booking.medicos?.nome ?? 'Médico não informado',
                     crm: booking.medicos?.crm ?? '',
                     especialidade: booking.medicos?.especialidade ?? '',

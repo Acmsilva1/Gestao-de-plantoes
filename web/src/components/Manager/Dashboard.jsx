@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Calendar, ChevronLeft, ChevronRight, Activity, Users, MapPin, Globe, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { readApiResponse } from '../../utils/api';
 
-const POLL_INTERVAL_MS = 30_000; // 30 segundos
+const POLL_INTERVAL_MS = 60_000; // 60 segundos
 
 const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -16,7 +16,7 @@ const formatMonthHeader = (month) => {
     return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
 };
 
-/** Retorna YYYY-MM do mês atual e próximo (janela do preditor) */
+/** Retorna YYYY-MM do mÃªs atual e prÃ³ximo (janela do preditor) */
 const getForecastWindow = () => {
     const now = new Date();
     const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -80,7 +80,7 @@ export default function ManagerDashboard() {
         fetchMetrics(false);
     }, [fetchMetrics]);
 
-    // Polling every 30s (silent refresh — no spinner, no flicker)
+    // Polling every 60s (silent refresh, no spinner, no flicker)
     useEffect(() => {
         const startPolling = () => {
             pollTimerRef.current = setInterval(() => {
@@ -136,7 +136,7 @@ export default function ManagerDashboard() {
                             <MapPin size={18} className="text-emerald-400" />
                             Unidades
                         </h3>
-                        <p className="mt-1 text-xs text-slate-400">Filtrar abrangência dos gráficos.</p>
+                        <p className="mt-1 text-xs text-slate-400">Filtrar abrangÃªncia dos grÃ¡ficos.</p>
                     </div>
 
                     <button
@@ -148,7 +148,7 @@ export default function ManagerDashboard() {
                         }`}
                     >
                         <Globe size={18} />
-                        Visão Nacional (Geral)
+                        VisÃ£o Nacional (Geral)
                     </button>
 
                     <div className="flex flex-col gap-1 overflow-y-auto max-h-[600px] pr-2">
@@ -175,10 +175,10 @@ export default function ManagerDashboard() {
                     <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
                         <div>
                             <h2 className="text-3xl font-black text-white">
-                                {selectedUnit === 'all' ? 'Análise Nacional' : 'Análise de Unidade'}
+                                {selectedUnit === 'all' ? 'AnÃ¡lise Nacional' : 'AnÃ¡lise de Unidade'}
                             </h2>
                             <div className="mt-2 flex items-center gap-3">
-                                <p className="text-sm text-slate-400">Ocupação e previsão de demanda dia a dia.</p>
+                                <p className="text-sm text-slate-400">OcupaÃ§Ã£o e previsÃ£o de demanda dia a dia.</p>
                                 {/* Live indicator */}
                                 {silentRefreshing ? (
                                     <span className="flex items-center gap-1.5 text-xs text-sky-400">
@@ -215,16 +215,16 @@ export default function ManagerDashboard() {
                         </div>
                     </div>
 
-                    {/* ⚠️ Out-of-forecast-window banner */}
+                    {/* âš ï¸ Out-of-forecast-window banner */}
                     {outsideForecast && (
                         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
                             <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
                             <div>
-                                <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
+                                <p className="font-bold text-amber-300">MÃªs fora da janela de previsÃ£o</p>
                                 <p className="mt-1 text-amber-200/80">
                                     O preditor cobre apenas <span className="font-semibold capitalize">{formatMonthHeader(forecastCurrent)}</span> e{' '}
                                     <span className="font-semibold capitalize">{formatMonthHeader(forecastNext)}</span>.
-                                    Os gráficos abaixo estarão zerados ou incompletos.
+                                    Os grÃ¡ficos abaixo estarÃ£o zerados ou incompletos.
                                 </p>
                             </div>
                         </div>
@@ -257,8 +257,8 @@ export default function ManagerDashboard() {
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                            <Bar dataKey="Disponíveis" fill="#34d399" radius={[4, 4, 0, 0]}>
-                                                <LabelList dataKey="Disponíveis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
+                                            <Bar dataKey="DisponÃ­veis" fill="#34d399" radius={[4, 4, 0, 0]}>
+                                                <LabelList dataKey="DisponÃ­veis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
                                             </Bar>
                                             <Bar dataKey="Ocupadas" fill="#60a5fa" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Ocupadas" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
@@ -285,8 +285,8 @@ export default function ManagerDashboard() {
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                            <Bar dataKey="Disponíveis" fill="#34d399" radius={[4, 4, 0, 0]}>
-                                                <LabelList dataKey="Disponíveis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
+                                            <Bar dataKey="DisponÃ­veis" fill="#34d399" radius={[4, 4, 0, 0]}>
+                                                <LabelList dataKey="DisponÃ­veis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
                                             </Bar>
                                             <Bar dataKey="Ocupadas" fill="#60a5fa" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Ocupadas" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
@@ -313,8 +313,8 @@ export default function ManagerDashboard() {
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                            <Bar dataKey="Manhã" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
-                                                <LabelList dataKey="Manhã" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
+                                            <Bar dataKey="ManhÃ£" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
+                                                <LabelList dataKey="ManhÃ£" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
                                             <Bar dataKey="Tarde" stackId="a" fill="#f97316">
                                                 <LabelList dataKey="Tarde" position="center" fill="#7c2d12" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
@@ -325,7 +325,7 @@ export default function ManagerDashboard() {
                                             <Bar dataKey="Madrugada" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Madrugada" position="center" fill="#fae8ff" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
-                                            {/* Removi o Bar de 'Geral' do stack para não dobrar a altura, mas ele aparece no Tooltip */}
+                                            {/* Removi o Bar de 'Geral' do stack para nÃ£o dobrar a altura, mas ele aparece no Tooltip */}
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -348,8 +348,8 @@ export default function ManagerDashboard() {
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                            <Bar dataKey="Manhã" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
-                                                <LabelList dataKey="Manhã" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
+                                            <Bar dataKey="ManhÃ£" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
+                                                <LabelList dataKey="ManhÃ£" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
                                             <Bar dataKey="Tarde" stackId="a" fill="#f97316">
                                                 <LabelList dataKey="Tarde" position="center" fill="#7c2d12" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
@@ -360,7 +360,7 @@ export default function ManagerDashboard() {
                                             <Bar dataKey="Madrugada" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Madrugada" position="center" fill="#fae8ff" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
                                             </Bar>
-                                            {/* Removi o Bar de 'Geral' do stack para não dobrar a altura, mas ele aparece no Tooltip */}
+                                            {/* Removi o Bar de 'Geral' do stack para nÃ£o dobrar a altura, mas ele aparece no Tooltip */}
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -372,3 +372,5 @@ export default function ManagerDashboard() {
         </div>
     );
 }
+
+

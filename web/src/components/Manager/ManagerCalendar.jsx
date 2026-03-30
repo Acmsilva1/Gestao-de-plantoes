@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle, Phone, Stethoscope, UserRoundCheck } from 'lucide-react';
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const shiftTypeOptions = ['Todos', 'Madrugada', 'Manhã', 'Tarde', 'Noite'];
@@ -12,6 +12,32 @@ const weekdayIndexByShortName = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5
 const getMonthAnchorDate = (month) => new Date(`${month}-01T12:00:00-03:00`);
 const getMonthTitle = (month) => monthFormatter.format(getMonthAnchorDate(month));
 const formatDisplayDate = (ds) => fullDateFormatter.format(new Date(`${ds}T12:00:00-03:00`)).replace(/\//g, '-');
+const formatBookingType = (doctor) => {
+    if (!doctor) return 'Completo';
+
+    if (doctor.tipoPlantao === 'PARCIAL') {
+        return doctor.horaInicio && doctor.horaFim
+            ? `Parcial • ${doctor.horaInicio.slice(0, 5)} às ${doctor.horaFim.slice(0, 5)}`
+            : 'Parcial';
+    }
+
+    if (doctor.tipoPlantao === 'FIXO') {
+        const rangeLabel =
+            doctor.dataInicioFixo && doctor.dataFimFixo
+                ? `${formatDisplayDate(doctor.dataInicioFixo)} até ${formatDisplayDate(doctor.dataFimFixo)}`
+                : doctor.dataFimFixo
+                  ? `até ${formatDisplayDate(doctor.dataFimFixo)}`
+                  : 'Sequência fixa';
+
+        if (doctor.horaInicio && doctor.horaFim) {
+            return `Fixo parcial • ${rangeLabel} • ${doctor.horaInicio.slice(0, 5)} às ${doctor.horaFim.slice(0, 5)}`;
+        }
+
+        return `Fixo completo • ${rangeLabel}`;
+    }
+
+    return 'Completo';
+};
 
 const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -57,43 +83,43 @@ const buildCalendarDays = (month, shifts) => {
 
 const getShiftTone = (shift) => {
     if (shift.vagas <= 0) {
-        return 'full';
+        return 'filled';
     }
 
     if (shift.vagasOcupadas > 0) {
         return 'partial';
     }
 
-    return 'open';
+    return 'empty';
 };
 
 const getShiftClasses = (shift) => {
     const tone = getShiftTone(shift);
 
-    if (tone === 'full') {
-        return 'border border-rose-400/70 bg-rose-500/10 text-rose-100 animate-pulse shadow-[0_0_0_1px_rgba(251,113,133,0.2),0_0_18px_rgba(244,63,94,0.16)]';
+    if (tone === 'filled') {
+        return 'border border-sky-400/70 bg-sky-500/10 text-sky-100  shadow-[0_0_0_1px_rgba(56,189,248,0.2),0_0_18px_rgba(14,165,233,0.16)]';
     }
 
     if (tone === 'partial') {
-        return 'border border-amber-400/60 bg-amber-500/10 text-amber-100 animate-pulse shadow-[0_0_0_1px_rgba(251,191,36,0.14),0_0_18px_rgba(245,158,11,0.16)]';
+        return 'border border-amber-400/60 bg-amber-500/10 text-amber-100  shadow-[0_0_0_1px_rgba(251,191,36,0.14),0_0_18px_rgba(245,158,11,0.16)]';
     }
 
-    return 'border border-emerald-300/55 bg-emerald-500/18 text-emerald-50 shadow-[0_0_0_1px_rgba(110,231,183,0.18),0_0_22px_rgba(16,185,129,0.18)]';
+    return 'border border-rose-400/60 bg-rose-500/10 text-rose-100 shadow-[0_0_0_1px_rgba(251,113,133,0.18),0_0_20px_rgba(244,63,94,0.14)]';
 };
 
 const getDayCardClasses = (shifts) => {
     const tones = shifts.map(getShiftTone);
 
-    if (tones.includes('full')) {
-        return 'border-rose-400/60 shadow-[0_0_0_1px_rgba(251,113,133,0.18),0_0_24px_rgba(244,63,94,0.14)]';
+    if (tones.includes('filled')) {
+        return 'border-sky-400/60 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_24px_rgba(14,165,233,0.14)]';
     }
 
     if (tones.includes('partial')) {
-        return 'border-sky-400/50 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_24px_rgba(14,165,233,0.12)]';
+        return 'border-amber-400/50 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_0_24px_rgba(245,158,11,0.12)]';
     }
 
-    if (tones.includes('open')) {
-        return 'border-emerald-300/70 shadow-[0_0_0_1px_rgba(110,231,183,0.2),0_0_24px_rgba(16,185,129,0.18)]';
+    if (tones.includes('empty')) {
+        return 'border-rose-400/60 shadow-[0_0_0_1px_rgba(251,113,133,0.18),0_0_24px_rgba(244,63,94,0.14)]';
     }
 
     return 'border-slate-800';
@@ -102,29 +128,29 @@ const getDayCardClasses = (shifts) => {
 const getShiftBadgeClasses = (shift) => {
     const tone = getShiftTone(shift);
 
-    if (tone === 'full') {
-        return 'border border-rose-400/40 bg-rose-500/10 text-rose-200';
+    if (tone === 'filled') {
+        return 'border border-sky-400/40 bg-sky-500/10 text-sky-200';
     }
 
     if (tone === 'partial') {
         return 'border border-amber-400/40 bg-amber-500/10 text-amber-200';
     }
 
-    return 'border border-emerald-300/55 bg-emerald-500/15 text-emerald-100';
+    return 'border border-rose-400/45 bg-rose-500/10 text-rose-200';
 };
 
 const getShiftPanelClasses = (shift) => {
     const tone = getShiftTone(shift);
 
-    if (tone === 'full') {
-        return 'bg-rose-950/30 ring-1 ring-rose-400/30 animate-pulse';
+    if (tone === 'filled') {
+        return 'bg-sky-950/30 ring-1 ring-sky-400/30 ';
     }
 
     if (tone === 'partial') {
-        return 'bg-amber-950/20 ring-1 ring-amber-400/25 animate-pulse';
+        return 'bg-amber-950/20 ring-1 ring-amber-400/25 ';
     }
 
-    return 'bg-emerald-950/25 ring-1 ring-emerald-300/35';
+    return 'bg-rose-950/25 ring-1 ring-rose-400/30';
 };
 
 export default function ManagerCalendar({ units = [] }) {
@@ -132,7 +158,9 @@ export default function ManagerCalendar({ units = [] }) {
     const [calUnit, setCalUnit] = useState(null);
     const [calData, setCalData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingDayAgenda, setLoadingDayAgenda] = useState(false);
     const [selectedDay, setSelectedDay] = useState(null);
+    const [selectedDayAgenda, setSelectedDayAgenda] = useState(null);
     const [shiftTypeFilter, setShiftTypeFilter] = useState('Todos');
     const [shiftStatusFilter, setShiftStatusFilter] = useState('Todos');
     const [refreshKey, setRefreshKey] = useState(0);
@@ -148,7 +176,7 @@ export default function ManagerCalendar({ units = [] }) {
     useEffect(() => {
         const intervalId = window.setInterval(() => {
             setRefreshKey((current) => current + 1);
-        }, 8000);
+        }, 60000);
 
         const handleWindowFocus = () => {
             setRefreshKey((current) => current + 1);
@@ -213,9 +241,17 @@ export default function ManagerCalendar({ units = [] }) {
     }, [calendarDays, hasActiveFilters]);
 
     const selectedDayShifts = useMemo(() => {
+        if (selectedDayAgenda?.shifts?.length) {
+            return selectedDayAgenda.shifts.filter((shift) => {
+                const matchesType = shiftTypeFilter === 'Todos' || shift.turno === shiftTypeFilter;
+                const matchesStatus = shiftStatusFilter === 'Todos' || shift.status === shiftStatusFilter;
+                return matchesType && matchesStatus;
+            });
+        }
+
         if (!selectedDay) return [];
-        return visibleShifts.filter(s => s.data === selectedDay);
-    }, [selectedDay, visibleShifts]);
+        return visibleShifts.filter((shift) => shift.data === selectedDay).map((shift) => ({ ...shift, medicos: [] }));
+    }, [selectedDay, selectedDayAgenda, visibleShifts, shiftTypeFilter, shiftStatusFilter]);
 
     useEffect(() => {
         if (!selectedDay) return;
@@ -226,11 +262,37 @@ export default function ManagerCalendar({ units = [] }) {
         }
     }, [selectedDay, visibleShifts]);
 
+    useEffect(() => {
+        if (!calUnit || !selectedDay) {
+            setSelectedDayAgenda(null);
+            return;
+        }
+
+        const fetchDayAgenda = async () => {
+            setLoadingDayAgenda(true);
+            try {
+                const response = await fetch(`/api/manager/agenda?unidadeId=${calUnit}&date=${selectedDay}`);
+                if (!response.ok) {
+                    throw new Error('Falha ao carregar agenda do dia.');
+                }
+
+                const data = await response.json();
+                setSelectedDayAgenda(data);
+            } catch {
+                setSelectedDayAgenda(null);
+            } finally {
+                setLoadingDayAgenda(false);
+            }
+        };
+
+        fetchDayAgenda();
+    }, [calUnit, selectedDay, refreshKey]);
+
     const selectedUnitName = units.find(u => u.id === calUnit)?.nome || '';
     const outsideForecast = isOutsideForecastWindow(calMonth);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
 
-    /* ——— Controls shown only in calendar view ——— */
+    /* â€”â€”â€” Controls shown only in calendar view â€”â€”â€” */
     const CalendarControls = (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-start gap-3 sm:items-center">
@@ -291,7 +353,7 @@ export default function ManagerCalendar({ units = [] }) {
     return (
         <section className="rounded-[2rem] border border-slate-700/60 bg-slate-900/60 p-4 shadow-2xl shadow-slate-950/40 animate-in fade-in duration-500 sm:p-8">
 
-            {/* ═══ CALENDAR VIEW ═══ */}
+            {/* â•â•â• CALENDAR VIEW â•â•â• */}
             {!selectedDay ? (
                 <>
                     <div className="mb-8 flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-start md:justify-between">
@@ -307,17 +369,19 @@ export default function ManagerCalendar({ units = [] }) {
                         </div>
                         {CalendarControls}
                     </div>
-
                     {calData && (
                         <div className="mb-6 flex flex-wrap gap-3">
-                            <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
+                            <span className="rounded-full border border-slate-600/50 bg-slate-800/40 px-4 py-1 text-xs font-bold text-slate-200">
                                 {visibleShifts.length} plantões no mês
                             </span>
-                            <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-4 py-1 text-xs font-bold text-rose-300">
-                                {visibleShifts.filter(s => s.vagas <= 0).length} esgotados
+                            <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-4 py-1 text-xs font-bold text-sky-300">
+                                {visibleShifts.filter(s => s.vagas <= 0).length} preenchidos
                             </span>
                             <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-1 text-xs font-bold text-amber-300">
-                                {visibleShifts.filter(s => s.vagas > 0).length} com vagas
+                                {visibleShifts.filter(s => s.vagas > 0 && s.vagasOcupadas > 0).length} parcialmente preenchidos
+                            </span>
+                            <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-4 py-1 text-xs font-bold text-rose-300">
+                                {visibleShifts.filter(s => s.vagasOcupadas === 0).length} sem preenchimento
                             </span>
                         </div>
                     )}
@@ -397,7 +461,7 @@ export default function ManagerCalendar({ units = [] }) {
                 </>
             ) : (
 
-                /* ═══ DAY DETAIL VIEW ═══ */
+                /* â•â•â• DAY DETAIL VIEW â•â•â• */
                 <>
                     <div className="mb-6 flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -416,7 +480,11 @@ export default function ManagerCalendar({ units = [] }) {
                         </button>
                     </div>
 
-                    {selectedDayShifts.length === 0 ? (
+                    {loadingDayAgenda ? (
+                        <div className="flex h-64 items-center justify-center">
+                            <div className="h-7 w-7 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
+                        </div>
+                    ) : selectedDayShifts.length === 0 ? (
                         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-10 text-center text-slate-400">
                             Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
                         </div>
@@ -426,12 +494,12 @@ export default function ManagerCalendar({ units = [] }) {
                                 <article
                                     key={shift.id}
                                     className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
-                                        getShiftTone(shift) === 'full'
-                                            ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)]'
+                                        getShiftTone(shift) === 'filled'
+                                            ? 'border-sky-400/70 shadow-[0_0_0_1px_rgba(56,189,248,0.28),0_0_28px_rgba(14,165,233,0.2)]'
                                             : getShiftTone(shift) === 'partial'
                                                 ? 'border-amber-400/50 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_0_24px_rgba(245,158,11,0.14)]'
-                                                : getShiftTone(shift) === 'open'
-                                                    ? 'border-emerald-400/30 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_24px_rgba(16,185,129,0.1)]'
+                                                : getShiftTone(shift) === 'empty'
+                                                    ? 'border-rose-400/40 shadow-[0_0_0_1px_rgba(251,113,133,0.16),0_0_24px_rgba(244,63,94,0.12)]'
                                                     : 'border-slate-700'
                                     }`}
                                 >
@@ -445,24 +513,64 @@ export default function ManagerCalendar({ units = [] }) {
                                     <div className={`mb-5 rounded-2xl p-4 ${getShiftPanelClasses(shift)}`}>
                                         <p className="text-sm text-slate-400">Vagas disponíveis</p>
                                         <p className={`mt-2 text-4xl font-black ${
-                                            getShiftTone(shift) === 'full'
-                                                ? 'text-rose-200'
+                                            getShiftTone(shift) === 'filled'
+                                                ? 'text-sky-200'
                                                 : getShiftTone(shift) === 'partial'
                                                     ? 'text-amber-100'
-                                                    : 'text-emerald-100'
+                                                    : 'text-rose-100'
                                         }`}>{shift.vagas}</p>
                                         <div className="mt-3 flex gap-4 text-xs text-slate-400">
                                             <span><span className="text-emerald-400 font-bold">{shift.vagasTotais}</span> totais</span>
                                             <span><span className="text-rose-400 font-bold">{shift.vagasOcupadas}</span> ocupadas</span>
                                         </div>
                                         <p className={`mt-3 text-xs uppercase tracking-[0.2em] ${
-                                            getShiftTone(shift) === 'full'
-                                                ? 'text-rose-200/80'
+                                            getShiftTone(shift) === 'filled'
+                                                ? 'text-sky-200/80'
                                                 : getShiftTone(shift) === 'partial'
                                                     ? 'text-amber-200/80'
-                                                    : 'text-emerald-200/70'
+                                                    : 'text-rose-200/80'
                                         }`}>{shift.status}</p>
                                     </div>
+
+                                    {shift.medicos?.length ? (
+                                        <div className="grid gap-3">
+                                            {shift.medicos.map((doctor) => (
+                                                <div key={doctor.agendamentoId} className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 px-4 py-4">
+                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 text-white">
+                                                                <UserRoundCheck size={16} className="text-emerald-400" />
+                                                                <span className="font-black">{doctor.nome}</span>
+                                                            </div>
+                                                            <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">CRM</div>
+                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.crm || 'Não informado'}</div>
+                                                            <div className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">Tipo de plantão</div>
+                                                            <div className="mt-1 inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200">
+                                                                {formatBookingType(doctor)}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="sm:text-right">
+                                                            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 sm:justify-end">
+                                                                <Stethoscope size={14} />
+                                                                Especialidade
+                                                            </div>
+                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.especialidade || 'Não informada'}</div>
+                                                            <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 sm:justify-end">
+                                                                <Phone size={14} />
+                                                                Contato
+                                                            </div>
+                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.telefone || 'Não informado'}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 px-4 py-5 text-sm text-slate-400">
+                                            Nenhum médico alocado neste turno.
+                                        </div>
+                                    )}
                                 </article>
                             ))}
                         </div>
@@ -472,3 +580,7 @@ export default function ManagerCalendar({ units = [] }) {
         </section>
     );
 }
+
+
+
+

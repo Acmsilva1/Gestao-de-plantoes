@@ -7,6 +7,15 @@ const PUBLIC_SHIFTS_TTL_MS = 30_000;
 const isReservationHoldTableMissing = (message = '') => /Could not find the table 'public\.reserva_holds'|relation "reserva_holds" does not exist/i.test(message);
 const shiftTurnOrder = { Madrugada: 0, Manhã: 1, Tarde: 2, Noite: 3 };
 
+const mapBookingDetails = (booking) => ({
+    tipoPlantao: booking.tipo_plantao || 'COMPLETO',
+    horaInicio: booking.hora_inicio || null,
+    horaFim: booking.hora_fim || null,
+    dataInicioFixo: booking.data_inicio_fixo || null,
+    dataFimFixo: booking.data_fim_fixo || null,
+    grupoSequenciaId: booking.grupo_sequencia_id || null
+});
+
 const getTodayKey = (referenceDate = new Date()) => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/Sao_Paulo',
@@ -175,7 +184,8 @@ export const getDoctorAgenda = async (req, res) => {
                 data: b.disponibilidade?.data_plantao,
                 turno: b.disponibilidade?.turno,
                 unidade: b.disponibilidade?.unidades?.nome,
-                especialidade: doctor.especialidade
+                especialidade: doctor.especialidade,
+                ...mapBookingDetails(b)
             }))
             .sort((left, right) => {
                 const dateCompare = (left.data || '').localeCompare(right.data || '');
@@ -293,14 +303,21 @@ export const releaseShiftHold = async (req, res) => {
 
 export const selectShift = async (req, res) => {
     const { id } = req.params;
-    const { medicoId } = req.body ?? {};
+    const { medicoId, bookingType, startTime, endTime, fixedEndDate, fixedMode, sequenceGroupId } = req.body ?? {};
 
     try {
         if (!medicoId) {
             return res.status(400).json({ error: 'Selecione um medico para reservar o plantao.' });
         }
 
-        const updatedShift = await dbModel.reserveShift(id, medicoId);
+        const updatedShift = await dbModel.reserveShift(id, medicoId, {
+            bookingType,
+            startTime,
+            endTime,
+            fixedEndDate,
+            fixedMode,
+            sequenceGroupId
+        });
         cacheModel.delete(PUBLIC_SHIFTS_CACHE_KEY);
 
         res.json({

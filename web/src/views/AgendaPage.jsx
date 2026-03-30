@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Stethoscope, UserRoundCheck, Phone, Users } from 'lucide-react';
 import { readApiResponse } from '../utils/api';
 
-const shiftOrder = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
+const shiftOrder = ['ManhÃ£', 'Tarde', 'Noite', 'Madrugada'];
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
@@ -20,6 +20,33 @@ const formatDateLabel = (dateString) =>
         year: 'numeric',
         timeZone: 'America/Sao_Paulo'
     }).format(new Date(`${dateString}T12:00:00-03:00`));
+
+const formatShiftBookingType = (doctor) => {
+    if (!doctor) return 'Completo';
+
+    if (doctor.tipoPlantao === 'PARCIAL') {
+        return doctor.horaInicio && doctor.horaFim
+            ? `Parcial â€¢ ${doctor.horaInicio.slice(0, 5)} Ã s ${doctor.horaFim.slice(0, 5)}`
+            : 'Parcial';
+    }
+
+    if (doctor.tipoPlantao === 'FIXO') {
+        const rangeLabel =
+            doctor.dataInicioFixo && doctor.dataFimFixo
+                ? `${formatDateLabel(doctor.dataInicioFixo)} atÃ© ${formatDateLabel(doctor.dataFimFixo)}`
+                : doctor.dataFimFixo
+                  ? `atÃ© ${formatDateLabel(doctor.dataFimFixo)}`
+                  : 'SequÃªncia fixa';
+
+        if (doctor.horaInicio && doctor.horaFim) {
+            return `Fixo parcial â€¢ ${rangeLabel} â€¢ ${doctor.horaInicio.slice(0, 5)} Ã s ${doctor.horaFim.slice(0, 5)}`;
+        }
+
+        return `Fixo completo â€¢ ${rangeLabel}`;
+    }
+
+    return 'Completo';
+};
 
 const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -69,11 +96,11 @@ const CalendarPopover = ({ month, selectedDate, daySummary, onMonthChange, onDat
         }
 
         if (hasDoctors) {
-            return 'border border-sky-400/30 bg-sky-500/10 text-sky-100 animate-pulse shadow-[0_0_18px_rgba(56,189,248,0.18)]';
+            return 'border border-sky-400/30 bg-sky-500/10 text-sky-100  shadow-[0_0_18px_rgba(56,189,248,0.18)]';
         }
 
         if (hasShifts) {
-            return 'border border-rose-400/30 bg-rose-500/10 text-rose-100 animate-pulse shadow-[0_0_18px_rgba(244,63,94,0.14)]';
+            return 'border border-rose-400/30 bg-rose-500/10 text-rose-100  shadow-[0_0_18px_rgba(244,63,94,0.14)]';
         }
 
         return 'border border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-600';
@@ -136,12 +163,12 @@ const CalendarPopover = ({ month, selectedDate, daySummary, onMonthChange, onDat
 
             <div className="mt-4 grid gap-2 text-[11px] text-slate-400">
                 <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full border border-sky-400 bg-sky-500/20 animate-pulse" />
-                    Dias com médicos agendados
+                    <span className="h-3 w-3 rounded-full border border-sky-400 bg-sky-500/20 " />
+                    Dias com mÃ©dicos agendados
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full border border-rose-400 bg-rose-500/20 animate-pulse" />
-                    Dias com turnos sem médicos alocados
+                    <span className="h-3 w-3 rounded-full border border-rose-400 bg-rose-500/20 " />
+                    Dias com turnos sem mÃ©dicos alocados
                 </div>
             </div>
         </div>
@@ -188,7 +215,7 @@ export default function AgendaPage() {
     useEffect(() => {
         const intervalId = window.setInterval(() => {
             setRefreshKey((current) => current + 1);
-        }, 8000);
+        }, 60000);
 
         const handleWindowFocus = () => {
             setRefreshKey((current) => current + 1);
@@ -266,9 +293,9 @@ export default function AgendaPage() {
     return (
         <div className="animate-in fade-in zoom-in-95 duration-500">
             <div className="mb-8">
-                <h2 className="text-3xl font-black text-white">Agenda de Plantões</h2>
+                <h2 className="text-3xl font-black text-white">Agenda de PlantÃµes</h2>
                 <p className="mt-2 text-sm text-slate-400">
-                    Filtre por unidade e data para ver os turnos do dia e quais médicos já estão alocados em cada um.
+                    Filtre por unidade e data para ver os turnos do dia e quais mÃ©dicos jÃ¡ estÃ£o alocados em cada um.
                 </p>
             </div>
 
@@ -342,7 +369,7 @@ export default function AgendaPage() {
                             <div className="mb-6 flex flex-col gap-2 rounded-3xl border border-slate-800 bg-slate-950/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Filtro atual</p>
-                                    <h3 className="mt-1 text-xl font-black text-white">{agenda?.unit?.nome || 'Unidade não selecionada'}</h3>
+                                    <h3 className="mt-1 text-xl font-black text-white">{agenda?.unit?.nome || 'Unidade nÃ£o selecionada'}</h3>
                                 </div>
                                 <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-300">
                                     {formatDateLabel(selectedDate)}
@@ -354,7 +381,7 @@ export default function AgendaPage() {
                                     <Users size={34} className="mb-4 text-slate-600" />
                                     <p className="text-lg font-bold text-slate-300">Nenhum turno encontrado para esse filtro.</p>
                                     <p className="mt-2 text-sm text-slate-500">
-                                        Ajuste a unidade ou a data, ou gere a previsão para preencher a disponibilidade.
+                                        Ajuste a unidade ou a data, ou gere a previsÃ£o para preencher a disponibilidade.
                                     </p>
                                 </div>
                             ) : (
@@ -384,14 +411,14 @@ export default function AgendaPage() {
                                                     <div className="mt-2 text-2xl font-black text-sky-300">{shift.vagasOcupadas}</div>
                                                 </div>
                                                 <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
-                                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Disponíveis</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">DisponÃ­veis</div>
                                                     <div className="mt-2 text-2xl font-black text-emerald-300">{shift.vagasDisponiveis}</div>
                                                 </div>
                                             </div>
 
                                             {shift.medicos.length === 0 ? (
                                                 <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 px-4 py-5 text-sm text-slate-400">
-                                                    Nenhum médico alocado neste turno.
+                                                    Nenhum mÃ©dico alocado neste turno.
                                                 </div>
                                             ) : (
                                                 <div className="grid gap-3">
@@ -404,7 +431,11 @@ export default function AgendaPage() {
                                                                         <span className="font-black">{doctor.nome}</span>
                                                                     </div>
                                                                     <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">CRM</div>
-                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.crm || 'Não informado'}</div>
+                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.crm || 'NÃ£o informado'}</div>
+                                                                    <div className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">Tipo de plantÃ£o</div>
+                                                                    <div className="mt-1 inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200">
+                                                                        {formatShiftBookingType(doctor)}
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="sm:text-right">
@@ -412,12 +443,12 @@ export default function AgendaPage() {
                                                                         <Stethoscope size={14} />
                                                                         Especialidade
                                                                     </div>
-                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.especialidade || 'Não informada'}</div>
+                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.especialidade || 'NÃ£o informada'}</div>
                                                                     <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 sm:justify-end">
                                                                         <Phone size={14} />
                                                                         Contato
                                                                     </div>
-                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.telefone || 'Não informado'}</div>
+                                                                    <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.telefone || 'NÃ£o informado'}</div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -435,3 +466,5 @@ export default function AgendaPage() {
         </div>
     );
 }
+
+

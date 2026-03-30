@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, CalendarDays, ShieldCheck, Lock, UserCog, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, CalendarDays, ShieldCheck, Lock, UserCog } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerDashboard from '../components/Manager/Dashboard';
 import ManagerAccess from '../components/Manager/AccessControl';
 import CalendarPage from './CalendarPage';
-import AgendaPage from './AgendaPage';
 import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
@@ -190,19 +189,6 @@ export default function ManagerView() {
                         <CalendarDays size={18} />
                         Calendário
                     </NavLink>
-                    <NavLink
-                        to="/gestor/agenda"
-                        className={({ isActive }) => 
-                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                isActive 
-                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                            }`
-                        }
-                    >
-                        <ClipboardList size={18} />
-                        Agenda
-                    </NavLink>
                 </nav>
 
             </aside>
@@ -240,7 +226,7 @@ export default function ManagerView() {
                             <Route path="dashboard" element={<ManagerDashboard />} />
                             <Route path="acessos" element={<ManagerAccess />} />
                             <Route path="calendario" element={<CalendarPage />} />
-                            <Route path="agenda" element={<AgendaPage />} />
+                            <Route path="agenda" element={<Navigate to="/gestor/calendario" replace />} />
                             <Route path="*" element={<Navigate to="dashboard" replace />} />
                         </Routes>
                     </div>

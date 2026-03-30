@@ -153,6 +153,12 @@ export const dbModel = {
                     id,
                     confirmado,
                     medico_id,
+                    tipo_plantao,
+                    hora_inicio,
+                    hora_fim,
+                    data_inicio_fixo,
+                    data_fim_fixo,
+                    grupo_sequencia_id,
                     medicos(
                         id,
                         nome,
@@ -210,7 +216,7 @@ export const dbModel = {
     async getBookingByShiftAndDoctor(shiftId, medicoId) {
         const response = await supabase
             .from('agendamentos')
-            .select('id, disponibilidade_id, medico_id, confirmado')
+            .select('id, disponibilidade_id, medico_id, confirmado, tipo_plantao, hora_inicio, hora_fim, data_inicio_fixo, data_fim_fixo, grupo_sequencia_id')
             .eq('disponibilidade_id', shiftId)
             .eq('medico_id', medicoId)
             .maybeSingle();
@@ -341,7 +347,7 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao gerar previsao mensal');
     },
-    async reserveShift(shiftId, medicoId) {
+    async reserveShift(shiftId, medicoId, reservationData = {}) {
         const currentShift = await this.getShiftById(shiftId);
 
         if (!currentShift) {
@@ -411,13 +417,23 @@ export const dbModel = {
         }
 
         if (medicoId) {
+            const normalizedBooking = {
+                tipo_plantao: reservationData.bookingType || 'COMPLETO',
+                hora_inicio: reservationData.startTime || null,
+                hora_fim: reservationData.endTime || null,
+                data_inicio_fixo: reservationData.bookingType === 'FIXO' ? currentShift.data_plantao : null,
+                data_fim_fixo: reservationData.bookingType === 'FIXO' ? reservationData.fixedEndDate || currentShift.data_plantao : null,
+                grupo_sequencia_id: reservationData.bookingType === 'FIXO' ? reservationData.sequenceGroupId || null : null
+            };
+
             const bookingResponse = await supabase
                 .from('agendamentos')
                 .upsert(
                     {
                         disponibilidade_id: shiftId,
                         medico_id: medicoId,
-                        confirmado: true
+                        confirmado: true,
+                        ...normalizedBooking
                     },
                     {
                         onConflict: 'disponibilidade_id,medico_id'
@@ -528,6 +544,12 @@ export const dbModel = {
             .select(`
                 id,
                 disponibilidade_id,
+                tipo_plantao,
+                hora_inicio,
+                hora_fim,
+                data_inicio_fixo,
+                data_fim_fixo,
+                grupo_sequencia_id,
                 disponibilidade(
                     id, 
                     data_plantao, 
