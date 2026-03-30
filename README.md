@@ -228,8 +228,8 @@ E só atualiza o que mudou.
 Regras importantes:
 
 - se o turno já existir e não mudou, ele é preservado
-- se o turno estiver `CANCELADO`, esse status é mantido
-- se `vagas_ocupadas >= vagas_totais`, o status vira `LOTADO`
+- se `vagas_ocupadas >= vagas_totais`, o status vira `OCUPADO`
+- se ainda existir ao menos uma vaga livre, o status fica `ABERTO`
 - caso contrário, o status fica `ABERTO`
 
 ### Quando a previsão roda

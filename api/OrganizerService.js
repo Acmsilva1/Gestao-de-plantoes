@@ -24,12 +24,8 @@ const resolveStatusForForecast = (existingRow, desiredRow) => {
         return desiredRow.status;
     }
 
-    if (existingRow.status === 'CANCELADO') {
-        return existingRow.status;
-    }
-
     if ((existingRow.vagas_ocupadas || 0) >= desiredRow.vagas_totais) {
-        return 'LOTADO';
+        return 'OCUPADO';
     }
 
     return 'ABERTO';

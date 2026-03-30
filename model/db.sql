@@ -31,7 +31,7 @@ CREATE TABLE disponibilidade (
     turno TEXT NOT NULL, -- 'Manhã', 'Tarde', 'Noite', 'Madrugada'
     vagas_totais INT NOT NULL, -- Calculado com base nos atendimentos por período
     vagas_ocupadas INT DEFAULT 0,
-    status TEXT DEFAULT 'ABERTO', -- 'ABERTO', 'LOTADO', 'CANCELADO'
+    status TEXT DEFAULT 'ABERTO', -- 'ABERTO' quando ainda ha vagas, 'OCUPADO' quando nao ha vagas
     
     -- Impede que o script de predição crie dois registros para o mesmo turno/dia/unidade
     UNIQUE(unidade_id, data_plantao, turno)

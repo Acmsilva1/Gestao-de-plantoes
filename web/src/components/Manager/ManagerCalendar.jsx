@@ -54,10 +54,6 @@ const buildCalendarDays = (month, shifts) => {
 };
 
 const getShiftTone = (shift) => {
-    if (shift.status === 'CANCELADO') {
-        return 'cancelled';
-    }
-
     if (shift.vagas <= 0) {
         return 'full';
     }
@@ -71,10 +67,6 @@ const getShiftTone = (shift) => {
 
 const getShiftClasses = (shift) => {
     const tone = getShiftTone(shift);
-
-    if (tone === 'cancelled') {
-        return 'border border-slate-600/70 bg-slate-800/70 text-slate-200';
-    }
 
     if (tone === 'full') {
         return 'border border-rose-400/70 bg-rose-500/10 text-rose-100 animate-pulse shadow-[0_0_0_1px_rgba(251,113,133,0.2),0_0_18px_rgba(244,63,94,0.16)]';
@@ -102,19 +94,11 @@ const getDayCardClasses = (shifts) => {
         return 'border-emerald-300/70 shadow-[0_0_0_1px_rgba(110,231,183,0.2),0_0_24px_rgba(16,185,129,0.18)]';
     }
 
-    if (tones.includes('cancelled')) {
-        return 'border-slate-700 shadow-[0_0_0_1px_rgba(51,65,85,0.2)]';
-    }
-
     return 'border-slate-800';
 };
 
 const getShiftBadgeClasses = (shift) => {
     const tone = getShiftTone(shift);
-
-    if (tone === 'cancelled') {
-        return 'border border-slate-600/70 bg-slate-800/80 text-slate-200';
-    }
 
     if (tone === 'full') {
         return 'border border-rose-400/40 bg-rose-500/10 text-rose-200';
@@ -129,10 +113,6 @@ const getShiftBadgeClasses = (shift) => {
 
 const getShiftPanelClasses = (shift) => {
     const tone = getShiftTone(shift);
-
-    if (tone === 'cancelled') {
-        return 'bg-slate-800/80 ring-1 ring-slate-700/70';
-    }
 
     if (tone === 'full') {
         return 'bg-rose-950/30 ring-1 ring-rose-400/30 animate-pulse';
@@ -368,9 +348,7 @@ export default function ManagerCalendar({ units = [] }) {
                                                 ? 'text-rose-200'
                                                 : getShiftTone(shift) === 'partial'
                                                     ? 'text-amber-100'
-                                                    : getShiftTone(shift) === 'open'
-                                                        ? 'text-emerald-100'
-                                                        : 'text-slate-200'
+                                                    : 'text-emerald-100'
                                         }`}>{shift.vagas}</p>
                                         <div className="mt-3 flex gap-4 text-xs text-slate-400">
                                             <span><span className="text-emerald-400 font-bold">{shift.vagasTotais}</span> totais</span>
@@ -381,9 +359,7 @@ export default function ManagerCalendar({ units = [] }) {
                                                 ? 'text-rose-200/80'
                                                 : getShiftTone(shift) === 'partial'
                                                     ? 'text-amber-200/80'
-                                                    : getShiftTone(shift) === 'open'
-                                                        ? 'text-emerald-200/70'
-                                                        : 'text-slate-400'
+                                                    : 'text-emerald-200/70'
                                         }`}>{shift.status}</p>
                                     </div>
                                 </article>

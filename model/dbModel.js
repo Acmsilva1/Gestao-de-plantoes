@@ -391,7 +391,7 @@ export const dbModel = {
         }
 
         const nextOccupiedSlots = currentShift.vagas_ocupadas + 1;
-        const nextStatus = nextOccupiedSlots >= currentShift.vagas_totais ? 'LOTADO' : currentShift.status;
+        const nextStatus = nextOccupiedSlots >= currentShift.vagas_totais ? 'OCUPADO' : 'ABERTO';
 
         const updateResponse = await supabase
             .from('disponibilidade')

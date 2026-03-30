@@ -678,7 +678,7 @@ export default function DoctorView() {
                                             <p className="mt-2 text-lg font-bold text-white">{shift.especialidade}</p>
                                             <p className="mt-4 text-sm text-slate-400">Vagas disponíveis</p>
                                             <p className={`mt-2 text-3xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
-                                            <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-slate-500'}`}>{shift.status}</p>
+                                            <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-emerald-200/70'}`}>{shift.status}</p>
                                         </div>
 
                                         <button
