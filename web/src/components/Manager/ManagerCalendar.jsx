@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle } from
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const shiftTypeOptions = ['Todos', 'Madrugada', 'Manhã', 'Tarde', 'Noite'];
+const shiftStatusOptions = ['Todos', 'ABERTO', 'OCUPADO'];
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
 const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
@@ -133,6 +134,7 @@ export default function ManagerCalendar({ units = [] }) {
     const [loading, setLoading] = useState(false);
     const [selectedDay, setSelectedDay] = useState(null);
     const [shiftTypeFilter, setShiftTypeFilter] = useState('Todos');
+    const [shiftStatusFilter, setShiftStatusFilter] = useState('Todos');
 
     useEffect(() => {
         if (units.length > 0 && !calUnit) setCalUnit(units[0].id);
@@ -154,26 +156,45 @@ export default function ManagerCalendar({ units = [] }) {
 
     useEffect(() => {
         setShiftTypeFilter('Todos');
+        setShiftStatusFilter('Todos');
     }, [calMonth]);
 
     const visibleShifts = useMemo(() => {
         const shifts = calData?.shifts || [];
+        return shifts.filter((shift) => {
+            const matchesType = shiftTypeFilter === 'Todos' || shift.turno === shiftTypeFilter;
+            const matchesStatus = shiftStatusFilter === 'Todos' || shift.status === shiftStatusFilter;
+            return matchesType && matchesStatus;
+        });
+    }, [calData, shiftTypeFilter, shiftStatusFilter]);
 
-        if (shiftTypeFilter === 'Todos') {
-            return shifts;
-        }
-
-        return shifts.filter((shift) => shift.turno === shiftTypeFilter);
-    }, [calData, shiftTypeFilter]);
+    const hasActiveFilters = shiftTypeFilter !== 'Todos' || shiftStatusFilter !== 'Todos';
 
     const calendarDays = useMemo(
         () => buildCalendarDays(calMonth, visibleShifts),
         [calMonth, visibleShifts]
     );
 
+    const filteredCalendarDays = useMemo(() => {
+        if (!hasActiveFilters) {
+            return calendarDays;
+        }
+
+        return calendarDays.filter((entry) => !entry.empty && entry.shifts.length > 0);
+    }, [calendarDays, hasActiveFilters]);
+
     const selectedDayShifts = useMemo(() => {
         if (!selectedDay) return [];
         return visibleShifts.filter(s => s.data === selectedDay);
+    }, [selectedDay, visibleShifts]);
+
+    useEffect(() => {
+        if (!selectedDay) return;
+
+        const stillVisible = visibleShifts.some((shift) => shift.data === selectedDay);
+        if (!stillVisible) {
+            setSelectedDay(null);
+        }
     }, [selectedDay, visibleShifts]);
 
     const selectedUnitName = units.find(u => u.id === calUnit)?.nome || '';
@@ -182,41 +203,58 @@ export default function ManagerCalendar({ units = [] }) {
 
     /* ——— Controls shown only in calendar view ——— */
     const CalendarControls = (
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
-                <MapPin size={14} className="text-sky-400 shrink-0" />
-                <select
-                    value={calUnit || ''}
-                    onChange={e => setCalUnit(e.target.value)}
-                    className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
-                >
-                    {units.map(u => (
-                        <option key={u.id} value={u.id} className="bg-slate-900">{u.nome}</option>
-                    ))}
-                </select>
-            </div>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
-                <Eye size={14} className="text-amber-300 shrink-0" />
-                <select
-                    value={shiftTypeFilter}
-                    onChange={e => setShiftTypeFilter(e.target.value)}
-                    className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
-                >
-                    {shiftTypeOptions.map(option => (
-                        <option key={option} value={option} className="bg-slate-900">{option}</option>
-                    ))}
-                </select>
-            </div>
-            <div className="flex items-center gap-1 rounded-2xl border border-slate-700 bg-slate-900/80 p-1">
-                <button onClick={() => setCalMonth(m => shiftMonth(m, -1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
-                    <ChevronLeft size={16} />
-                </button>
-                <span className="min-w-0 flex-1 px-2 text-center text-sm font-bold capitalize text-white sm:min-w-36">
-                    {getMonthTitle(calMonth)}
-                </span>
-                <button onClick={() => setCalMonth(m => shiftMonth(m, 1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
-                    <ChevronRight size={16} />
-                </button>
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-start gap-3 sm:items-center">
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
+                    <MapPin size={14} className="text-sky-400 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Unidade</span>
+                    <select
+                        value={calUnit || ''}
+                        onChange={e => setCalUnit(e.target.value)}
+                        className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
+                    >
+                        {units.map(u => (
+                            <option key={u.id} value={u.id} className="bg-slate-900">{u.nome}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
+                    <Eye size={14} className="text-amber-300 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Turno</span>
+                    <select
+                        value={shiftTypeFilter}
+                        onChange={e => setShiftTypeFilter(e.target.value)}
+                        className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
+                    >
+                        {shiftTypeOptions.map(option => (
+                            <option key={option} value={option} className="bg-slate-900">{option}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-2">
+                    <AlertTriangle size={14} className="text-rose-300 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Status</span>
+                    <select
+                        value={shiftStatusFilter}
+                        onChange={e => setShiftStatusFilter(e.target.value)}
+                        className="bg-transparent text-sm font-semibold text-white outline-none cursor-pointer"
+                    >
+                        {shiftStatusOptions.map(option => (
+                            <option key={option} value={option} className="bg-slate-900">{option}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-1 rounded-2xl border border-slate-700 bg-slate-900/80 p-1">
+                    <button onClick={() => setCalMonth(m => shiftMonth(m, -1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
+                        <ChevronLeft size={16} />
+                    </button>
+                    <span className="min-w-0 flex-1 px-2 text-center text-sm font-bold capitalize text-white sm:min-w-36">
+                        {getMonthTitle(calMonth)}
+                    </span>
+                    <button onClick={() => setCalMonth(m => shiftMonth(m, 1))} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -283,8 +321,13 @@ export default function ManagerCalendar({ units = [] }) {
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-1 gap-2 md:grid-cols-7">
-                                {calendarDays.map(entry =>
+                            {hasActiveFilters && filteredCalendarDays.length === 0 ? (
+                                <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-10 text-center text-slate-400">
+                                    Nenhum dia encontrado para os filtros selecionados neste mês.
+                                </div>
+                            ) : (
+                            <div className={`grid grid-cols-1 gap-2 ${hasActiveFilters ? 'md:grid-cols-4 xl:grid-cols-5' : 'md:grid-cols-7'}`}>
+                                {(hasActiveFilters ? filteredCalendarDays : calendarDays).map(entry =>
                                     entry.empty ? (
                                         <div key={entry.key} className="hidden md:block rounded-2xl border border-transparent" />
                                     ) : (
@@ -319,6 +362,7 @@ export default function ManagerCalendar({ units = [] }) {
                                     )
                                 )}
                             </div>
+                            )}
                         </>
                     )}
                 </>
