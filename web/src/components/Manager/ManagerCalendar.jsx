@@ -117,14 +117,14 @@ const getShiftBadgeClasses = (shift) => {
     }
 
     if (tone === 'full') {
-        return 'border border-rose-400/40 bg-rose-500/10 text-rose-200 animate-pulse';
+        return 'border border-rose-400/40 bg-rose-500/10 text-rose-200';
     }
 
     if (tone === 'partial') {
-        return 'border border-amber-400/40 bg-amber-500/10 text-amber-200 animate-pulse';
+        return 'border border-amber-400/40 bg-amber-500/10 text-amber-200';
     }
 
-    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 animate-pulse';
+    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-300';
 };
 
 const getShiftPanelClasses = (shift) => {
@@ -135,14 +135,14 @@ const getShiftPanelClasses = (shift) => {
     }
 
     if (tone === 'full') {
-        return 'bg-rose-950/30 ring-1 ring-rose-400/30';
+        return 'bg-rose-950/30 ring-1 ring-rose-400/30 animate-pulse';
     }
 
     if (tone === 'partial') {
-        return 'bg-amber-950/20 ring-1 ring-amber-400/25';
+        return 'bg-amber-950/20 ring-1 ring-amber-400/25 animate-pulse';
     }
 
-    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15';
+    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15 animate-pulse';
 };
 
 export default function ManagerCalendar({ units = [] }) {
@@ -346,9 +346,9 @@ export default function ManagerCalendar({ units = [] }) {
                                     key={shift.id}
                                     className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
                                         getShiftTone(shift) === 'full'
-                                            ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)] animate-pulse'
+                                            ? 'border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.28),0_0_28px_rgba(244,63,94,0.2)]'
                                             : getShiftTone(shift) === 'partial'
-                                                ? 'border-amber-400/50 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_0_24px_rgba(245,158,11,0.14)] animate-pulse'
+                                                ? 'border-amber-400/50 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_0_24px_rgba(245,158,11,0.14)]'
                                                 : getShiftTone(shift) === 'open'
                                                     ? 'border-emerald-400/30 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_24px_rgba(16,185,129,0.1)]'
                                                     : 'border-slate-700'
