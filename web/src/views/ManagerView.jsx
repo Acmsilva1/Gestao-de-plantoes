@@ -144,7 +144,7 @@ export default function ManagerView() {
             {/* Sidebar */}
             <aside className="w-64 flex flex-col border-r border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 shadow-2xl shadow-slate-950/40">
                 <div className="mb-10">
-                    <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">Maestro OS</p>
+                    <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">GESTÃO DE PLANTÕES</p>
                     <h1 className="text-2xl font-black tracking-tight text-white">Central do Gestor</h1>
                 </div>
 

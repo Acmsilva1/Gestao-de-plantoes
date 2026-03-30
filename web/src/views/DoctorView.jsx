@@ -441,7 +441,7 @@ export default function DoctorView() {
             <div className="mx-auto max-w-7xl px-6 py-10">
                 <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
-                        <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">Maestro</p>
+                        <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
                         <h1 className="text-4xl font-black tracking-tight text-white">Agenda mensal de plantões</h1>
                         
                         <div className="mt-4 flex flex-wrap items-center gap-4">

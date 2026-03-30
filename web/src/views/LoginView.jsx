@@ -91,7 +91,7 @@ export default function LoginView() {
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] px-6 py-10 text-slate-100 flex flex-col items-center justify-center">
             <header className="mb-10 text-center">
-                <p className="mb-3 text-sm uppercase tracking-[0.35em] text-emerald-300/70">Maestro</p>
+                <p className="mb-3 text-sm uppercase tracking-[0.35em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
                 <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white">Central de Acessos</h1>
                 <p className="mt-4 max-w-lg mx-auto text-base text-slate-300">Escolha seu perfil para entrar no sistema operacional.</p>
             </header>
@@ -133,23 +133,23 @@ export default function LoginView() {
                 {activeTab === 'medico' && (
                     <form className="grid gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300" onSubmit={handleLoginMedico}>
                         <div>
-                            <label className="mb-2 block text-sm font-semibold text-slate-200">Senha</label>
-                            <input
-                                type="password"
-                                value={senhaMedico}
-                                onChange={(e) => setSenhaMedico(e.target.value)}
-                                placeholder="Sua senha de acesso"
-                                required
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
-                            />
-                        </div>
-                        <div>
                             <label className="mb-2 block text-sm font-semibold text-slate-200">CRM</label>
                             <input
                                 type="text"
                                 value={crm}
                                 onChange={(e) => setCrm(e.target.value)}
                                 placeholder="12345-ES"
+                                required
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-semibold text-slate-200">Senha</label>
+                            <input
+                                type="password"
+                                value={senhaMedico}
+                                onChange={(e) => setSenhaMedico(e.target.value)}
+                                placeholder="Sua senha de acesso"
                                 required
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-400"
                             />
