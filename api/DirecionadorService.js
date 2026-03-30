@@ -5,6 +5,7 @@ import { generateForecastWindows } from './OrganizerService.js';
 const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const PUBLIC_SHIFTS_TTL_MS = 30_000;
 const isReservationHoldTableMissing = (message = '') => /Could not find the table 'public\.reserva_holds'|relation "reserva_holds" does not exist/i.test(message);
+const shiftTurnOrder = { Madrugada: 0, Manhã: 1, Tarde: 2, Noite: 3 };
 
 const getTodayKey = (referenceDate = new Date()) => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -167,14 +168,23 @@ export const getDoctorAgenda = async (req, res) => {
 
         const bookings = await dbModel.getDoctorBookedShifts(medicoId);
         
-        const mappedAgenda = (bookings || []).map(b => ({
-            id: b.id,
-            disponibilidadeId: b.disponibilidade_id,
-            data: b.disponibilidade?.data_plantao,
-            turno: b.disponibilidade?.turno,
-            unidade: b.disponibilidade?.unidades?.nome,
-            especialidade: doctor.especialidade
-        }));
+        const mappedAgenda = (bookings || [])
+            .map(b => ({
+                id: b.id,
+                disponibilidadeId: b.disponibilidade_id,
+                data: b.disponibilidade?.data_plantao,
+                turno: b.disponibilidade?.turno,
+                unidade: b.disponibilidade?.unidades?.nome,
+                especialidade: doctor.especialidade
+            }))
+            .sort((left, right) => {
+                const dateCompare = (left.data || '').localeCompare(right.data || '');
+                if (dateCompare !== 0) {
+                    return dateCompare;
+                }
+
+                return (shiftTurnOrder[left.turno] ?? 99) - (shiftTurnOrder[right.turno] ?? 99);
+            });
 
         res.json(mappedAgenda);
     } catch (err) {

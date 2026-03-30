@@ -26,7 +26,7 @@ const supabase = new Proxy(
         }
     }
 );
-const HOLD_DURATION_SECONDS = 3;
+const HOLD_DURATION_SECONDS = 6;
 
 const unwrap = (response, defaultMessage) => {
     if (response.error) {

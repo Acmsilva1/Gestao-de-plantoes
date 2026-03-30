@@ -17,7 +17,8 @@ const initialState = {
     showProfileModal: false,
     showPasswordSuggestion: false,
     myAgenda: [],
-    calendar: null
+    calendar: null,
+    bookingConfigs: {}
 };
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -92,6 +93,54 @@ const buildCalendarDays = (month, shifts) => {
         });
     }
     return days;
+};
+
+const bookingTypeOptions = [
+    { id: 'COMPLETO', label: 'Completo', description: 'Finaliza o agendamento para o turno inteiro.' },
+    { id: 'PARCIAL', label: 'Parcial', description: 'Seleciona um horario de inicio e fim dentro do dia.' },
+    { id: 'FIXO', label: 'Fixo', description: 'Replica o agendamento em dias sequenciais, com horario inteiro ou parcial.' }
+];
+
+const getDefaultBookingForm = (shift) => ({
+    bookingType: 'COMPLETO',
+    partialStartTime: '07:00',
+    partialEndTime: '13:00',
+    fixedEndDate: shift?.data || '',
+    fixedMode: 'COMPLETO',
+    fixedStartTime: '07:00',
+    fixedEndTime: '13:00'
+});
+
+const getBookingConfigStorageKey = (doctorId) => `doctor_booking_configs_${doctorId}`;
+
+const loadBookingConfigs = (doctorId) => {
+    if (!doctorId || typeof window === 'undefined') return {};
+
+    try {
+        const raw = window.localStorage.getItem(getBookingConfigStorageKey(doctorId));
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+};
+
+const saveBookingConfigs = (doctorId, nextConfigs) => {
+    if (!doctorId || typeof window === 'undefined') return;
+    window.localStorage.setItem(getBookingConfigStorageKey(doctorId), JSON.stringify(nextConfigs));
+};
+
+const buildBookingConfigLabel = (config) => {
+    if (!config) return '';
+    if (config.bookingType === 'PARCIAL') {
+        return `Parcial • ${config.startTime} às ${config.endTime}`;
+    }
+    if (config.bookingType === 'FIXO') {
+        if (config.fixedMode === 'PARCIAL') {
+            return `Fixo parcial • até ${formatDisplayDate(config.fixedEndDate)} • ${config.startTime} às ${config.endTime}`;
+        }
+        return `Fixo completo • até ${formatDisplayDate(config.fixedEndDate)}`;
+    }
+    return 'Completo';
 };
 
 const ProfileModal = ({ doctor, onClose, onUpdate }) => {
@@ -255,6 +304,32 @@ export default function DoctorView() {
         }
     }, [session?.id, state.selectedMonth, state.selectedUnitId]);
 
+    useEffect(() => {
+        if (!session?.id) return;
+        setState((current) => ({
+            ...current,
+            bookingConfigs: loadBookingConfigs(session.id)
+        }));
+    }, [session?.id]);
+
+    const persistBookingConfigEntries = (entries) => {
+        if (!session?.id || !entries || Object.keys(entries).length === 0) return;
+
+        setState((current) => {
+            const nextConfigs = {
+                ...current.bookingConfigs,
+                ...entries
+            };
+            saveBookingConfigs(session.id, nextConfigs);
+            return {
+                ...current,
+                bookingConfigs: nextConfigs
+            };
+        });
+    };
+
+    const findShiftById = (shiftId) => (state.calendar?.shifts || []).find((shift) => shift.id === shiftId);
+
     const releaseReservationHold = async (shiftId) => {
         if (!session?.id || !shiftId) return;
 
@@ -292,14 +367,18 @@ export default function DoctorView() {
 
             if (!response.ok) throw new Error(data?.error || 'Nao foi possivel iniciar a reserva.');
 
+            const shift = findShiftById(shiftId);
+
             setState((current) => ({
                 ...current,
                 modal: {
-                    type: 'confirm-reservation',
+                    type: 'select-shift-type',
                     shiftId,
+                    shift,
                     reservedUntil: data?.hold?.reservedUntil,
-                    title: 'Confirmar plantao',
-                    message: 'Clique em OK para confirmar a reserva. Se voce fechar esta janela, a vaga volta para a fila.'
+                    title: 'Tipo de plantao',
+                    message: 'Escolha se o plantao sera completo, parcial ou fixo antes de finalizar a reserva.',
+                    form: getDefaultBookingForm(shift)
                 }
             }));
         } catch (error) {
@@ -337,48 +416,223 @@ export default function DoctorView() {
 
     const closeModal = () => {
         const activeModal = state.modal;
-        if (activeModal?.type === 'confirm-reservation') {
+        if (activeModal?.type === 'loading') {
+            return;
+        }
+        if (activeModal?.shiftId && activeModal?.type !== 'feedback' && activeModal?.type !== 'loading') {
             releaseReservationHold(activeModal.shiftId);
         }
         setState((current) => ({
             ...current,
             modal: null,
-            reservandoId: activeModal?.type === 'confirm-reservation' ? '' : current.reservandoId
+            reservandoId: activeModal?.shiftId ? '' : current.reservandoId
         }));
     };
 
+    const updateBookingForm = (field, value) => {
+        setState((current) => {
+            if (!current.modal?.form) return current;
+
+            return {
+                ...current,
+                modal: {
+                    ...current.modal,
+                    form: {
+                        ...current.modal.form,
+                        [field]: value
+                    }
+                }
+            };
+        });
+    };
+
+    const buildReservationPayload = (form) => {
+        if (form.bookingType === 'PARCIAL') {
+            return {
+                bookingType: 'PARCIAL',
+                startTime: form.partialStartTime,
+                endTime: form.partialEndTime
+            };
+        }
+
+        if (form.bookingType === 'FIXO') {
+            return {
+                bookingType: 'FIXO',
+                fixedMode: form.fixedMode,
+                fixedEndDate: form.fixedEndDate,
+                startTime: form.fixedMode === 'PARCIAL' ? form.fixedStartTime : null,
+                endTime: form.fixedMode === 'PARCIAL' ? form.fixedEndTime : null
+            };
+        }
+
+        return {
+            bookingType: 'COMPLETO'
+        };
+    };
+
+    const validateReservationForm = (modalState) => {
+        const form = modalState?.form;
+        const shift = modalState?.shift;
+
+        if (!form || !shift) {
+            return 'Plantao selecionado invalido.';
+        }
+
+        if (form.bookingType === 'PARCIAL') {
+            if (!form.partialStartTime || !form.partialEndTime) {
+                return 'Selecione o horario inicial e final do plantao parcial.';
+            }
+
+            if (form.partialStartTime >= form.partialEndTime) {
+                return 'O horario final precisa ser maior que o horario inicial.';
+            }
+        }
+
+        if (form.bookingType === 'FIXO') {
+            if (!form.fixedEndDate) {
+                return 'Selecione a data final do plantao fixo.';
+            }
+
+            if (form.fixedEndDate < shift.data) {
+                return 'A data final do plantao fixo nao pode ser anterior ao dia selecionado.';
+            }
+
+            if (form.fixedMode === 'PARCIAL') {
+                if (!form.fixedStartTime || !form.fixedEndTime) {
+                    return 'Selecione o horario inicial e final do plantao fixo parcial.';
+                }
+
+                if (form.fixedStartTime >= form.fixedEndTime) {
+                    return 'O horario final do plantao fixo precisa ser maior que o horario inicial.';
+                }
+            }
+        }
+
+        return '';
+    };
+
+    const reserveSingleShift = async (shiftId, payload, acquireHold = false) => {
+        if (acquireHold) {
+            const holdResponse = await fetch(`/api/vagas/${shiftId}/bloquear`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ medicoId: session.id })
+            });
+            const holdData = await parseJsonSafely(holdResponse);
+
+            if (!holdResponse.ok) {
+                throw new Error(holdData?.error || 'Nao foi possivel bloquear uma das vagas da sequencia.');
+            }
+        }
+
+        const response = await fetch(`/api/vagas/${shiftId}/selecionar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ medicoId: session.id, ...payload })
+        });
+        const data = await parseJsonSafely(response);
+
+        if (!response.ok) {
+            if (acquireHold) {
+                await releaseReservationHold(shiftId);
+            }
+            throw new Error(data?.error || 'Falha ao reservar plantao.');
+        }
+
+        return data;
+    };
+
     const handleConfirmReservation = async () => {
-        if (!session?.id || state.modal?.type !== 'confirm-reservation') return;
+        if (!session?.id || state.modal?.type !== 'select-shift-type') return;
 
         const shiftId = state.modal.shiftId;
+        const shift = state.modal.shift;
+        const validationError = validateReservationForm(state.modal);
+
+        if (validationError) {
+            setState((current) => ({
+                ...current,
+                error: validationError
+            }));
+            return;
+        }
+
+        const payload = buildReservationPayload(state.modal.form);
         try {
             setState((current) => ({
                 ...current,
                 modal: {
                     type: 'loading',
                     title: 'Processando reserva',
-                    message: 'Estamos confirmando sua vez na fila e registrando o agendamento.'
+                    message: payload.bookingType === 'FIXO'
+                        ? 'Estamos aplicando a sequencia fixa de plantao nos dias selecionados.'
+                        : 'Estamos confirmando sua vez na fila e registrando o agendamento.'
                 }
             }));
 
-            const response = await fetch(`/api/vagas/${shiftId}/selecionar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medicoId: session.id })
-            });
-            const data = await parseJsonSafely(response);
+            let successMessage = 'Plantao reservado com sucesso.';
+            const savedConfigs = {};
 
-            if (!response.ok) throw new Error(data?.error || 'Falha ao reservar plantao.');
+            if (payload.bookingType === 'FIXO') {
+                const sequenceShifts = (state.calendar?.shifts || [])
+                    .filter((calendarShift) =>
+                        calendarShift.turno === shift.turno &&
+                        calendarShift.data >= shift.data &&
+                        calendarShift.data <= payload.fixedEndDate
+                    )
+                    .sort((left, right) => left.data.localeCompare(right.data));
+
+                if (sequenceShifts.length === 0) {
+                    throw new Error('Nenhum plantao sequencial foi encontrado para o periodo informado.');
+                }
+
+                const bookedIds = [];
+                const failedDates = [];
+
+                for (const [index, targetShift] of sequenceShifts.entries()) {
+                    try {
+                        await reserveSingleShift(targetShift.id, payload, index !== 0);
+                        bookedIds.push(targetShift.id);
+                        savedConfigs[targetShift.id] = {
+                            bookingType: 'FIXO',
+                            fixedMode: payload.fixedMode,
+                            fixedEndDate: payload.fixedEndDate,
+                            startTime: payload.startTime,
+                            endTime: payload.endTime
+                        };
+                    } catch (reservationError) {
+                        failedDates.push(`${formatDisplayDate(targetShift.data)} (${reservationError.message})`);
+                    }
+                }
+
+                if (bookedIds.length === 0) {
+                    throw new Error(failedDates[0] || 'Nao foi possivel reservar a sequencia fixa.');
+                }
+
+                successMessage = failedDates.length > 0
+                    ? `Sequencia fixa aplicada em ${bookedIds.length} dia(s). Algumas datas nao puderam ser reservadas: ${failedDates.join('; ')}`
+                    : `Sequencia fixa aplicada com sucesso em ${bookedIds.length} dia(s).`;
+            } else {
+                const data = await reserveSingleShift(shiftId, payload, false);
+                successMessage = data?.message || 'Plantao reservado com sucesso.';
+                savedConfigs[shiftId] = {
+                    bookingType: payload.bookingType,
+                    startTime: payload.startTime,
+                    endTime: payload.endTime
+                };
+            }
+
+            persistBookingConfigEntries(savedConfigs);
 
             setState((current) => ({
                 ...current,
                 reservandoId: '',
-                success: data.message,
+                success: successMessage,
                 modal: {
                     type: 'feedback',
                     variant: 'success',
                     title: 'Reserva confirmada',
-                    message: data.message
+                    message: successMessage
                 }
             }));
 
@@ -398,7 +652,7 @@ export default function DoctorView() {
         }
     };
 
-    const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, showProfileModal, showPasswordSuggestion, myAgenda, calendar } = state;
+    const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, showProfileModal, showPasswordSuggestion, myAgenda, calendar, bookingConfigs } = state;
     const calendarDays = buildCalendarDays(selectedMonth, calendar?.shifts || []);
     const outsideForecast = isOutsideForecastWindow(selectedMonth);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
@@ -679,6 +933,9 @@ export default function DoctorView() {
                                             <p className="mt-4 text-sm text-slate-400">Vagas disponíveis</p>
                                             <p className={`mt-2 text-3xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
                                             <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-emerald-200/70'}`}>{shift.status}</p>
+                                            {bookedShiftIds.includes(shift.id) && bookingConfigs[shift.id] ? (
+                                                <p className="mt-3 text-xs text-sky-200/90">{buildBookingConfigLabel(bookingConfigs[shift.id])}</p>
+                                            ) : null}
                                         </div>
 
                                         <button
@@ -742,6 +999,7 @@ export default function DoctorView() {
                                                 <th className="px-6 py-4">Data</th>
                                                 <th className="px-6 py-4">Unidade</th>
                                                 <th className="px-6 py-4">Turno</th>
+                                                <th className="px-6 py-4">Tipo</th>
                                                 <th className="px-6 py-4">Especialidade</th>
                                             </tr>
                                         </thead>
@@ -754,6 +1012,9 @@ export default function DoctorView() {
                                                         <span className="inline-flex rounded-lg bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 text-[10px] font-black uppercase text-sky-400">
                                                             {item.turno}
                                                         </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-slate-300">
+                                                        {buildBookingConfigLabel(bookingConfigs[item.disponibilidadeId]) || 'Completo'}
                                                     </td>
                                                     <td className="px-6 py-4 text-slate-400 group-hover:text-slate-200">{item.especialidade}</td>
                                                 </tr>
@@ -769,7 +1030,7 @@ export default function DoctorView() {
 
                 {modal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-6 backdrop-blur-sm" onClick={closeModal}>
-                        <div className="w-full max-w-md rounded-[2rem] border border-slate-700 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/60" onClick={(event) => event.stopPropagation()}>
+                        <div className="w-full max-w-xl rounded-[2rem] border border-slate-700 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/60" onClick={(event) => event.stopPropagation()}>
                             <div
                                 className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] ${
                                     modal.type === 'loading'
@@ -778,28 +1039,150 @@ export default function DoctorView() {
                                           ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
                                           : modal.variant === 'warning'
                                             ? 'border border-amber-400/30 bg-amber-500/10 text-amber-200'
-                                            : modal.type === 'confirm-reservation'
+                                            : modal.type === 'select-shift-type'
                                               ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
                                               : 'border border-rose-400/30 bg-rose-500/10 text-rose-200'
                                 }`}
                             >
-                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'confirm-reservation' ? 'Confirmação' : 'Processado'}
+                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'select-shift-type' ? 'Configuração' : 'Processado'}
                             </div>
 
                             <h3 className="text-2xl font-black text-white">{modal.title}</h3>
                             <p className="mt-3 text-sm leading-6 text-slate-300">{modal.message}</p>
 
-                            {modal.type === 'loading' || modal.type === 'confirm-reservation' ? (
+                            {modal.type === 'select-shift-type' ? (
+                                <div className="mt-6 space-y-4">
+                                    <div className="grid gap-3">
+                                        {bookingTypeOptions.map((option) => (
+                                            <button
+                                                key={option.id}
+                                                type="button"
+                                                onClick={() => updateBookingForm('bookingType', option.id)}
+                                                className={`rounded-2xl border px-4 py-4 text-left transition ${
+                                                    modal.form.bookingType === option.id
+                                                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.12)]'
+                                                        : 'border-slate-700 bg-slate-950/40 hover:border-slate-500'
+                                                }`}
+                                            >
+                                                <div className="text-sm font-black text-white">{option.label}</div>
+                                                <div className="mt-1 text-xs text-slate-400">{option.description}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {modal.form.bookingType === 'PARCIAL' ? (
+                                        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                            <div>
+                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
+                                                <input
+                                                    type="time"
+                                                    value={modal.form.partialStartTime}
+                                                    onChange={(event) => updateBookingForm('partialStartTime', event.target.value)}
+                                                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora fim</label>
+                                                <input
+                                                    type="time"
+                                                    value={modal.form.partialEndTime}
+                                                    onChange={(event) => updateBookingForm('partialEndTime', event.target.value)}
+                                                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    {modal.form.bookingType === 'FIXO' ? (
+                                        <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                            <div>
+                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Período em dias</label>
+                                                <div className="grid gap-3 md:grid-cols-2">
+                                                    <div>
+                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">De</label>
+                                                        <input
+                                                            type="date"
+                                                            value={modal.shift?.data || ''}
+                                                            disabled
+                                                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-400 outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">Até</label>
+                                                        <input
+                                                            type="date"
+                                                            min={modal.shift?.data}
+                                                            value={modal.form.fixedEndDate}
+                                                            onChange={(event) => updateBookingForm('fixedEndDate', event.target.value)}
+                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateBookingForm('fixedMode', 'COMPLETO')}
+                                                    className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                                                        modal.form.fixedMode === 'COMPLETO'
+                                                            ? 'border-emerald-400 bg-emerald-500/10 text-emerald-100'
+                                                            : 'border-slate-700 bg-slate-900 text-slate-300'
+                                                    }`}
+                                                >
+                                                    Fixo completo
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateBookingForm('fixedMode', 'PARCIAL')}
+                                                    className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                                                        modal.form.fixedMode === 'PARCIAL'
+                                                            ? 'border-emerald-400 bg-emerald-500/10 text-emerald-100'
+                                                            : 'border-slate-700 bg-slate-900 text-slate-300'
+                                                    }`}
+                                                >
+                                                    Fixo parcial
+                                                </button>
+                                            </div>
+
+                                            {modal.form.fixedMode === 'PARCIAL' ? (
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
+                                                        <input
+                                                            type="time"
+                                                            value={modal.form.fixedStartTime}
+                                                            onChange={(event) => updateBookingForm('fixedStartTime', event.target.value)}
+                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora fim</label>
+                                                        <input
+                                                            type="time"
+                                                            value={modal.form.fixedEndTime}
+                                                            onChange={(event) => updateBookingForm('fixedEndTime', event.target.value)}
+                                                            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+
+                            {modal.type === 'loading' ? (
                                 <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/55 px-4 py-4">
-                                    <div className={`h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-transparent ${modal.type === 'confirm-reservation' ? 'border-t-emerald-300' : 'border-t-sky-300'}`} />
+                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-sky-300" />
                                     <div className="text-sm text-slate-300">
-                                        {modal.type === 'confirm-reservation' ? 'Aguardando seu OK...' : 'Processando sua solicitação...'}
+                                        Processando sua solicitação...
                                     </div>
                                 </div>
                             ) : null}
 
                             <div className="mt-6 flex gap-3">
-                                {modal.type === 'confirm-reservation' ? (
+                                {modal.type === 'select-shift-type' ? (
                                     <>
                                         <button
                                             type="button"
@@ -813,7 +1196,7 @@ export default function DoctorView() {
                                             onClick={handleConfirmReservation}
                                             className="flex-1 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
                                         >
-                                            OK
+                                            Finalizar agendamento
                                         </button>
                                     </>
                                 ) : modal.type !== 'loading' ? (
