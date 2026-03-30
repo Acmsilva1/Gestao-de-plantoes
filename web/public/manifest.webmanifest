@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Maestro Gestao de Plantoes",
-  "short_name": "Maestro",
-  "description": "Plataforma para medicos e gestores acompanharem agenda, acessos e plantões.",
+  "name": "GESTÃO DE PLANTÕES",
+  "short_name": "GESTÃO DE PLANTÕES",
+  "description": "GESTÃO DE PLANTÕES, plataforma para médicos e gestores acompanharem agenda, acessos e plantões.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

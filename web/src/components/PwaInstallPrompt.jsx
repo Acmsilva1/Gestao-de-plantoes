@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Share2, X } from 'lucide-react';
 
-const DISMISS_KEY = 'maestro-pwa-install-dismissed';
+const DISMISS_KEY = 'gestao-de-plantoes-pwa-install-dismissed';
 
 const isIosDevice = () => {
     const userAgent = window.navigator.userAgent;
@@ -111,7 +111,7 @@ export default function PwaInstallPrompt() {
                     <>
                         <p className="text-sm leading-6 text-slate-300">
                             {deferredPrompt
-                                ? 'Instale o Maestro para abrir em tela cheia, com atalho no celular e experiência de app.'
+                                ? 'Instale o GESTÃO DE PLANTÕES para abrir em tela cheia, com atalho no celular e experiência de app.'
                                 : 'Se o botão de instalar ainda não aparecer, aguarde alguns segundos ou abra o menu do navegador e escolha instalar app.'}
                         </p>
                         <button
