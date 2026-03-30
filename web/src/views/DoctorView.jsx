@@ -132,13 +132,13 @@ const saveBookingConfigs = (doctorId, nextConfigs) => {
 const buildBookingConfigLabel = (config) => {
     if (!config) return '';
     if (config.bookingType === 'PARCIAL') {
-        return `Parcial â€¢ ${config.startTime} Ã s ${config.endTime}`;
+        return `Parcial • ${config.startTime} às ${config.endTime}`;
     }
     if (config.bookingType === 'FIXO') {
         if (config.fixedMode === 'PARCIAL') {
-            return `Fixo parcial â€¢ atÃ© ${formatDisplayDate(config.fixedEndDate)} â€¢ ${config.startTime} Ã s ${config.endTime}`;
+            return `Fixo parcial • até ${formatDisplayDate(config.fixedEndDate)} • ${config.startTime} às ${config.endTime}`;
         }
-        return `Fixo completo â€¢ atÃ© ${formatDisplayDate(config.fixedEndDate)}`;
+        return `Fixo completo • até ${formatDisplayDate(config.fixedEndDate)}`;
     }
     return 'Completo';
 };
@@ -146,22 +146,22 @@ const buildBookingConfigLabel = (config) => {
 const buildAgendaBookingLabel = (agendaItem, fallbackConfig) => {
     if (agendaItem?.tipoPlantao === 'PARCIAL') {
         return agendaItem.horaInicio && agendaItem.horaFim
-            ? `Parcial â€¢ ${agendaItem.horaInicio.slice(0, 5)} Ã s ${agendaItem.horaFim.slice(0, 5)}`
+            ? `Parcial • ${agendaItem.horaInicio.slice(0, 5)} às ${agendaItem.horaFim.slice(0, 5)}`
             : 'Parcial';
     }
 
     if (agendaItem?.tipoPlantao === 'FIXO') {
         const rangeLabel = agendaItem.dataInicioFixo && agendaItem.dataFimFixo
-            ? `${formatDisplayDate(agendaItem.dataInicioFixo)} atÃ© ${formatDisplayDate(agendaItem.dataFimFixo)}`
+            ? `${formatDisplayDate(agendaItem.dataInicioFixo)} até ${formatDisplayDate(agendaItem.dataFimFixo)}`
             : agendaItem.dataFimFixo
-              ? `atÃ© ${formatDisplayDate(agendaItem.dataFimFixo)}`
-              : 'SequÃªncia fixa';
+              ? `até ${formatDisplayDate(agendaItem.dataFimFixo)}`
+              : 'Sequência fixa';
 
         if (agendaItem.horaInicio && agendaItem.horaFim) {
-            return `Fixo parcial â€¢ ${rangeLabel} â€¢ ${agendaItem.horaInicio.slice(0, 5)} Ã s ${agendaItem.horaFim.slice(0, 5)}`;
+            return `Fixo parcial • ${rangeLabel} • ${agendaItem.horaInicio.slice(0, 5)} às ${agendaItem.horaFim.slice(0, 5)}`;
         }
 
-        return `Fixo completo â€¢ ${rangeLabel}`;
+        return `Fixo completo • ${rangeLabel}`;
     }
 
     return buildBookingConfigLabel(fallbackConfig) || 'Completo';
@@ -243,7 +243,7 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                     <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">Senha Privada</label>
                         <input
-                            type="text" // Texto para ser fÃ¡cil de ver e trocar conforme instruÃ§Ã£o "facil de mudar"
+                            type="text" // Texto para ser fácil de ver e trocar conforme instrução "facil de mudar"
                             value={formData.senha}
                             onChange={e => setFormData({ ...formData, senha: e.target.value })}
                             className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400"
@@ -321,7 +321,7 @@ export default function DoctorView() {
         if (session?.id) {
             loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
             
-            // SugestÃ£o de troca de senha se for a padrÃ£o
+            // Sugestão de troca de senha se for a padrão
             if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
                 setState(prev => ({ ...prev, showPasswordSuggestion: true }));
             }
@@ -678,7 +678,7 @@ export default function DoctorView() {
                     type: 'feedback',
                     variant: 'error',
                     title: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'TEMPO EXCEDIDO!' : 'Reserva nao concluida',
-                    message: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'VAGA INDISPONÃVEL!' : error.message
+                    message: /TEMPO EXCEDIDO! VAGA INDISPONIVEL!/i.test(error.message) ? 'VAGA INDISPONÍVEL!' : error.message
                 }
             }));
         }
@@ -710,16 +710,16 @@ export default function DoctorView() {
 
     return (
         <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
-            {/* SugestÃ£o de Troca de Senha */}
+            {/* Sugestão de Troca de Senha */}
             {showPasswordSuggestion && (
                 <div className="flex flex-col gap-3 bg-emerald-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p className="flex items-start gap-2 text-sm font-bold sm:items-center">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                        Sua senha ainda Ã© a padrÃ£o (12345). Para sua seguranÃ§a, recomendamos trocÃ¡-la agora.
+                        Sua senha ainda é a padrão (12345). Para sua segurança, recomendamos trocá-la agora.
                     </p>
                     <div className="flex flex-wrap items-center gap-4">
                         <button onClick={() => setState(prev => ({ ...prev, showProfileModal: true, showPasswordSuggestion: false }))} className="text-xs font-black uppercase underline hover:no-underline">Trocar Agora</button>
-                        <button onClick={() => { setState(prev => ({ ...prev, showPasswordSuggestion: false })); localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-70">NÃ£o agora</button>
+                        <button onClick={() => { setState(prev => ({ ...prev, showPasswordSuggestion: false })); localStorage.setItem(`hide_pass_suggest_${session.id}`, 'true'); }} className="text-xs font-bold opacity-70">Não agora</button>
                     </div>
                 </div>
             )}
@@ -727,8 +727,8 @@ export default function DoctorView() {
             <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
                 <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
-                        <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃƒO DE PLANTÃ•ES</p>
-                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Agenda mensal de plantÃµes</h1>
+                        <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
+                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Agenda mensal de plantões</h1>
                         
                         <div className="mt-4 flex flex-wrap items-center gap-4">
                             <div className="text-xs text-slate-400 uppercase tracking-widest font-bold">Unidade Atual:</div>
@@ -799,7 +799,7 @@ export default function DoctorView() {
                 </header>
 
                 <section className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
-                    <div className="text-sm text-slate-300">Selecione o mÃªs e clique no dia desejado para ver os plantÃµes disponÃ­veis.</div>
+                    <div className="text-sm text-slate-300">Selecione o mês e clique no dia desejado para ver os plantões disponíveis.</div>
 
                     <div className="flex items-center gap-3">
                         <button
@@ -807,7 +807,7 @@ export default function DoctorView() {
                             onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, -1) }))}
                             className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
-                            MÃªs anterior
+                            Mês anterior
                         </button>
                         <div className="min-w-0 flex-1 text-center text-sm font-semibold capitalize text-slate-200 sm:min-w-44">{getMonthTitle(visibleMonth)}</div>
                         <button
@@ -815,7 +815,7 @@ export default function DoctorView() {
                             onClick={() => setState((current) => ({ ...current, selectedDay: '', selectedMonth: shiftMonth(current.selectedMonth, 1) }))}
                             className="rounded-2xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700 sm:px-4"
                         >
-                            PrÃ³ximo mÃªs
+                            Próximo mês
                         </button>
                         </div>
                 </section>
@@ -824,11 +824,11 @@ export default function DoctorView() {
                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
                         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
                         <div>
-                            <p className="font-bold text-amber-300">MÃªs fora da janela de previsÃ£o</p>
+                            <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
                             <p className="mt-1 text-amber-200/80">
                                 O preditor cobre apenas <span className="font-semibold capitalize">{getMonthTitle(forecastCurrent)}</span> e{' '}
                                 <span className="font-semibold capitalize">{getMonthTitle(forecastNext)}</span>.
-                                O calendÃ¡rio abaixo pode ficar vazio ou incompleto.
+                                O calendário abaixo pode ficar vazio ou incompleto.
                             </p>
                         </div>
                     </div>
@@ -841,7 +841,7 @@ export default function DoctorView() {
                     <section className="rounded-[2rem] border border-slate-800 bg-slate-900/75 p-6 shadow-2xl shadow-slate-950/40">
                         <div className="mb-6 flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
                             <div>
-                                <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">CalendÃ¡rio</p>
+                                <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/70">Calendário</p>
                                 <h2 className="mt-2 text-3xl font-black text-white">{session.nome}</h2>
                                 <p className="mt-2 text-sm text-slate-400">
                                     Unidade: <span className="text-slate-200">{calendar?.unit?.nome || session.unidadeFixaNome}</span> | Especialidade:{' '}
@@ -849,12 +849,12 @@ export default function DoctorView() {
                                 </p>
                             </div>
                             <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                                {(calendar?.shifts || []).length} plantÃµes no mÃªs
+                                {(calendar?.shifts || []).length} plantões no mês
                             </div>
                         </div>
 
                         {loadingCalendar ? (
-                            <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando calendÃ¡rio...</div>
+                            <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando calendário...</div>
                         ) : (
                             <>
                                 <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">
@@ -920,13 +920,13 @@ export default function DoctorView() {
                                 onClick={() => setState((current) => ({ ...current, selectedDay: '' }))}
                                 className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
                             >
-                                Voltar ao calendÃ¡rio
+                                Voltar ao calendário
                             </button>
                         </div>
 
                         {selectedDayShifts.length === 0 ? (
                             <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-10 text-center text-slate-300">
-                                NÃ£o hÃ¡ plantÃµes disponÃ­veis em {formatDisplayDate(selectedDay)}.
+                                Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
                             </div>
                         ) : (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -952,7 +952,7 @@ export default function DoctorView() {
                                                                 : 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
                                                     }`}
                                                 >
-                                                    {shift.turno} {bookedShiftIds.includes(shift.id) && 'â€¢ MEU PLANTÃƒO'}
+                                                    {shift.turno} {bookedShiftIds.includes(shift.id) && '• MEU PLANTÃO'}
                                                 </span>
                                                 <h2 className="mt-4 text-2xl font-bold text-white">{shift.local}</h2>
                                             </div>
@@ -962,7 +962,7 @@ export default function DoctorView() {
                                         <div className={`mb-6 rounded-2xl p-4 ${shift.vagas <= 0 ? 'bg-rose-950/30 ring-1 ring-rose-400/30' : 'bg-slate-800/70'}`}>
                                             <p className="text-sm text-slate-400">Especialidade</p>
                                             <p className="mt-2 text-lg font-bold text-white">{shift.especialidade}</p>
-                                            <p className="mt-4 text-sm text-slate-400">Vagas disponÃ­veis</p>
+                                            <p className="mt-4 text-sm text-slate-400">Vagas disponíveis</p>
                                             <p className={`mt-2 text-3xl font-black ${shift.vagas <= 0 ? 'text-rose-200' : 'text-white'}`}>{shift.vagas}</p>
                                             <p className={`mt-2 text-xs uppercase tracking-[0.2em] ${shift.vagas <= 0 ? 'text-rose-200/80' : 'text-emerald-200/70'}`}>{shift.status}</p>
                                             {bookedShiftIds.includes(shift.id) && bookingConfigs[shift.id] ? (
@@ -976,7 +976,7 @@ export default function DoctorView() {
                                             disabled={reservandoId === shift.id || shift.vagas <= 0}
                                             className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                                         >
-                                            {reservandoId === shift.id ? 'Reservando...' : 'Aceitar plantÃ£o'}
+                                            {reservandoId === shift.id ? 'Reservando...' : 'Aceitar plantão'}
                                         </button>
                                     </article>
                                 ))}
@@ -984,27 +984,27 @@ export default function DoctorView() {
                         )}
                     </section>
                 )}
-            {/* Modal de Perfil do MÃ©dico */}
+            {/* Modal de Perfil do Médico */}
             {showProfileModal && (
                 <ProfileModal 
                     doctor={session} 
                     onClose={() => setState(p => ({ ...p, showProfileModal: false }))}
                     onUpdate={(updatedDoc) => {
                         setState(p => ({ ...p, showProfileModal: false }));
-                        // Atualiza a sessÃ£o localmente (depende da sua implementaÃ§Ã£o de AuthContext ter persistÃªncia/update)
-                        window.location.reload(); // Forma bruta de atualizar a sessÃ£o pro mÃ©dico ver o novo nome/senha
+                        // Atualiza a sessão localmente (depende da sua implementação de AuthContext ter persistência/update)
+                        window.location.reload(); // Forma bruta de atualizar a sessão pro médico ver o novo nome/senha
                     }}
                 />
             )}
 
-            {/* Modal de Agenda do MÃ©dico */}
+            {/* Modal de Agenda do Médico */}
             {showAgendaModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md" onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}>
                     <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-8">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-400 mb-1">Meus Agendamentos</p>
-                                <h3 className="text-3xl font-black text-white">Sua agenda de plantÃµes</h3>
+                                <h3 className="text-3xl font-black text-white">Sua agenda de plantões</h3>
                             </div>
                             <button 
                                 onClick={() => setState(p => ({ ...p, showAgendaModal: false }))}
@@ -1020,8 +1020,8 @@ export default function DoctorView() {
                                     <div className="inline-flex p-6 rounded-full bg-slate-800/50 mb-6">
                                         <svg className="h-12 w-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                                     </div>
-                                    <h4 className="text-xl font-bold text-slate-300">Nenhum plantÃ£o reservado</h4>
-                                    <p className="text-slate-500 mt-2">Os plantÃµes que vocÃª aceitar aparecerÃ£o aqui.</p>
+                                    <h4 className="text-xl font-bold text-slate-300">Nenhum plantão reservado</h4>
+                                    <p className="text-slate-500 mt-2">Os plantões que você aceitar aparecerão aqui.</p>
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
@@ -1076,7 +1076,7 @@ export default function DoctorView() {
                                               : 'border border-rose-400/30 bg-rose-500/10 text-rose-200'
                                 }`}
                             >
-                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'select-shift-type' ? 'ConfiguraÃ§Ã£o' : 'Processado'}
+                                {modal.type === 'loading' ? 'PROCESSANDO' : modal.type === 'select-shift-type' ? 'Configuração' : 'Processado'}
                             </div>
 
                             <h3 className="text-2xl font-black text-white">{modal.title}</h3>
@@ -1105,7 +1105,7 @@ export default function DoctorView() {
                                     {modal.form.bookingType === 'PARCIAL' ? (
                                         <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                             <div>
-                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora inÃ­cio</label>
+                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
                                                 <input
                                                     type="time"
                                                     value={modal.form.partialStartTime}
@@ -1128,7 +1128,7 @@ export default function DoctorView() {
                                     {modal.form.bookingType === 'FIXO' ? (
                                         <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                             <div>
-                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">PerÃ­odo em dias</label>
+                                                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Período em dias</label>
                                                 <div className="grid gap-3 md:grid-cols-2">
                                                     <div>
                                                         <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">De</label>
@@ -1140,7 +1140,7 @@ export default function DoctorView() {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">AtÃ©</label>
+                                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">Até</label>
                                                         <input
                                                             type="date"
                                                             min={modal.shift?.data}
@@ -1180,7 +1180,7 @@ export default function DoctorView() {
                                             {modal.form.fixedMode === 'PARCIAL' ? (
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora inÃ­cio</label>
+                                                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora início</label>
                                                         <input
                                                             type="time"
                                                             value={modal.form.fixedStartTime}
@@ -1208,7 +1208,7 @@ export default function DoctorView() {
                                 <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/55 px-4 py-4">
                                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-sky-300" />
                                     <div className="text-sm text-slate-300">
-                                        Processando sua solicitaÃ§Ã£o...
+                                        Processando sua solicitação...
                                     </div>
                                 </div>
                             ) : null}

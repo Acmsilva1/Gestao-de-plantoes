@@ -303,7 +303,7 @@ export default function ManagerCalendar({ units = [] }) {
     const outsideForecast = isOutsideForecastWindow(calMonth);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
 
-    /* â€”â€”â€” Controls shown only in calendar view â€”â€”â€” */
+    /* ——— Controls shown only in calendar view ——— */
     const CalendarControls = (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-start gap-3 sm:items-center">
@@ -364,7 +364,7 @@ export default function ManagerCalendar({ units = [] }) {
     return (
         <section className="rounded-[2rem] border border-slate-700/60 bg-slate-900/60 p-4 shadow-2xl shadow-slate-950/40 animate-in fade-in duration-500 sm:p-8">
 
-            {/* â•â•â• CALENDAR VIEW â•â•â• */}
+            {/* ═══ CALENDAR VIEW ═══ */}
             {!selectedDay ? (
                 <>
                     <div className="mb-8 flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-start md:justify-between">
@@ -472,7 +472,7 @@ export default function ManagerCalendar({ units = [] }) {
                 </>
             ) : (
 
-                /* â•â•â• DAY DETAIL VIEW â•â•â• */
+                /* ═══ DAY DETAIL VIEW ═══ */
                 <>
                     <div className="mb-6 flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-end md:justify-between">
                         <div>
