@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, MapPin, Eye, ArrowLeft, AlertTriangle, Phone
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const shiftTypeOptions = ['Todos', 'Madrugada', 'Manhã', 'Tarde', 'Noite'];
 const shiftStatusOptions = ['Todos', 'ABERTO', 'OCUPADO'];
+const shiftOrderIndex = { Madrugada: 0, Manhã: 1, Tarde: 2, Noite: 3 };
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
 const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
@@ -241,16 +242,26 @@ export default function ManagerCalendar({ units = [] }) {
     }, [calendarDays, hasActiveFilters]);
 
     const selectedDayShifts = useMemo(() => {
-        if (selectedDayAgenda?.shifts?.length) {
-            return selectedDayAgenda.shifts.filter((shift) => {
+        if (!selectedDay) return [];
+
+        const calendarDayShifts = visibleShifts.filter((shift) => shift.data === selectedDay);
+        const agendaById = new Map((selectedDayAgenda?.shifts || []).map((shift) => [shift.id, shift]));
+
+        return calendarDayShifts
+            .map((shift) => {
+                const agendaShift = agendaById.get(shift.id);
+                return {
+                    ...shift,
+                    ...(agendaShift || {}),
+                    medicos: agendaShift?.medicos || []
+                };
+            })
+            .filter((shift) => {
                 const matchesType = shiftTypeFilter === 'Todos' || shift.turno === shiftTypeFilter;
                 const matchesStatus = shiftStatusFilter === 'Todos' || shift.status === shiftStatusFilter;
                 return matchesType && matchesStatus;
-            });
-        }
-
-        if (!selectedDay) return [];
-        return visibleShifts.filter((shift) => shift.data === selectedDay).map((shift) => ({ ...shift, medicos: [] }));
+            })
+            .sort((a, b) => (shiftOrderIndex[a.turno] ?? 99) - (shiftOrderIndex[b.turno] ?? 99));
     }, [selectedDay, selectedDayAgenda, visibleShifts, shiftTypeFilter, shiftStatusFilter]);
 
     useEffect(() => {
@@ -489,7 +500,7 @@ export default function ManagerCalendar({ units = [] }) {
                             Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
                         </div>
                     ) : (
-                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                             {selectedDayShifts.map(shift => (
                                 <article
                                     key={shift.id}
