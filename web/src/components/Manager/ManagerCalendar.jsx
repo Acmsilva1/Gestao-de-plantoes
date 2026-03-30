@@ -84,7 +84,7 @@ const getShiftClasses = (shift) => {
         return 'border border-amber-400/60 bg-amber-500/10 text-amber-100 animate-pulse shadow-[0_0_0_1px_rgba(251,191,36,0.14),0_0_18px_rgba(245,158,11,0.16)]';
     }
 
-    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_18px_rgba(16,185,129,0.14)]';
+    return 'border border-emerald-300/55 bg-emerald-500/18 text-emerald-50 shadow-[0_0_0_1px_rgba(110,231,183,0.18),0_0_22px_rgba(16,185,129,0.18)]';
 };
 
 const getDayCardClasses = (shifts) => {
@@ -99,7 +99,7 @@ const getDayCardClasses = (shifts) => {
     }
 
     if (tones.includes('open')) {
-        return 'border-emerald-400/40 shadow-[0_0_0_1px_rgba(52,211,153,0.14),0_0_22px_rgba(16,185,129,0.12)]';
+        return 'border-emerald-300/70 shadow-[0_0_0_1px_rgba(110,231,183,0.2),0_0_24px_rgba(16,185,129,0.18)]';
     }
 
     if (tones.includes('cancelled')) {
@@ -124,7 +124,7 @@ const getShiftBadgeClasses = (shift) => {
         return 'border border-amber-400/40 bg-amber-500/10 text-amber-200';
     }
 
-    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-300';
+    return 'border border-emerald-300/55 bg-emerald-500/15 text-emerald-100';
 };
 
 const getShiftPanelClasses = (shift) => {
@@ -142,7 +142,7 @@ const getShiftPanelClasses = (shift) => {
         return 'bg-amber-950/20 ring-1 ring-amber-400/25 animate-pulse';
     }
 
-    return 'bg-emerald-950/10 ring-1 ring-emerald-400/15';
+    return 'bg-emerald-950/25 ring-1 ring-emerald-300/35';
 };
 
 export default function ManagerCalendar({ units = [] }) {
