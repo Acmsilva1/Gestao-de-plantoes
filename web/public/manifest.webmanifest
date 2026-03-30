@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "GESTÃO DE PLANTÕES",
-  "short_name": "GESTÃO DE PLANTÕES",
-  "description": "GESTÃO DE PLANTÕES, plataforma para médicos e gestores acompanharem agenda, acessos e plantões.",
+  "name": "GEST\u00c3O DE PLANT\u00d5ES",
+  "short_name": "GEST\u00c3O DE PLANT\u00d5ES",
+  "description": "GEST\u00c3O DE PLANT\u00d5ES, plataforma para m\u00e9dicos e gestores acompanharem agenda, acessos e plant\u00f5es.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
