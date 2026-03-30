@@ -229,6 +229,55 @@ export const getManagerCalendar = async (req, res) => {
     }
 };
 
+export const getManagerAgenda = async (req, res) => {
+    const { unidadeId, date } = req.query;
+
+    if (!unidadeId) {
+        return res.status(400).json({ error: 'Unidade não informada.' });
+    }
+
+    if (!date) {
+        return res.status(400).json({ error: 'Data não informada.' });
+    }
+
+    try {
+        const [unit, shifts] = await Promise.all([
+            dbModel.getUnitById(unidadeId),
+            dbModel.getShiftAgendaByUnitAndDate(unidadeId, date)
+        ]);
+
+        const normalizedShifts = (shifts || []).map((shift) => ({
+            id: shift.id,
+            unidadeId: shift.unidade_id,
+            local: shift.unidades?.nome ?? unit?.nome ?? 'Unidade',
+            data: shift.data_plantao,
+            turno: shift.turno,
+            vagasTotais: shift.vagas_totais,
+            vagasOcupadas: shift.vagas_ocupadas,
+            vagasDisponiveis: Math.max(shift.vagas_totais - shift.vagas_ocupadas, 0),
+            status: shift.status,
+            medicos: (shift.agendamentos || [])
+                .filter((booking) => booking.confirmado)
+                .map((booking) => ({
+                    agendamentoId: booking.id,
+                    medicoId: booking.medico_id,
+                    nome: booking.medicos?.nome ?? 'Médico não informado',
+                    crm: booking.medicos?.crm ?? '',
+                    especialidade: booking.medicos?.especialidade ?? '',
+                    telefone: booking.medicos?.telefone ?? ''
+                }))
+        }));
+
+        res.json({
+            unit: unit || { id: unidadeId, nome: 'Unidade' },
+            date,
+            shifts: normalizedShifts
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar agenda da unidade.', details: err.message });
+    }
+};
+
 export const createDoctor = async (req, res) => {
     const { nome, crm, especialidade, unidadeFixaId, telefone, senha } = req.body;
 

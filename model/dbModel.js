@@ -137,6 +137,37 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar calendario da unidade');
     },
+    async getShiftAgendaByUnitAndDate(unidadeId, dataPlantao) {
+        const response = await supabase
+            .from('disponibilidade')
+            .select(`
+                id,
+                unidade_id,
+                data_plantao,
+                turno,
+                vagas_totais,
+                vagas_ocupadas,
+                status,
+                unidades(nome),
+                agendamentos(
+                    id,
+                    confirmado,
+                    medico_id,
+                    medicos(
+                        id,
+                        nome,
+                        crm,
+                        especialidade,
+                        telefone
+                    )
+                )
+            `)
+            .eq('unidade_id', unidadeId)
+            .eq('data_plantao', dataPlantao)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar agenda da unidade');
+    },
     async getAvailabilityByUnitAndRange(unidadeId, startDate, endDate) {
         const response = await supabase
             .from('disponibilidade')
