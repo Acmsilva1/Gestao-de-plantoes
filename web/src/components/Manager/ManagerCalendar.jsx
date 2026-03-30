@@ -500,11 +500,11 @@ export default function ManagerCalendar({ units = [] }) {
                             Não há plantões disponíveis em {formatDisplayDate(selectedDay)}.
                         </div>
                     ) : (
-                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-3">
                             {selectedDayShifts.map(shift => (
                                 <article
                                     key={shift.id}
-                                    className={`rounded-3xl border bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 ${
+                                    className={`min-w-0 overflow-hidden rounded-3xl border bg-slate-900/80 p-4 shadow-2xl shadow-slate-950/40 transition duration-300 hover:-translate-y-1 xl:p-5 ${
                                         getShiftTone(shift) === 'filled'
                                             ? 'border-sky-400/70 shadow-[0_0_0_1px_rgba(56,189,248,0.28),0_0_28px_rgba(14,165,233,0.2)]'
                                             : getShiftTone(shift) === 'partial'
@@ -514,16 +514,16 @@ export default function ManagerCalendar({ units = [] }) {
                                                     : 'border-slate-700'
                                     }`}
                                 >
-                                    <div className="mb-5 flex items-start justify-between gap-3">
+                                    <div className="mb-4 flex items-start justify-between gap-2">
                                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${getShiftBadgeClasses(shift)}`}>
                                             {shift.turno}
                                         </span>
-                                        <span className="text-sm text-slate-400">{formatDisplayDate(shift.data)}</span>
+                                        <span className="shrink-0 text-xs text-slate-400 xl:text-sm">{formatDisplayDate(shift.data)}</span>
                                     </div>
 
-                                    <div className={`mb-5 rounded-2xl p-4 ${getShiftPanelClasses(shift)}`}>
+                                    <div className={`mb-4 rounded-2xl p-3 xl:p-4 ${getShiftPanelClasses(shift)}`}>
                                         <p className="text-sm text-slate-400">Vagas disponíveis</p>
-                                        <p className={`mt-2 text-4xl font-black ${
+                                        <p className={`mt-2 text-3xl font-black xl:text-4xl ${
                                             getShiftTone(shift) === 'filled'
                                                 ? 'text-sky-200'
                                                 : getShiftTone(shift) === 'partial'
@@ -544,34 +544,34 @@ export default function ManagerCalendar({ units = [] }) {
                                     </div>
 
                                     {shift.medicos?.length ? (
-                                        <div className="grid gap-3">
+                                        <div className="grid gap-2.5">
                                             {shift.medicos.map((doctor) => (
-                                                <div key={doctor.agendamentoId} className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 px-4 py-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                        <div>
+                                                <div key={doctor.agendamentoId} className="min-w-0 overflow-hidden rounded-2xl border border-emerald-400/15 bg-emerald-500/5 px-3 py-3">
+                                                    <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
+                                                        <div className="min-w-0">
                                                             <div className="flex items-center gap-2 text-white">
-                                                                <UserRoundCheck size={16} className="text-emerald-400" />
-                                                                <span className="font-black">{doctor.nome}</span>
+                                                                <UserRoundCheck size={16} className="shrink-0 text-emerald-400" />
+                                                                <span className="min-w-0 break-words text-lg font-black leading-tight">{doctor.nome}</span>
                                                             </div>
                                                             <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">CRM</div>
-                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.crm || 'Não informado'}</div>
+                                                            <div className="mt-1 break-words text-sm font-semibold text-slate-200">{doctor.crm || 'Não informado'}</div>
                                                             <div className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">Tipo de plantão</div>
-                                                            <div className="mt-1 inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200">
+                                                            <div className="mt-1 inline-flex max-w-full break-words rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200">
                                                                 {formatBookingType(doctor)}
                                                             </div>
                                                         </div>
 
-                                                        <div className="sm:text-right">
-                                                            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 sm:justify-end">
+                                                        <div className="min-w-0 2xl:text-right">
+                                                            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 2xl:justify-end">
                                                                 <Stethoscope size={14} />
                                                                 Especialidade
                                                             </div>
-                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.especialidade || 'Não informada'}</div>
-                                                            <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 sm:justify-end">
+                                                            <div className="mt-1 break-words text-sm font-semibold text-slate-200">{doctor.especialidade || 'Não informada'}</div>
+                                                            <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500 2xl:justify-end">
                                                                 <Phone size={14} />
                                                                 Contato
                                                             </div>
-                                                            <div className="mt-1 text-sm font-semibold text-slate-200">{doctor.telefone || 'Não informado'}</div>
+                                                            <div className="mt-1 break-words text-sm font-semibold text-slate-200">{doctor.telefone || 'Não informado'}</div>
                                                         </div>
                                                     </div>
                                                 </div>
