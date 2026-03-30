@@ -84,7 +84,7 @@ const getShiftClasses = (shift) => {
         return 'border border-amber-400/60 bg-amber-500/10 text-amber-100 animate-pulse shadow-[0_0_0_1px_rgba(251,191,36,0.14),0_0_18px_rgba(245,158,11,0.16)]';
     }
 
-    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 animate-pulse shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_18px_rgba(16,185,129,0.14)]';
+    return 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_0_18px_rgba(16,185,129,0.14)]';
 };
 
 const getDayCardClasses = (shifts) => {
