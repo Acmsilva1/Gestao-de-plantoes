@@ -25,6 +25,7 @@ import {
     getUnitsList,
     getManagerCalendar,
     getManagerAgenda,
+    getManagerAgendaSummary,
     updateDoctorProfileByManager,
     updateManagerProfile,
     createDoctor,
@@ -73,6 +74,7 @@ app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
 app.get('/api/manager/calendario/:unidadeId', getManagerCalendar);
 app.get('/api/manager/agenda', getManagerAgenda);
+app.get('/api/manager/agenda/resumo', getManagerAgendaSummary);
 app.post('/api/manager/previsao', triggerPredictionCycle);
 app.post('/api/manager/previsao/:unidadeId', generateUnitForecast);
 app.post('/api/manager/medicos/:id/acessos', manageDoctorUnitAccess);

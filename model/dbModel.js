@@ -168,6 +168,25 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar agenda da unidade');
     },
+    async getShiftAgendaSummaryByUnitAndMonth(unidadeId, startDate, endDate) {
+        const response = await supabase
+            .from('disponibilidade')
+            .select(`
+                id,
+                data_plantao,
+                turno,
+                agendamentos(
+                    id,
+                    confirmado
+                )
+            `)
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar resumo da agenda da unidade');
+    },
     async getAvailabilityByUnitAndRange(unidadeId, startDate, endDate) {
         const response = await supabase
             .from('disponibilidade')

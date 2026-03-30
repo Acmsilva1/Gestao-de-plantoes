@@ -278,6 +278,46 @@ export const getManagerAgenda = async (req, res) => {
     }
 };
 
+export const getManagerAgendaSummary = async (req, res) => {
+    const { unidadeId, month } = req.query;
+
+    if (!unidadeId) {
+        return res.status(400).json({ error: 'Unidade não informada.' });
+    }
+
+    if (!month) {
+        return res.status(400).json({ error: 'Mês não informado.' });
+    }
+
+    try {
+        const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const rows = await dbModel.getShiftAgendaSummaryByUnitAndMonth(unidadeId, startMonthDate, endMonthDate);
+
+        const summaryByDate = (rows || []).reduce((accumulator, row) => {
+            const current = accumulator.get(row.data_plantao) || {
+                date: row.data_plantao,
+                shifts: 0,
+                doctorsAllocated: 0
+            };
+
+            current.shifts += 1;
+            current.doctorsAllocated += (row.agendamentos || []).filter((booking) => booking.confirmado).length;
+            accumulator.set(row.data_plantao, current);
+            return accumulator;
+        }, new Map());
+
+        res.json({
+            month,
+            days: Array.from(summaryByDate.values()).map((entry) => ({
+                ...entry,
+                hasDoctors: entry.doctorsAllocated > 0
+            }))
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar resumo mensal da agenda.', details: err.message });
+    }
+};
+
 export const createDoctor = async (req, res) => {
     const { nome, crm, especialidade, unidadeFixaId, telefone, senha } = req.body;
 
