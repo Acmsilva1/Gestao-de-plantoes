@@ -160,6 +160,7 @@ export default function AgendaPage() {
     const [loadingAgenda, setLoadingAgenda] = useState(false);
     const [loadingSummary, setLoadingSummary] = useState(false);
     const [error, setError] = useState('');
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         const loadUnits = async () => {
@@ -185,6 +186,31 @@ export default function AgendaPage() {
     }, []);
 
     useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setRefreshKey((current) => current + 1);
+        }, 8000);
+
+        const handleWindowFocus = () => {
+            setRefreshKey((current) => current + 1);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                setRefreshKey((current) => current + 1);
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    useEffect(() => {
         if (!selectedUnitId || !selectedDate) return;
 
         const loadAgenda = async () => {
@@ -207,7 +233,7 @@ export default function AgendaPage() {
         };
 
         loadAgenda();
-    }, [selectedUnitId, selectedDate]);
+    }, [selectedUnitId, selectedDate, refreshKey]);
 
     useEffect(() => {
         if (!selectedUnitId || !calendarMonth) return;
@@ -230,7 +256,7 @@ export default function AgendaPage() {
         };
 
         loadSummary();
-    }, [selectedUnitId, calendarMonth]);
+    }, [selectedUnitId, calendarMonth, refreshKey]);
 
     const orderedShifts = useMemo(() => {
         const shifts = agenda?.shifts || [];

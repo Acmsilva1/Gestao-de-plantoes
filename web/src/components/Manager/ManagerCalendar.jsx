@@ -135,16 +135,45 @@ export default function ManagerCalendar({ units = [] }) {
     const [selectedDay, setSelectedDay] = useState(null);
     const [shiftTypeFilter, setShiftTypeFilter] = useState('Todos');
     const [shiftStatusFilter, setShiftStatusFilter] = useState('Todos');
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         if (units.length > 0 && !calUnit) setCalUnit(units[0].id);
     }, [units]);
 
     useEffect(() => {
+        setSelectedDay(null);
+    }, [calUnit, calMonth]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setRefreshKey((current) => current + 1);
+        }, 8000);
+
+        const handleWindowFocus = () => {
+            setRefreshKey((current) => current + 1);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                setRefreshKey((current) => current + 1);
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    useEffect(() => {
         if (!calUnit) return;
         const fetchCal = async () => {
             setLoading(true);
-            setSelectedDay(null);
             try {
                 const res = await fetch(`/api/manager/calendario/${calUnit}?month=${calMonth}`);
                 if (res.ok) setCalData(await res.json());
@@ -152,7 +181,7 @@ export default function ManagerCalendar({ units = [] }) {
             setLoading(false);
         };
         fetchCal();
-    }, [calUnit, calMonth]);
+    }, [calUnit, calMonth, refreshKey]);
 
     useEffect(() => {
         setShiftTypeFilter('Todos');
