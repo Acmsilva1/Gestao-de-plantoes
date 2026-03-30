@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Calendar, ChevronLeft, ChevronRight, Activity, Users, MapPin, Globe, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+import { readApiResponse } from '../../utils/api';
 
 const POLL_INTERVAL_MS = 30_000; // 30 segundos
 
@@ -60,7 +61,7 @@ export default function ManagerDashboard() {
         try {
             const unitParam = selectedUnit !== 'all' ? `&unidadeId=${selectedUnit}` : '';
             const response = await fetch(`/api/manager/dashboard?month=${month}${unitParam}`);
-            const result = await response.json();
+            const result = await readApiResponse(response);
 
             if (!response.ok) throw new Error(result.error || 'Falha ao buscar dados');
 

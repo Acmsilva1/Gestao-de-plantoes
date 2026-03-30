@@ -1,7 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
-import { env } from '../config/env.js';
+import { env, getMissingEnvVars } from '../config/env.js';
 
-const supabase = createClient(env.supabaseUrl, env.supabaseKey);
+let supabaseClient = null;
+const getSupabase = () => {
+    if (supabaseClient) {
+        return supabaseClient;
+    }
+
+    const missingEnvVars = getMissingEnvVars();
+
+    if (missingEnvVars.length > 0) {
+        throw new Error(`Variaveis de ambiente obrigatorias ausentes: ${missingEnvVars.join(', ')}`);
+    }
+
+    supabaseClient = createClient(env.supabaseUrl, env.supabaseKey);
+    return supabaseClient;
+};
+
+const supabase = new Proxy(
+    {},
+    {
+        get(_target, prop) {
+            const value = getSupabase()[prop];
+            return typeof value === 'function' ? value.bind(getSupabase()) : value;
+        }
+    }
+);
 const HOLD_DURATION_SECONDS = 3;
 
 const unwrap = (response, defaultMessage) => {

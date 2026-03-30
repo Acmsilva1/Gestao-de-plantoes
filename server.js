@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { env } from './config/env.js';
+import { env, getMissingEnvVars, hasDatabaseEnv } from './config/env.js';
 import { loginWithCrm } from './api/AuthService.js';
 import { startPredictionScheduler } from './api/SchedulerService.js';
 import {
@@ -36,8 +36,22 @@ const distPath = path.join(__dirname, 'web/dist');
 app.use(cors());
 app.use(express.json());
 
+app.use('/api', (req, res, next) => {
+    if (hasDatabaseEnv()) {
+        return next();
+    }
+
+    return res.status(503).json({
+        error: 'Configuracao de banco ausente para este ambiente.',
+        missingEnvVars: getMissingEnvVars()
+    });
+});
+
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+    res.json({
+        status: hasDatabaseEnv() ? 'ok' : 'degraded',
+        missingEnvVars: getMissingEnvVars()
+    });
 });
 
 app.post('/api/auth/login', loginWithCrm);
@@ -72,7 +86,9 @@ if (fs.existsSync(distPath)) {
 if (!process.env.VERCEL) {
     app.listen(env.port, () => {
         console.log(`Maestro rodando na porta ${env.port}`);
-        startPredictionScheduler();
+        if (hasDatabaseEnv()) {
+            startPredictionScheduler();
+        }
     });
 }
 

@@ -1,14 +1,19 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootEnvPath = path.resolve(__dirname, '..', '.env');
+
+dotenv.config({ path: rootEnvPath });
 dotenv.config();
 
-const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY'];
+export const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY'];
 
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        throw new Error(`Variavel de ambiente obrigatoria ausente: ${envVar}`);
-    }
-}
+export const getMissingEnvVars = () =>
+    requiredEnvVars.filter((envVar) => !process.env[envVar]);
+
+export const hasDatabaseEnv = () => getMissingEnvVars().length === 0;
 
 export const env = {
     port: Number(process.env.PORT || 3000),

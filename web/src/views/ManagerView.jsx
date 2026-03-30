@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ManagerDashboard from '../components/Manager/Dashboard';
 import ManagerAccess from '../components/Manager/AccessControl';
 import CalendarPage from './CalendarPage';
+import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
     const [loading, setLoading] = useState(false);
@@ -26,7 +27,7 @@ const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-            const data = await response.json();
+            const data = await readApiResponse(response);
 
             if (!response.ok) throw new Error(data.error || 'Falha ao atualizar perfil.');
 

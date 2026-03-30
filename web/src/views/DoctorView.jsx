@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { readApiResponse } from '../utils/api';
 
 const initialState = {
     loadingCalendar: false,
@@ -100,7 +101,7 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-            const data = await response.json();
+            const data = await readApiResponse(response);
 
             if (!response.ok) throw new Error(data.error || 'Falha ao atualizar perfil.');
 

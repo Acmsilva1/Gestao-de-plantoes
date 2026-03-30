@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Users, CheckCircle, Search, Save, AlertTriangle } from 'lucide-react';
+import { readApiResponse } from '../../utils/api';
 
 export default function ManagerAccessControl() {
     const { session } = useAuth();
@@ -112,7 +113,7 @@ export default function ManagerAccessControl() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newDoc)
             });
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar médico.');
 
             setModal({ type: 'success', title: 'Sucesso', message: 'Médico cadastrado com sucesso!' });

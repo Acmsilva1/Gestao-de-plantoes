@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { readApiResponse } from '../utils/api';
 
 export default function LoginView() {
     const { login } = useAuth();
@@ -31,7 +32,7 @@ export default function LoginView() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crm, senha: senhaMedico })
             });
-            const data = await response.json();
+            const data = await readApiResponse(response);
 
             if (!response.ok) throw new Error(data.error || 'Falha no login de médico.');
 
@@ -67,7 +68,7 @@ export default function LoginView() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ usuario, senha })
             });
-            const data = await response.json();
+            const data = await readApiResponse(response);
 
             if (!response.ok) throw new Error(data.error || 'Falha no login de gestor.');
 
