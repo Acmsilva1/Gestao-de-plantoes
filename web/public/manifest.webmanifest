@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "/?app=gestao-de-plantoes-v2",
   "name": "GEST\u00c3O DE PLANT\u00d5ES",
   "short_name": "GEST\u00c3O DE PLANT\u00d5ES",
   "description": "GEST\u00c3O DE PLANT\u00d5ES, plataforma para m\u00e9dicos e gestores acompanharem agenda, acessos e plant\u00f5es.",
   "lang": "pt-BR",
-  "start_url": "/",
+  "start_url": "/?app=gestao-de-plantoes-v2",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],

@@ -1,8 +1,8 @@
-const STATIC_CACHE = 'gestao-de-plantoes-static-v5';
-const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v5';
+const STATIC_CACHE = 'gestao-de-plantoes-static-v6';
+const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v6';
 const APP_SHELL = [
     '/offline.html',
-    '/manifest.webmanifest?v=20260329-gestao-de-plantoes-v3',
+    '/manifest.webmanifest?v=20260329-gestao-de-plantoes-v4',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/icons/icon-maskable-512.png'
@@ -26,7 +26,9 @@ self.addEventListener('activate', event => {
                         key.startsWith('gestao-de-plantoes-static-v3') ||
                         key.startsWith('gestao-de-plantoes-runtime-v3') ||
                         key.startsWith('gestao-de-plantoes-static-v4') ||
-                        key.startsWith('gestao-de-plantoes-runtime-v4')
+                        key.startsWith('gestao-de-plantoes-runtime-v4') ||
+                        key.startsWith('gestao-de-plantoes-static-v5') ||
+                        key.startsWith('gestao-de-plantoes-runtime-v5')
                     )
                     .map(key => caches.delete(key))
             )
