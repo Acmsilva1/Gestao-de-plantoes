@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
 import DoctorView from './views/DoctorView';
 import ManagerView from './views/ManagerView';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 const PrivateRoute = ({ children, requireManager = false }) => {
     const { session, loading } = useAuth();
@@ -26,6 +27,7 @@ export default function App() {
     return (
         <AuthProvider>
             <BrowserRouter>
+                <PwaInstallPrompt />
                 <Routes>
                     <Route path="/" element={<LoginView />} />
                     

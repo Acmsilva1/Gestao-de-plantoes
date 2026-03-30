@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
 
@@ -48,6 +49,18 @@ const shiftMonth = (month, delta) => {
     const [year, monthIndex] = month.split('-').map(Number);
     const date = new Date(Date.UTC(year, monthIndex - 1 + delta, 1));
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const getForecastWindow = () => {
+    const now = new Date();
+    const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const next = shiftMonth(current, 1);
+    return { current, next };
+};
+
+const isOutsideForecastWindow = (month) => {
+    const { current, next } = getForecastWindow();
+    return month < current || month > next;
 };
 
 const getMonthFromDate = (dateString) => dateString.slice(0, 7);
@@ -387,6 +400,8 @@ export default function DoctorView() {
 
     const { loadingCalendar, modal, error, success, reservandoId, selectedMonth, selectedDay, selectedUnitId, bookedShiftIds, showAgendaModal, showProfileModal, showPasswordSuggestion, myAgenda, calendar } = state;
     const calendarDays = buildCalendarDays(selectedMonth, calendar?.shifts || []);
+    const outsideForecast = isOutsideForecastWindow(selectedMonth);
+    const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
     
     const getShiftAlertClasses = (shift) => {
         const isMine = bookedShiftIds.includes(shift.id);
@@ -516,8 +531,22 @@ export default function DoctorView() {
                         >
                             Próximo mês
                         </button>
-                    </div>
+                        </div>
                 </section>
+
+                {outsideForecast && (
+                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300">
+                        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
+                        <div>
+                            <p className="font-bold text-amber-300">Mês fora da janela de previsão</p>
+                            <p className="mt-1 text-amber-200/80">
+                                O preditor cobre apenas <span className="font-semibold capitalize">{getMonthTitle(forecastCurrent)}</span> e{' '}
+                                <span className="font-semibold capitalize">{getMonthTitle(forecastNext)}</span>.
+                                O calendário abaixo pode ficar vazio ou incompleto.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {success && <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{success}</div>}
                 {error && <div className="mb-6 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
