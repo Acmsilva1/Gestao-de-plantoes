@@ -4,7 +4,7 @@ import App from './App.jsx';
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(registration => {
             registration.update();
 
             if (registration.waiting) {

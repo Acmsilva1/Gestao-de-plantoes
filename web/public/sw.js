@@ -1,9 +1,8 @@
-const STATIC_CACHE = 'gestao-de-plantoes-static-v3';
-const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v3';
+const STATIC_CACHE = 'gestao-de-plantoes-static-v4';
+const RUNTIME_CACHE = 'gestao-de-plantoes-runtime-v4';
 const APP_SHELL = [
-    '/',
     '/offline.html',
-    '/manifest.webmanifest?v=20260329-gestao-de-plantoes',
+    '/manifest.webmanifest?v=20260329-gestao-de-plantoes-v2',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/icons/icon-maskable-512.png'
@@ -21,7 +20,12 @@ self.addEventListener('activate', event => {
         caches.keys().then(keys =>
             Promise.all(
                 keys
-                    .filter(key => ![STATIC_CACHE, RUNTIME_CACHE].includes(key))
+                    .filter(key =>
+                        ![STATIC_CACHE, RUNTIME_CACHE].includes(key) ||
+                        key.startsWith('maestro-') ||
+                        key.startsWith('gestao-de-plantoes-static-v3') ||
+                        key.startsWith('gestao-de-plantoes-runtime-v3')
+                    )
                     .map(key => caches.delete(key))
             )
         )
@@ -52,15 +56,7 @@ self.addEventListener('fetch', event => {
     if (request.mode === 'navigate') {
         event.respondWith(
             fetch(request)
-                .then(response => {
-                    const copy = response.clone();
-                    caches.open(RUNTIME_CACHE).then(cache => cache.put(request, copy));
-                    return response;
-                })
-                .catch(async () => {
-                    const cachedPage = await caches.match(request);
-                    return cachedPage || caches.match('/offline.html');
-                })
+                .catch(() => caches.match('/offline.html'))
         );
         return;
     }
