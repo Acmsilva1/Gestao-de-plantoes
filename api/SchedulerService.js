@@ -43,6 +43,22 @@ export const runPredictionCycle = async () => {
     return results;
 };
 
+export const triggerPredictionCycle = async (req, res) => {
+    try {
+        const results = await runPredictionCycle();
+        res.json({
+            message: 'Previsao executada com sucesso para todas as unidades.',
+            totalUnits: results.length,
+            results
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: 'Erro ao executar o ciclo de previsao.',
+            details: error.message
+        });
+    }
+};
+
 export const startPredictionScheduler = () => {
     const scheduleNext = () => {
         const now = new Date();

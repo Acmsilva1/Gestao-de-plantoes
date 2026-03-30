@@ -5,13 +5,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { env, getMissingEnvVars, hasDatabaseEnv } from './config/env.js';
 import { loginWithCrm } from './api/AuthService.js';
-import { startPredictionScheduler } from './api/SchedulerService.js';
+import { startPredictionScheduler, triggerPredictionCycle } from './api/SchedulerService.js';
 import {
     getDoctorCalendar,
     getDoctorAgenda,
     updateDoctorProfile,
     getDoctors,
     getPublicShifts,
+    generateUnitForecast,
     holdShift,
     releaseShiftHold,
     selectShift
@@ -70,6 +71,8 @@ app.get('/api/manager/dashboard', getDashboardMetrics);
 app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
 app.get('/api/manager/calendario/:unidadeId', getManagerCalendar);
+app.post('/api/manager/previsao', triggerPredictionCycle);
+app.post('/api/manager/previsao/:unidadeId', generateUnitForecast);
 app.post('/api/manager/medicos/:id/acessos', manageDoctorUnitAccess);
 app.post('/api/manager/medicos/:id/perfil', updateDoctorProfileByManager);
 app.post('/api/manager/perfil/:id', updateManagerProfile);
