@@ -122,6 +122,7 @@ const mapDoctorForClient = (doctor) => {
     return {
         id: doctor.id,
         nome: doctor.nome,
+        usuario: doctor.usuario || '',
         crm: doctor.crm,
         senha: doctor.senha,
         telefone: doctor.telefone,

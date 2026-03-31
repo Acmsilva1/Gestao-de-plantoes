@@ -5,6 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE medicos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome TEXT NOT NULL,
+    usuario TEXT UNIQUE NOT NULL,
     telefone TEXT,
     especialidade TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL, -- Impede CRM duplicado
@@ -75,3 +76,4 @@ CREATE TABLE tasy_raw_history (
     -- Impede histórico duplicado para a mesma unidade/data/período
     UNIQUE(unidade_id, data_atendimento, periodo)
 );
+

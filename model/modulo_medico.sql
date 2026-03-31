@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS unidades (
 CREATE TABLE IF NOT EXISTS medicos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
+    usuario TEXT UNIQUE NOT NULL,
     telefone TEXT,
     especialidade TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL,
@@ -51,18 +52,18 @@ VALUES
     ('b1000001-0000-4000-8000-000000000006', 'PR', 'Regional Paraná', 10)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO medicos (id, nome, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
+INSERT INTO medicos (id, nome, usuario, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
 VALUES
-    ('c1000001-0000-4000-8000-000000000001', 'Ana Paula Ferreira', '10001-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000002', 'Bruno Almeida Costa', '10002-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000003', 'Carla Mendes Rocha', '20001-RJ', '(21) 96666-2003', 'Emergência', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000004', 'Daniel Ribeiro Santos', '20002-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', '30001-SP', '(11) 94444-3005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000006', 'Felipe Nogueira Dias', '30002-SP', '(11) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000007', 'Gabriela Souza Pinto', '40001-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000008', 'Henrique Castro Melo', '40002-MG', '(31) 91111-4008', 'Emergência', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000009', 'Isabela Freitas Araújo', '50001-BA', '(71) 90000-5009', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000010', 'João Victor Prado', '60001-PR', '(41) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10)
+    ('c1000001-0000-4000-8000-000000000001', 'Ana Paula Ferreira', 'ana.ferreira', '10001-ES', '(27) 98888-1001', 'Clinica Medica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000002', 'Bruno Almeida Costa', 'bruno.costa', '10002-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000003', 'Carla Mendes Rocha', 'carla.rocha', '20001-RJ', '(21) 96666-2003', 'Emergencia', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000004', 'Daniel Ribeiro Santos', 'daniel.santos', '20002-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', 'eduarda.oliveira', '30001-SP', '(11) 94444-3005', 'Clinica Medica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000006', 'Felipe Nogueira Dias', 'felipe.dias', '30002-SP', '(11) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000007', 'Gabriela Souza Pinto', 'gabriela.pinto', '40001-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000008', 'Henrique Castro Melo', 'henrique.melo', '40002-MG', '(31) 91111-4008', 'Emergencia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000009', 'Isabela Freitas Araujo', 'isabela.araujo', '50001-BA', '(71) 90000-5009', 'Clinica Medica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000010', 'Joao Victor Prado', 'joao.prado', '60001-PR', '(41) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO escala (id, unidade_id, medico_id, data_plantao, turno)
@@ -245,3 +246,4 @@ VALUES
 -- Pedidos de troca (colega → gestor → escala): executar também model/pedidos_troca_escala.sql no Supabase.
 -- Pedidos assumir vago (gestor → escala): executar também model/pedidos_assumir_escala.sql no Supabase.
 -- Publicação da escala por mês (Liberado/Bloqueado): executar também model/escala_mes_publicacao.sql no Supabase.
+

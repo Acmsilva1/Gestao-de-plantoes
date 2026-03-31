@@ -45,6 +45,25 @@ const normalizeLabelToSlug = (rawLabel) =>
         .replace(/^-+|-+$/g, '')
         .slice(0, 24) || 'unidade';
 
+const normalizeUsernameChunk = (rawChunk) =>
+    String(rawChunk || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9.]+/g, '')
+        .trim();
+
+const buildDoctorUsernameBase = (fullName) => {
+    const parts = String(fullName || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (!parts.length) return 'medico';
+    const first = normalizeUsernameChunk(parts[0]) || 'medico';
+    const last = normalizeUsernameChunk(parts[parts.length - 1]) || first;
+    return `${first}.${last}`;
+};
+
 export const dbModel = {
     async getUnits() {
         const response = await supabase.from('unidades').select('id, nome, endereco').order('nome', { ascending: true });
@@ -62,7 +81,7 @@ export const dbModel = {
     async getDoctors() {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome)')
+            .select('id, nome, usuario, crm, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome)')
             .order('nome', { ascending: true });
 
         return unwrap(response, 'Falha ao carregar medicos');
@@ -70,7 +89,7 @@ export const dbModel = {
     async getDoctorsByUnit(unidadeId) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id')
+            .select('id, nome, usuario, crm, especialidade, unidade_fixa_id')
             .eq('unidade_fixa_id', unidadeId)
             .order('nome', { ascending: true });
 
@@ -79,7 +98,7 @@ export const dbModel = {
     async getDoctorById(medicoId) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
+            .select('id, nome, usuario, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('id', medicoId)
             .maybeSingle();
 
@@ -88,7 +107,7 @@ export const dbModel = {
     async getDoctorByCrm(crm) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
+            .select('id, nome, usuario, crm, senha, telefone, especialidade, unidade_fixa_id, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id, unidades(nome))')
             .eq('crm', crm)
             .maybeSingle();
 
@@ -1018,7 +1037,7 @@ export const dbModel = {
     async getDoctorsAccessList() {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
+            .select('id, nome, usuario, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
             .order('nome', { ascending: true });
 
         return unwrap(response, 'Falha ao carregar lista de médicos e acessos.');
@@ -1026,7 +1045,7 @@ export const dbModel = {
     async getDoctorsAccessListByUnit(unidadeId) {
         const response = await supabase
             .from('medicos')
-            .select('id, nome, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
+            .select('id, nome, usuario, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
             .eq('unidade_fixa_id', unidadeId)
             .order('nome', { ascending: true });
 
@@ -1087,6 +1106,7 @@ export const dbModel = {
         if (Object.prototype.hasOwnProperty.call(data, 'nome')) payload.nome = data.nome;
         if (Object.prototype.hasOwnProperty.call(data, 'telefone')) payload.telefone = data.telefone;
         if (Object.prototype.hasOwnProperty.call(data, 'senha')) payload.senha = data.senha;
+        if (Object.prototype.hasOwnProperty.call(data, 'usuario')) payload.usuario = data.usuario;
         if (Object.prototype.hasOwnProperty.call(data, 'unidadeFixaId')) payload.unidade_fixa_id = data.unidadeFixaId;
 
         const response = await supabase
@@ -1099,10 +1119,26 @@ export const dbModel = {
         return unwrap(response, 'Falha ao atualizar perfil do médico.');
     },
     async createDoctor(data) {
+        const usernameBase = buildDoctorUsernameBase(data.nome);
+        let nextUsername = normalizeUsernameChunk(data.usuario) || usernameBase;
+        if (!nextUsername.includes('.')) {
+            nextUsername = usernameBase;
+        }
+        let usernameAttempt = nextUsername;
+        let suffix = 2;
+        while (true) {
+            const existsResp = await supabase.from('medicos').select('id').eq('usuario', usernameAttempt).maybeSingle();
+            const exists = unwrap(existsResp, 'Falha ao validar usuÃ¡rio de mÃ©dico');
+            if (!exists) break;
+            usernameAttempt = `${nextUsername}.${suffix}`;
+            suffix += 1;
+        }
+
         const response = await supabase
             .from('medicos')
             .insert({
                 nome: data.nome,
+                usuario: usernameAttempt,
                 crm: data.crm,
                 especialidade: data.especialidade,
                 unidade_fixa_id: data.unidadeFixaId,

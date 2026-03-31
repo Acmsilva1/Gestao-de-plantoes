@@ -377,6 +377,7 @@ export const getDoctorAccesses = async (req, res) => {
         const mappedList = list.map(doc => ({
             id: doc.id,
             nome: doc.nome,
+            usuario: doc.usuario || '',
             crm: doc.crm,
             telefone: doc.telefone || '',
             senha: doc.senha || '',
@@ -428,7 +429,7 @@ export const manageDoctorUnitAccess = async (req, res) => {
 
 export const updateDoctorProfileByManager = async (req, res) => {
     const { id } = req.params;
-    const { nome, telefone, senha, unidadeFixaId } = req.body;
+    const { nome, telefone, usuario, unidadeFixaId } = req.body;
 
     try {
         const manager = await getScopedManager(req, res);
@@ -442,7 +443,10 @@ export const updateDoctorProfileByManager = async (req, res) => {
             return res.status(403).json({ error: 'Sem permissão para alterar médico de outra unidade.' });
         }
 
-        const payload = { nome, telefone, senha };
+        const payload = {};
+        if (typeof nome === 'string') payload.nome = nome;
+        if (typeof telefone === 'string') payload.telefone = telefone;
+        if (typeof usuario === 'string') payload.usuario = usuario;
         if (isMasterManager(manager) && unidadeFixaId) {
             payload.unidadeFixaId = unidadeFixaId;
         }
@@ -612,7 +616,7 @@ export const getManagerAgendaSummary = async (req, res) => {
 };
 
 export const createDoctor = async (req, res) => {
-    const { nome, crm, especialidade, unidadeFixaId, telefone, senha } = req.body;
+    const { nome, crm, especialidade, unidadeFixaId, telefone, senha, usuario } = req.body;
 
     try {
         const manager = await getScopedManager(req, res);
@@ -624,7 +628,7 @@ export const createDoctor = async (req, res) => {
 
         if (!assertUnitScope(res, manager, unidadeFixaId)) return;
 
-        const newDoc = await dbModel.createDoctor({ nome, crm, especialidade, unidadeFixaId, telefone, senha });
+        const newDoc = await dbModel.createDoctor({ nome, crm, especialidade, unidadeFixaId, telefone, senha, usuario });
         res.status(201).json({
             message: 'Médico cadastrado com sucesso!',
             doctor: newDoc

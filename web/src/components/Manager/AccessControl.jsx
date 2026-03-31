@@ -28,10 +28,22 @@ export default function ManagerAccessControl() {
         crm: '',
         especialidade: '',
         unidadeFixaId: '',
-        telefone: '',
-        senha: ''
+        telefone: ''
     });
     const gestorId = session?.id || '';
+
+    const buildUsername = (fullName = '') => {
+        const normalized = String(fullName || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z\s]/g, ' ')
+            .trim()
+            .toLowerCase();
+        const parts = normalized.split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '';
+        if (parts.length === 1) return parts[0];
+        return `${parts[0]}.${parts[parts.length - 1]}`;
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -114,14 +126,14 @@ export default function ManagerAccessControl() {
             const response = await fetch('/api/manager/medicos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newDoc, gestorId })
+                body: JSON.stringify({ ...newDoc, usuario: buildUsername(newDoc.nome), gestorId })
             });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar médico.');
 
             setModal({ type: 'success', title: 'Sucesso', message: 'Médico cadastrado com sucesso!' });
             setIsAdding(false);
-            setNewDoc({ nome: '', crm: '', especialidade: '', unidadeFixaId: '', telefone: '', senha: '' });
+            setNewDoc({ nome: '', crm: '', especialidade: '', unidadeFixaId: '', telefone: '' });
             fetchData();
         } catch (err) {
             setModal({ type: 'error', title: 'Falha', message: err.message });
@@ -165,7 +177,7 @@ export default function ManagerAccessControl() {
                 body: JSON.stringify({
                     nome: docData.nome,
                     telefone: docData.telefone,
-                    senha: docData.senha,
+                    usuario: buildUsername(docData.nome),
                     unidadeFixaId: docData.unidadeFixaId,
                     gestorId
                 })
@@ -260,8 +272,11 @@ export default function ManagerAccessControl() {
                                 </select>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <input placeholder="Telefone" value={newDoc.telefone} onChange={e => setNewDoc({...newDoc, telefone: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
-                                    <input placeholder="Senha (Mantenha 12345 se padrão)" value={newDoc.senha} onChange={e => setNewDoc({...newDoc, senha: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500" />
+                                    <input placeholder="Usuário (auto): primeiro.ultimo" value={buildUsername(newDoc.nome)} readOnly className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 outline-none" />
                                 </div>
+                                <p className="text-[10px] text-slate-400">
+                                    Senha padrão inicial: <span className="font-mono text-slate-300">12345</span>. O médico altera no primeiro acesso.
+                                </p>
                                 <button type="submit" disabled={saving} className="w-full bg-sky-500 py-2.5 rounded-xl text-slate-950 text-xs font-black uppercase tracking-widest hover:bg-sky-400 transition disabled:opacity-50">
                                     {saving ? 'Salvando...' : 'Confirmar Cadastro'}
                                 </button>
@@ -389,18 +404,18 @@ export default function ManagerAccessControl() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Senha Privada</label>
+                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Usuário</label>
                                         <input 
                                             type="text"
-                                            value={selectedDoctor.senha || ''}
-                                            onChange={(e) => {
-                                                const newDoctors = doctors.map(d => d.id === selectedDoctor.id ? { ...d, senha: e.target.value } : d);
-                                                setDoctors(newDoctors);
-                                            }}
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition font-mono"
+                                            value={selectedDoctor.usuario || buildUsername(selectedDoctor.nome)}
+                                            readOnly
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none font-mono"
                                         />
                                     </div>
                                 </div>
+                                <p className="mt-2 text-[11px] text-slate-400">
+                                    Senha padrão inicial do médico é <span className="font-mono text-slate-300">12345</span> e deve ser trocada no primeiro acesso.
+                                </p>
 
                                 {isMaster && (
                                     <div className="mt-4 space-y-1.5">

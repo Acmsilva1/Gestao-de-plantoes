@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS perfis (
 CREATE TABLE IF NOT EXISTS medicos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome TEXT NOT NULL,
+    usuario TEXT UNIQUE NOT NULL,
     telefone TEXT,
     especialidade TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL,
@@ -138,13 +139,13 @@ VALUES
     ('b1000001-0000-4000-8000-000000000005', 'BA', 'Regional Bahia', 10)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO medicos (id, nome, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
+INSERT INTO medicos (id, nome, usuario, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
 VALUES
-    ('c1000001-0000-4000-8000-000000000001', 'Ana Paula Ferreira', '12345-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000002', 'Bruno Almeida Costa', '67890-RJ', '(21) 97777-2002', 'Pediatria', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000003', 'Carla Mendes Rocha', '11223-SP', '(11) 96666-3003', 'Emergência', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000004', 'Daniel Ribeiro Santos', '44556-MG', '(31) 95555-4004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', '77889-BA', '(71) 94444-5005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10)
+    ('c1000001-0000-4000-8000-000000000001', 'Ana Paula Ferreira', 'ana.ferreira', '12345-ES', '(27) 98888-1001', 'Clinica Medica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000002', 'Bruno Almeida Costa', 'bruno.costa', '67890-RJ', '(21) 97777-2002', 'Pediatria', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000003', 'Carla Mendes Rocha', 'carla.rocha', '11223-SP', '(11) 96666-3003', 'Emergencia', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000004', 'Daniel Ribeiro Santos', 'daniel.santos', '44556-MG', '(31) 95555-4004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', 'eduarda.oliveira', '77889-BA', '(71) 94444-5005', 'Clinica Medica', 'b1000001-0000-4000-8000-000000000005', '12345', 10)
 ON CONFLICT (id) DO NOTHING;
 
 -- Perfil e gestores por unidade (um gestor por unidade)
@@ -170,3 +171,4 @@ ON CONFLICT (id) DO NOTHING;
 -- Supabase: ative RLS nas tabelas se usar políticas; para testes internos,
 -- em Authentication > Policies pode permitir service role / anon conforme o caso.
 -- =============================================================================
+

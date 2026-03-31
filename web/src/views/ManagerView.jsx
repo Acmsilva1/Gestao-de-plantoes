@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -126,12 +126,55 @@ function GestorChrome() {
     const isEscalaRoute = location.pathname === '/gestor/escala';
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
+    const [pendingTrocas, setPendingTrocas] = useState(0);
+    const [pendingAceites, setPendingAceites] = useState(0);
+    const loadPendingCounts = useCallback(async () => {
+        if (!session?.id || isMaster) {
+            setPendingTrocas(0);
+            setPendingAceites(0);
+            return;
+        }
+        try {
+            const gestorId = encodeURIComponent(session.id);
+            const [trocasResp, aceitesResp] = await Promise.all([
+                fetch(`/api/manager/trocas-pendentes?gestorId=${gestorId}`),
+                fetch(`/api/manager/assumir-pendentes?gestorId=${gestorId}`)
+            ]);
+
+            const [trocasData, aceitesData] = await Promise.all([readApiResponse(trocasResp), readApiResponse(aceitesResp)]);
+            setPendingTrocas(trocasResp.ok ? (trocasData?.pedidos?.length || 0) : 0);
+            setPendingAceites(aceitesResp.ok ? (aceitesData?.pedidos?.length || 0) : 0);
+        } catch {
+            setPendingTrocas(0);
+            setPendingAceites(0);
+        }
+    }, [session?.id, isMaster]);
 
     useEffect(() => {
         if (session?.senha === '12345' && !localStorage.getItem(`hide_manager_pass_suggest_${session.id}`)) {
             setShowPasswordSuggestion(true);
         }
     }, [session?.id, session?.senha]);
+
+    useEffect(() => {
+        if (!session?.id || isMaster) {
+            setPendingTrocas(0);
+            setPendingAceites(0);
+            return;
+        }
+        let timer = null;
+        const onPendingRefresh = () => {
+            loadPendingCounts();
+        };
+        loadPendingCounts();
+        window.addEventListener('manager-pending-refresh', onPendingRefresh);
+        timer = setInterval(loadPendingCounts, 60_000);
+
+        return () => {
+            window.removeEventListener('manager-pending-refresh', onPendingRefresh);
+            if (timer) clearInterval(timer);
+        };
+    }, [session?.id, isMaster, loadPendingCounts]);
 
     const mainInnerClass = isEscalaRoute ? 'mx-auto w-full max-w-none' : 'mx-auto max-w-7xl lg:max-w-[100rem]';
 
@@ -205,7 +248,7 @@ function GestorChrome() {
                         <NavLink
                             to="/gestor/trocas"
                             className={({ isActive }) => 
-                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                `relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                                     isActive 
                                         ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
                                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
@@ -214,6 +257,11 @@ function GestorChrome() {
                         >
                             <ArrowLeftRight size={18} />
                             Trocas
+                            {pendingTrocas > 0 ? (
+                                <span className="absolute right-3 top-1/2 flex h-5 min-w-[1.25rem] -translate-y-1/2 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-black text-slate-950">
+                                    {pendingTrocas > 9 ? '9+' : pendingTrocas}
+                                </span>
+                            ) : null}
                         </NavLink>
                     )}
 
@@ -221,7 +269,7 @@ function GestorChrome() {
                         <NavLink
                             to="/gestor/aceites-assumir"
                             className={({ isActive }) => 
-                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                `relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                                     isActive 
                                         ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
                                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
@@ -230,6 +278,11 @@ function GestorChrome() {
                         >
                             <ClipboardCheck size={18} />
                             Aceites (vagos)
+                            {pendingAceites > 0 ? (
+                                <span className="absolute right-3 top-1/2 flex h-5 min-w-[1.25rem] -translate-y-1/2 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-black text-slate-950">
+                                    {pendingAceites > 9 ? '9+' : pendingAceites}
+                                </span>
+                            ) : null}
                         </NavLink>
                     )}
                 </nav>

@@ -66,6 +66,7 @@ export default function ManagerAceitesAssumirPage() {
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Operacao falhou.');
             await load();
+            window.dispatchEvent(new Event('manager-pending-refresh'));
         } catch (e) {
             setError(e.message);
         } finally {

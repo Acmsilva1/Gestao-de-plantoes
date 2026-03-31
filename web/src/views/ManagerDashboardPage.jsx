@@ -307,12 +307,12 @@ export default function ManagerDashboardPage() {
                                 <div key={unit.unidadeId} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
                                     <div className="border-b border-slate-800 bg-slate-900/70 px-4 py-3 text-sm font-black text-sky-300">{unit.unidade}</div>
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-[560px] w-full text-left text-sm">
+                                        <table className="min-w-[560px] w-full table-fixed text-left text-sm">
                                             <thead>
                                                 <tr className="text-xs uppercase tracking-widest text-slate-500">
                                                     <th className="px-4 py-3">Médico</th>
-                                                    <th className="px-4 py-3">CRM</th>
-                                                    <th className="px-4 py-3">Plantões</th>
+                                                    <th className="w-44 px-4 py-3">CRM</th>
+                                                    <th className="w-28 px-4 py-3 text-center">Plantões</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-800/60">
@@ -320,7 +320,7 @@ export default function ManagerDashboardPage() {
                                                     <tr key={`${unit.unidadeId}-${medico.medicoId}`} className="hover:bg-slate-900/50">
                                                         <td className="px-4 py-3 text-slate-200">{medico.nome}</td>
                                                         <td className="px-4 py-3 text-slate-400">{medico.crm || '-'}</td>
-                                                        <td className="px-4 py-3 font-black text-white">{medico.totalPlantoes}</td>
+                                                        <td className="px-4 py-3 text-center font-black text-white">{medico.totalPlantoes}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
