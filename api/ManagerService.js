@@ -352,3 +352,35 @@ export const deleteDoctor = async (req, res) => {
         res.status(500).json({ error: 'Erro ao excluir médico.', details: err.message });
     }
 };
+
+export const getTrocasPendentesGestor = async (req, res) => {
+    const { unidadeId } = req.query;
+
+    try {
+        const pedidos = await dbModel.listPedidosTrocaParaGestor(unidadeId || null);
+        res.json({ pedidos });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar pedidos de troca.', details: err.message });
+    }
+};
+
+export const postDecidirTrocaGestor = async (req, res) => {
+    const { pedidoId } = req.params;
+    const { aprovar } = req.body ?? {};
+
+    try {
+        if (typeof aprovar !== 'boolean') {
+            return res.status(400).json({ error: 'Informe aprovar: true ou false.' });
+        }
+
+        if (aprovar) {
+            await dbModel.aprovarPedidoTrocaGestorRpc(pedidoId);
+            res.json({ message: 'Troca aprovada. A escala foi atualizada.' });
+        } else {
+            await dbModel.recusarPedidoTrocaGestor(pedidoId);
+            res.json({ message: 'Pedido recusado pelo gestor.' });
+        }
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};

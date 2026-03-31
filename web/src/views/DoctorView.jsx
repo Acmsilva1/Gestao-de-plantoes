@@ -17,7 +17,9 @@ const initialState = {
     myAgenda: [],
     calendar: null,
     bookingConfigs: {},
-    shiftDetailModal: null
+    shiftDetailModal: null,
+    pendentesColegaTroca: 0,
+    pedidosTroca: []
 };
 
 const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -162,9 +164,27 @@ const turnButtonClass = (shift, medicoId, bookedShiftIds) => {
     return 'border-dashed border-slate-600/80 bg-slate-950/40 text-slate-500 hover:border-slate-500';
 };
 
-const ProfileModal = ({ doctor, onClose, onUpdate }) => {
+const trocaStatusLabel = (status, souSolicitante) => {
+    switch (status) {
+        case 'AGUARDANDO_COLEGA':
+            return souSolicitante ? 'Aguardando confirmação do colega' : 'Aguardando a sua resposta';
+        case 'AGUARDANDO_GESTOR':
+            return 'Aguardando o gestor';
+        case 'APROVADO':
+            return 'Aprovado — escala atualizada';
+        case 'RECUSADO_COLEGA':
+            return 'Recusado pelo colega';
+        case 'RECUSADO_GESTOR':
+            return 'Recusado pelo gestor';
+        default:
+            return status || '—';
+    }
+};
+
+const ProfileModal = ({ doctor, pedidosTroca, onRefreshTrocas, onClose, onUpdate }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [respostaBusyId, setRespostaBusyId] = useState(null);
     const [formData, setFormData] = useState({
         nome: doctor.nome || '',
         telefone: doctor.telefone || '',
@@ -194,9 +214,31 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
         }
     };
 
+    const responderPedido = async (pedidoId, aceitar) => {
+        setError('');
+        setRespostaBusyId(pedidoId);
+        try {
+            const response = await fetch(`/api/medicos/${doctor.id}/trocas/${pedidoId}/responder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aceitar })
+            });
+            const data = await parseJsonSafely(response);
+            if (!response.ok) throw new Error(data?.error || data?.details || 'Nao foi possivel responder.');
+            await onRefreshTrocas?.();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setRespostaBusyId(null);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-lg" onClick={onClose}>
-            <div className="w-full max-w-md rounded-[2.5rem] border border-slate-700 bg-slate-900 p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div
+                className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[2.5rem] border border-slate-700 bg-slate-900 p-8 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="mb-8 text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
                         <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,6 +252,71 @@ const ProfileModal = ({ doctor, onClose, onUpdate }) => {
                 {error && (
                     <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-center text-sm text-rose-200">{error}</div>
                 )}
+
+                {pedidosTroca?.length > 0 ? (
+                    <div className="mb-8 rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-amber-200/90">Pedidos de troca</p>
+                        <ul className="space-y-3">
+                            {pedidosTroca.map((p) => {
+                                const souSolicitante = p.medico_solicitante_id === doctor.id;
+                                const souAlvo = p.medico_alvo_id === doctor.id;
+                                const unidadeNome = p.unidades?.nome || p.unidade_nome || '—';
+                                const outroNome = souSolicitante ? p.alvo?.nome || 'Colega' : p.solicitante?.nome || 'Colega';
+                                const podeResponder = souAlvo && p.status === 'AGUARDANDO_COLEGA';
+                                const busy = respostaBusyId === p.id;
+                                return (
+                                    <li key={p.id} className="rounded-xl border border-slate-700/80 bg-slate-950/50 p-3 text-left">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span
+                                                className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${
+                                                    souSolicitante ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-200'
+                                                }`}
+                                            >
+                                                {souSolicitante ? 'Enviado' : 'Recebido'}
+                                            </span>
+                                            <span className="text-xs font-mono text-slate-500">{formatDisplayDate(p.data_plantao)}</span>
+                                            <span className="text-xs font-bold text-slate-300">{p.turno}</span>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-200">
+                                            {souSolicitante ? (
+                                                <>
+                                                    Troca com <span className="font-semibold text-white">{outroNome}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="font-semibold text-white">{p.solicitante?.nome || 'Colega'}</span> pediu trocar com você
+                                                </>
+                                            )}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {unidadeNome} · {trocaStatusLabel(p.status, souSolicitante)}
+                                        </p>
+                                        {podeResponder ? (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => responderPedido(p.id, true)}
+                                                    className="flex-1 rounded-xl bg-emerald-500/90 py-2 text-xs font-black text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                                                >
+                                                    {busy ? '...' : 'Aceitar'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => responderPedido(p.id, false)}
+                                                    className="flex-1 rounded-xl border border-slate-600 bg-slate-800 py-2 text-xs font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                                                >
+                                                    Recusar
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                ) : null}
 
                 <form onSubmit={handleSave} className="grid gap-5">
                     <div>
@@ -273,6 +380,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
     const [confirmTrocaOpen, setConfirmTrocaOpen] = useState(false);
     const [confirmAssumirOpen, setConfirmAssumirOpen] = useState(false);
     const [pedidoGestorSucesso, setPedidoGestorSucesso] = useState(false);
+    const [pedidoSucessoTipo, setPedidoSucessoTipo] = useState(null);
 
     const { date, turno, shift, unidadeId } = modal || {};
     const list = shift?.plantonistas || [];
@@ -288,6 +396,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
         setConfirmTrocaOpen(false);
         setConfirmAssumirOpen(false);
         setPedidoGestorSucesso(false);
+        setPedidoSucessoTipo(null);
         const cols = (modal.shift?.plantonistas || []).filter((p) => p.id !== medicoId);
         setColegaParaTrocaId(cols.length === 1 ? cols[0].id : null);
     }, [modal, medicoId]);
@@ -312,6 +421,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                 throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
             }
             setConfirmAssumirOpen(false);
+            setPedidoSucessoTipo('assumir');
             setPedidoGestorSucesso(true);
         } catch (err) {
             setActionError(err.message);
@@ -343,6 +453,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                 throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
             }
             setConfirmTrocaOpen(false);
+            setPedidoSucessoTipo('troca');
             setPedidoGestorSucesso(true);
         } catch (err) {
             setActionError(err.message);
@@ -353,6 +464,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
 
     const fecharAposPedidoGestor = () => {
         setPedidoGestorSucesso(false);
+        setPedidoSucessoTipo(null);
         onSuccess?.();
         onClose();
     };
@@ -489,7 +601,16 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                 <div className="flex-1 overflow-y-auto p-6">
                     {pedidoGestorSucesso ? (
                         <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-6 text-center">
-                            <p className="text-base font-bold text-emerald-100">Em análise com o gestor, aguarde retorno.</p>
+                            {pedidoSucessoTipo === 'troca' ? (
+                                <>
+                                    <p className="text-base font-bold text-emerald-100">Aguardando confirmação!</p>
+                                    <p className="mt-2 text-sm text-slate-400">
+                                        O colega precisa aceitar; depois o gestor aprovará a troca na escala.
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-base font-bold text-emerald-100">Em análise com o gestor, aguarde retorno.</p>
+                            )}
                             <button
                                 type="button"
                                 onClick={fecharAposPedidoGestor}
@@ -631,6 +752,22 @@ export default function DoctorView() {
         }
     };
 
+    const loadTrocasResumo = async (doctorId) => {
+        if (!doctorId) return;
+        try {
+            const response = await fetch(`/api/medicos/${doctorId}/trocas`);
+            const data = await parseJsonSafely(response);
+            if (!response.ok) return;
+            setState((prev) => ({
+                ...prev,
+                pendentesColegaTroca: typeof data.pendentesColega === 'number' ? data.pendentesColega : 0,
+                pedidosTroca: Array.isArray(data.pedidos) ? data.pedidos : []
+            }));
+        } catch {
+            /* ignore */
+        }
+    };
+
     const fetchMyAgenda = async () => {
         if (!session?.id) return;
         try {
@@ -647,6 +784,7 @@ export default function DoctorView() {
     useEffect(() => {
         if (session?.id) {
             loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
+            loadTrocasResumo(session.id);
 
             if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
                 setState((prev) => ({ ...prev, showPasswordSuggestion: true }));
@@ -662,6 +800,12 @@ export default function DoctorView() {
         }));
     }, [session?.id]);
 
+    useEffect(() => {
+        if (state.showProfileModal && session?.id) {
+            loadTrocasResumo(session.id);
+        }
+    }, [state.showProfileModal, session?.id]);
+
     const {
         loadingCalendar,
         error,
@@ -674,7 +818,9 @@ export default function DoctorView() {
         myAgenda,
         calendar,
         bookingConfigs,
-        shiftDetailModal
+        shiftDetailModal,
+        pendentesColegaTroca,
+        pedidosTroca
     } = state;
 
     const calendarDays = buildCalendarDayEntries(selectedMonth, calendar?.shifts || []);
@@ -776,8 +922,13 @@ export default function DoctorView() {
 
                         <button
                             onClick={() => setState((prev) => ({ ...prev, showProfileModal: true }))}
-                            className="group flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-left shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-500/20"
+                            className="group relative flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-left shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-500/20"
                         >
+                            {pendentesColegaTroca > 0 ? (
+                                <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-black text-slate-950">
+                                    {pendentesColegaTroca > 9 ? '9+' : pendentesColegaTroca}
+                                </span>
+                            ) : null}
                             <div className="rounded-full bg-emerald-500/20 p-2 transition group-hover:bg-emerald-500/30">
                                 <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -918,6 +1069,8 @@ export default function DoctorView() {
                 {showProfileModal && (
                     <ProfileModal
                         doctor={session}
+                        pedidosTroca={pedidosTroca}
+                        onRefreshTrocas={() => loadTrocasResumo(session.id)}
                         onClose={() => setState((p) => ({ ...p, showProfileModal: false }))}
                         onUpdate={() => {
                             setState((p) => ({ ...p, showProfileModal: false }));
@@ -934,6 +1087,7 @@ export default function DoctorView() {
                     onClose={() => setState((p) => ({ ...p, shiftDetailModal: null }))}
                     onSuccess={() => {
                         loadCalendar(session.id, selectedMonth, selectedUnitId);
+                        loadTrocasResumo(session.id);
                         setState((p) => ({ ...p, shiftDetailModal: null }));
                     }}
                 />

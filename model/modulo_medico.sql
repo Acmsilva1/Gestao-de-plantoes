@@ -241,3 +241,5 @@ VALUES
     ('f1000001-0000-4000-8000-000000000172', 'b1000001-0000-4000-8000-000000000006', 'c1000001-0000-4000-8000-000000000010', '2026-03-31', 'Madrugada');
 
 -- Calendário demo: março/2026. Dias 7, 13, 14, 20, 21, 28 sem linhas (furos); vários turnos/dia sem médico.
+
+-- Pedidos de troca (colega → gestor → escala): executar também model/pedidos_troca_escala.sql no Supabase.

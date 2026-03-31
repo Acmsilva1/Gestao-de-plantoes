@@ -226,6 +226,143 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao inserir na escala');
     },
+    async getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId) {
+        const response = await supabase
+            .from('escala')
+            .select('id')
+            .eq('unidade_id', unidadeId)
+            .eq('data_plantao', data_plantao)
+            .eq('turno', turno)
+            .eq('medico_id', medicoId)
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao localizar linha da escala');
+    },
+    async getPedidoTrocaById(pedidoId) {
+        const response = await supabase.from('pedidos_troca_escala').select('*').eq('id', pedidoId).maybeSingle();
+
+        return unwrap(response, 'Falha ao carregar pedido de troca');
+    },
+    async createPedidoTrocaEscala(row) {
+        const response = await supabase
+            .from('pedidos_troca_escala')
+            .insert({
+                unidade_id: row.unidadeId,
+                data_plantao: row.dataPlantao,
+                turno: row.turno,
+                medico_solicitante_id: row.solicitanteId,
+                medico_alvo_id: row.alvoId,
+                escala_alvo_id: row.escalaAlvoId,
+                status: 'AGUARDANDO_COLEGA'
+            })
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao criar pedido de troca');
+    },
+    async _enrichPedidosTrocaComMedicos(rows) {
+        if (!rows?.length) return [];
+        const ids = [...new Set(rows.flatMap((r) => [r.medico_solicitante_id, r.medico_alvo_id]))];
+        const { data: meds, error } = await supabase.from('medicos').select('id, nome, crm, especialidade').in('id', ids);
+        if (error) {
+            throw new Error(`Falha ao carregar medicos dos pedidos: ${error.message}`);
+        }
+        const byId = Object.fromEntries((meds || []).map((m) => [m.id, m]));
+        return rows.map((r) => ({
+            ...r,
+            solicitante: byId[r.medico_solicitante_id],
+            alvo: byId[r.medico_alvo_id]
+        }));
+    },
+    async listPedidosTrocaPorMedico(medicoId) {
+        const response = await supabase
+            .from('pedidos_troca_escala')
+            .select('*, unidades(nome)')
+            .or(`medico_solicitante_id.eq.${medicoId},medico_alvo_id.eq.${medicoId}`)
+            .order('created_at', { ascending: false });
+
+        const rows = unwrap(response, 'Falha ao listar pedidos de troca');
+        return this._enrichPedidosTrocaComMedicos(rows || []);
+    },
+    async countPedidosTrocaAguardandoColega(medicoId) {
+        const response = await supabase
+            .from('pedidos_troca_escala')
+            .select('id', { count: 'exact', head: true })
+            .eq('medico_alvo_id', medicoId)
+            .eq('status', 'AGUARDANDO_COLEGA');
+
+        if (response.error) {
+            throw new Error(`Falha ao contar pedidos: ${response.error.message}`);
+        }
+
+        return response.count ?? 0;
+    },
+    async responderColegaPedidoTroca(pedidoId, medicoAlvoId, aceitar) {
+        const pedido = await this.getPedidoTrocaById(pedidoId);
+        if (!pedido) {
+            throw new Error('Pedido nao encontrado.');
+        }
+        if (pedido.medico_alvo_id !== medicoAlvoId) {
+            throw new Error('Apenas o colega indicado pode responder a este pedido.');
+        }
+        if (pedido.status !== 'AGUARDANDO_COLEGA') {
+            throw new Error('Este pedido nao esta aguardando resposta do colega.');
+        }
+
+        const novoStatus = aceitar ? 'AGUARDANDO_GESTOR' : 'RECUSADO_COLEGA';
+        const response = await supabase
+            .from('pedidos_troca_escala')
+            .update({
+                status: novoStatus,
+                colega_respondeu_em: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId)
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao registar resposta do colega');
+    },
+    async listPedidosTrocaParaGestor(unidadeId) {
+        let query = supabase
+            .from('pedidos_troca_escala')
+            .select('*, unidades(nome)')
+            .eq('status', 'AGUARDANDO_GESTOR')
+            .order('created_at', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        const rows = unwrap(response, 'Falha ao listar pedidos para o gestor');
+        return this._enrichPedidosTrocaComMedicos(rows || []);
+    },
+    async aprovarPedidoTrocaGestorRpc(pedidoId) {
+        const response = await supabase.rpc('aprovar_pedido_troca_gestor', { p_pedido_id: pedidoId });
+        if (response.error) {
+            throw new Error(response.error.message || 'Falha ao aprovar pedido de troca');
+        }
+    },
+    async recusarPedidoTrocaGestor(pedidoId) {
+        const response = await supabase
+            .from('pedidos_troca_escala')
+            .update({
+                status: 'RECUSADO_GESTOR',
+                gestor_respondeu_em: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId)
+            .eq('status', 'AGUARDANDO_GESTOR')
+            .select('*')
+            .maybeSingle();
+
+        const row = unwrap(response, 'Falha ao recusar pedido');
+        if (!row) {
+            throw new Error('Pedido nao encontrado ou ja decidido.');
+        }
+        return row;
+    },
     async getShiftAgendaByUnitAndDate(unidadeId, dataPlantao) {
         const response = await supabase
             .from('disponibilidade')

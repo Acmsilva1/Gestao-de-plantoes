@@ -370,12 +370,76 @@ export const postPedidoTrocaEscala = async (req, res) => {
             return res.status(400).json({ error: 'O colega indicado nao esta locado neste turno.' });
         }
 
-        res.json({
-            message: 'Pedido em analise com o gestor.',
-            colegaMedicoId
-        });
+        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, colegaMedicoId);
+        if (!escalaLinha?.id) {
+            return res.status(400).json({ error: 'Linha da escala do colega nao encontrada.' });
+        }
+
+        try {
+            const pedido = await dbModel.createPedidoTrocaEscala({
+                unidadeId,
+                dataPlantao: data_plantao,
+                turno,
+                solicitanteId: medicoId,
+                alvoId: colegaMedicoId,
+                escalaAlvoId: escalaLinha.id
+            });
+
+            res.status(201).json({
+                id: pedido.id,
+                status: pedido.status,
+                message: 'Pedido registado. Aguardando confirmacao do colega.'
+            });
+        } catch (insertErr) {
+            if (/duplicate|unique|23505/i.test(String(insertErr.message))) {
+                return res.status(409).json({ error: 'Ja existe pedido ativo para este plantao.' });
+            }
+            throw insertErr;
+        }
     } catch (err) {
         res.status(500).json({ error: 'Erro ao registar pedido de troca.', details: err.message });
+    }
+};
+
+export const getDoctorTrocas = async (req, res) => {
+    const { medicoId } = req.params;
+
+    try {
+        const doctor = await dbModel.getDoctorById(medicoId);
+        if (!doctor) {
+            return res.status(404).json({ error: 'Medico nao encontrado.' });
+        }
+
+        const pedidos = await dbModel.listPedidosTrocaPorMedico(medicoId);
+        const pendentesColega = await dbModel.countPedidosTrocaAguardandoColega(medicoId);
+
+        res.json({
+            pedidos,
+            pendentesColega
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao listar trocas.', details: err.message });
+    }
+};
+
+export const postResponderTrocaColega = async (req, res) => {
+    const { medicoId, pedidoId } = req.params;
+    const { aceitar } = req.body ?? {};
+
+    try {
+        if (typeof aceitar !== 'boolean') {
+            return res.status(400).json({ error: 'Informe aceitar: true ou false.' });
+        }
+
+        const pedido = await dbModel.responderColegaPedidoTroca(pedidoId, medicoId, aceitar);
+
+        res.json({
+            pedido,
+            message: aceitar ? 'Colega aceitou. Aguardando gestor.' : 'Pedido recusado pelo colega.'
+        });
+    } catch (err) {
+        const status = /nao encontrado|nao esta|Apenas o colega/i.test(err.message) ? 403 : 400;
+        res.status(status).json({ error: err.message });
     }
 };
 

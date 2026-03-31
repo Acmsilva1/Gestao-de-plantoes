@@ -11,6 +11,8 @@ import {
     postAssumirEscala,
     postPedidoAssumirEscala,
     postPedidoTrocaEscala,
+    getDoctorTrocas,
+    postResponderTrocaColega,
     updateDoctorProfile,
     getDoctors,
     getPublicShifts,
@@ -30,7 +32,9 @@ import {
     updateDoctorProfileByManager,
     updateManagerProfile,
     createDoctor,
-    deleteDoctor
+    deleteDoctor,
+    getTrocasPendentesGestor,
+    postDecidirTrocaGestor
 } from './api/ManagerService.js';
 
 const app = express();
@@ -64,6 +68,8 @@ app.get('/api/medicos/:medicoId/agenda', getDoctorAgenda);
 app.post('/api/medicos/:medicoId/escala/assumir', postAssumirEscala);
 app.post('/api/medicos/:medicoId/escala/pedido-assumir', postPedidoAssumirEscala);
 app.post('/api/medicos/:medicoId/escala/pedido-troca', postPedidoTrocaEscala);
+app.get('/api/medicos/:medicoId/trocas', getDoctorTrocas);
+app.post('/api/medicos/:medicoId/trocas/:pedidoId/responder', postResponderTrocaColega);
 app.post('/api/medicos/:medicoId/perfil', updateDoctorProfile);
 app.get('/api/vagas', getPublicShifts);
 app.post('/api/vagas/:id/bloquear', holdShift);
@@ -84,6 +90,8 @@ app.post('/api/manager/medicos/:id/perfil', updateDoctorProfileByManager);
 app.post('/api/manager/perfil/:id', updateManagerProfile);
 app.post('/api/manager/medicos', createDoctor);
 app.delete('/api/manager/medicos/:id', deleteDoctor);
+app.get('/api/manager/trocas-pendentes', getTrocasPendentesGestor);
+app.post('/api/manager/trocas/:pedidoId/decidir', postDecidirTrocaGestor);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
