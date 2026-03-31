@@ -1079,3 +1079,144 @@ export const getReportsData = async (req, res) => {
         res.status(500).json({ error: 'Erro ao gerar dados do relatório.', details: err.message });
     }
 };
+
+// --- Templates ---
+export const getManagerTemplates = async (req, res) => {
+    try {
+        const { gestorId, unidadeId } = req.query;
+        if (!gestorId || !unidadeId) {
+            return res.status(400).json({ error: 'Faltam parametros (gestorId, unidadeId).' });
+        }
+        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        const list = await dbModel.getTemplatesByUnit(unidadeId);
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ error: 'Falha ao logar templates', details: err.message });
+    }
+};
+
+export const getManagerTemplateById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { gestorId } = req.query;
+        const tpl = await dbModel.getTemplateById(id);
+        if (!tpl) return res.status(404).json({ error: 'Template nao existe.' });
+        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
+        res.json(tpl);
+    } catch (err) {
+        res.status(500).json({ error: 'Falha ao ler', details: err.message });
+    }
+};
+
+export const createManagerTemplate = async (req, res) => {
+    try {
+        const { gestorId, unidadeId, nome, tipo } = req.body;
+        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        const tpl = await dbModel.createTemplate(unidadeId, nome, tipo);
+        res.json(tpl);
+    } catch (err) {
+        res.status(500).json({ error: 'Criação falhou', details: err.message });
+    }
+};
+
+export const updateManagerTemplate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { gestorId, slots } = req.body;
+        const tpl = await dbModel.getTemplateById(id);
+        if (!tpl) return res.status(404).json({ error: 'Não encontrado.' });
+        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
+        await dbModel.saveTemplateSlots(id, slots);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Update falhou', details: err.message });
+    }
+};
+
+export const deleteManagerTemplate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { gestorId } = req.query;
+        const tpl = await dbModel.getTemplateById(id);
+        if (!tpl) return res.status(404).json({ error: 'Não encontrado.' });
+        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
+        await dbModel.deleteTemplate(id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Delta falhou', details: err.message });
+    }
+};
+
+export const postApplyTemplateToMonth = async (req, res) => {
+    try {
+        const { gestorId, unidadeId, mesDestino, templateId } = req.body;
+        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        const tpl = await dbModel.getTemplateById(templateId);
+        if (!tpl || tpl.unidade_id !== unidadeId) return res.status(400).json({ error: 'Template inválido.' });
+        
+        const [year, rawMonth] = mesDestino.split('-');
+        const y = Number(year);
+        const m = Number(rawMonth);
+        const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        
+        let novasLinhas = [];
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(Date.UTC(y, m - 1, day));
+            // 0=Sun, 1=Mon...6=Sat
+            const weekday = date.getUTCDay();
+            const dateStr = `${mesDestino}-${String(day).padStart(2, '0')}`;
+            
+            const matchingSlots = tpl.slots.filter(s => {
+                if (tpl.tipo === 'SEMANAL') return s.dia === weekday;
+                if (tpl.tipo === 'MENSAL') return s.dia === day;
+                if (tpl.tipo === 'QUINZENAL') {
+                    const qDay = ((day - 1) % 15) + 1;
+                    return s.dia === qDay;
+                }
+                return false;
+            });
+            
+            for (const slot of matchingSlots) {
+                novasLinhas.push({
+                    unidadeId,
+                    medicoId: slot.medico_id,
+                    data_plantao: dateStr,
+                    turno: slot.turno,
+                    gestorId
+                });
+            }
+        }
+        
+        let sucesso = 0;
+        let pular = 0;
+        for (const linha of novasLinhas) {
+            try {
+                await dbModel.insertEscalaRow({
+                    unidadeId: linha.unidadeId,
+                    medicoId: linha.medicoId,
+                    data_plantao: linha.data_plantao,
+                    turno: linha.turno
+                });
+                sucesso++;
+            } catch (err) {
+                // Ignore duplicates
+                pular++;
+            }
+        }
+        res.json({ sucesso, pular, total: novasLinhas.length });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed', details: err.message });
+    }
+};
+
+export const postClearMonthScale = async (req, res) => {
+    try {
+        const { gestorId, unidadeId, mesDestino } = req.body;
+        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        await dbModel.clearMonthScale(unidadeId, mesDestino);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to clear', details: err.message });
+    }
+};

@@ -83,6 +83,8 @@ export default function ManagerEscalaEditorPage() {
     const [addSlotModal, setAddSlotModal] = useState(null);
     const [modalMedicoId, setModalMedicoId] = useState('');
     const [modalError, setModalError] = useState('');
+    const [templates, setTemplates] = useState([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
     useEffect(() => {
         if (!gestorId) return;
@@ -133,6 +135,13 @@ export default function ManagerEscalaEditorPage() {
                 const data = await readApiResponse(r);
                 if (!r.ok) throw new Error(data.error || data.details || 'Não foi possível carregar o editor.');
                 setEditor(data);
+                
+                // Load templates
+                try {
+                    const tRes = await fetch(`/api/manager/templates?unidadeId=${encodeURIComponent(unitId)}&gestorId=${encodeURIComponent(gestorId)}`);
+                    const tData = await readApiResponse(tRes);
+                    if (tRes.ok) setTemplates(tData || []);
+                } catch(e) { /* ignore */ }
             } catch (e) {
                 setError(e.message);
                 if (!preserveUi) {
@@ -297,6 +306,64 @@ export default function ManagerEscalaEditorPage() {
                     document.getElementById(`editor-mes-${mesDestino}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
             });
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setBusyKey(null);
+        }
+    };
+
+    const importarModelo = async (mesDestino) => {
+        if (!unitId || !selectedTemplateId) {
+            window.alert('Selecione um Modelo de Escala na lista primeiro.');
+            return;
+        }
+        const tpl = templates.find(t => t.id === selectedTemplateId);
+        if (!tpl) return;
+        
+        if (!window.confirm(`Você está prestes a aplicar o modelo "${tpl.nome}" no mês de ${getMonthTitle(mesDestino)}.\n\nATENÇÃO: Este modelo de repetição (${tpl.tipo}) irá SOMAR plantões (ignorando duplicidades exatas) a este mês. Continuar?`)) {
+            return;
+        }
+        
+        setBusyKey(`tpl-${mesDestino}`);
+        setError('');
+        try {
+            const r = await fetch('/api/manager/escala/importar-template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unidadeId: unitId, mesDestino, templateId: selectedTemplateId, gestorId })
+            });
+            const data = await readApiResponse(r);
+            if (!r.ok) throw new Error(data.error || data.details || 'Falha ao aplicar modelo.');
+            setExpanded((prev) => ({ ...prev, [mesDestino]: true }));
+            await loadEditor({ preserveUi: true });
+            
+            window.alert(`Modelo aplicado!\n\nPlantões novos gerados: ${data.sucesso}\nPlantões ignorados (duplicados ou inválidos): ${data.pular}`);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setBusyKey(null);
+        }
+    };
+
+    const limparMes = async (mesDestino) => {
+        if (!unitId) return;
+        if (!window.confirm(`CUIDADO EXTREMO: Tem certeza que deseja LIMPAR O MÊS ${getMonthTitle(mesDestino)}?\n\nIsso apagará DE UMA SÓ VEZ TODOS os plantões, vagas e agendamentos existentes neste mês para esta unidade de forma irreparável.`)) {
+            return;
+        }
+        
+        setBusyKey(`clear-${mesDestino}`);
+        setError('');
+        try {
+            const r = await fetch('/api/manager/escala/limpar-mes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unidadeId: unitId, mesDestino, gestorId })
+            });
+            const data = await readApiResponse(r);
+            if (!r.ok) throw new Error(data.error || data.details || 'Falha ao limpar mês.');
+            await loadEditor({ preserveUi: true });
+            window.alert(`Mês ${getMonthTitle(mesDestino)} limpo com sucesso! A grelha ficou vazia.`);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -480,6 +547,44 @@ export default function ManagerEscalaEditorPage() {
                                                     >
                                                         <Copy className="h-4 w-4" />
                                                         Importar mês anterior
+                                                    </button>
+                                                </div>
+
+                                                <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400/90">Aplicar Modelo (Bloco de Notas)</p>
+                                                        <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                                                            Aplica uma de suas matrizes de <span className="font-semibold text-slate-300">Modelos de Escala</span> para popular automaticamente esse calendário.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex shrink-0 flex-col sm:flex-row gap-3 items-center">
+                                                        <select
+                                                            value={selectedTemplateId}
+                                                            onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                                            className="w-full sm:w-auto rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-emerald-500"
+                                                        >
+                                                            <option value="">Escolher Modelo...</option>
+                                                            {templates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.nome} ({tpl.tipo})</option>)}
+                                                        </select>
+                                                        <button
+                                                            type="button"
+                                                            disabled={Boolean(busyKey) || !selectedTemplateId}
+                                                            onClick={() => importarModelo(m.mes)}
+                                                            className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-4 py-2.5 text-xs font-black text-emerald-100 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                                                        >
+                                                            {busyKey === `tpl-${m.mes}` ? 'Aplicando...' : 'Aplicar Matriz'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="mb-4 flex flex-col items-center sm:flex-row sm:justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={Boolean(busyKey)}
+                                                        onClick={() => limparMes(m.mes)}
+                                                        className="inline-flex items-center justify-center gap-2 rounded-xl text-xs font-bold text-rose-500 hover:text-rose-400 underline disabled:opacity-50"
+                                                    >
+                                                        {busyKey === `clear-${m.mes}` ? 'Limpando...' : 'Limpar o mês inteiro (Apagar Tudo)'}
                                                     </button>
                                                 </div>
 

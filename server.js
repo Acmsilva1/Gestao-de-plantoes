@@ -44,7 +44,14 @@ import {
     deleteEscalaLinha,
     putEscalaMesVisibilidade,
     postImportarMesAnteriorEscala,
-    getReportsData
+    getReportsData,
+    getManagerTemplates,
+    getManagerTemplateById,
+    createManagerTemplate,
+    updateManagerTemplate,
+    deleteManagerTemplate,
+    postApplyTemplateToMonth,
+    postClearMonthScale
 } from './api/ManagerService.js';
 
 const app = express();
@@ -112,6 +119,15 @@ app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);
 app.put('/api/manager/escala/mes-visibilidade', putEscalaMesVisibilidade);
 app.post('/api/manager/escala/importar-mes-anterior', postImportarMesAnteriorEscala);
 app.get('/api/manager/reports', getReportsData);
+
+// --- Rotas Templates Customizados ---
+app.get('/api/manager/templates', getManagerTemplates);
+app.get('/api/manager/templates/:id', getManagerTemplateById);
+app.post('/api/manager/templates', createManagerTemplate);
+app.put('/api/manager/templates/:id', updateManagerTemplate);
+app.delete('/api/manager/templates/:id', deleteManagerTemplate);
+app.post('/api/manager/escala/importar-template', postApplyTemplateToMonth);
+app.post('/api/manager/escala/limpar-mes', postClearMonthScale);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));

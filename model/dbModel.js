@@ -1176,5 +1176,109 @@ export const dbModel = {
 
         const response = await query.order('created_at', { ascending: false });
         return unwrap(response, 'Falha ao carregar demanda de trocas por período');
+    },
+
+    // --- TEMPLATES DE ESCALA ---
+    async getTemplatesByUnit(unidadeId) {
+        const response = await supabase
+            .from('escala_templates')
+            .select('id, nome, tipo, created_at')
+            .eq('unidade_id', unidadeId)
+            .order('nome', { ascending: true });
+        return unwrap(response, 'Falha ao carregar templates');
+    },
+
+    async getTemplateById(templateId) {
+        const response = await supabase
+            .from('escala_templates')
+            .select('id, nome, tipo, unidade_id')
+            .eq('id', templateId)
+            .single();
+
+        const template = unwrap(response, 'Falha ao carregar template principal');
+        if (!template) return null;
+
+        const slotsResponse = await supabase
+            .from('escala_template_slots')
+            .select('id, dia, turno, medico_id, medicos(nome, especialidade)')
+            .eq('template_id', templateId)
+            .order('dia', { ascending: true });
+
+        template.slots = unwrap(slotsResponse, 'Falha ao carregar slots do template') || [];
+        return template;
+    },
+
+    async createTemplate(unidadeId, nome, tipo) {
+        const response = await supabase
+            .from('escala_templates')
+            .insert([{ unidade_id: unidadeId, nome, tipo }])
+            .select()
+            .single();
+        return unwrap(response, 'Falha ao criar template');
+    },
+
+    async deleteTemplate(templateId) {
+        const response = await supabase
+            .from('escala_templates')
+            .delete()
+            .eq('id', templateId);
+        return unwrap(response, 'Falha ao deletar template');
+    },
+
+    async saveTemplateSlots(templateId, slotsPayload) {
+        // Primeiro deleta todos
+        await supabase
+            .from('escala_template_slots')
+            .delete()
+            .eq('template_id', templateId);
+            
+        if (!slotsPayload || slotsPayload.length === 0) return true;
+
+        const insertData = slotsPayload.map(s => ({
+            template_id: templateId,
+            dia: s.dia,
+            turno: s.turno,
+            medico_id: s.medico_id
+        }));
+
+        const response = await supabase
+            .from('escala_template_slots')
+            .insert(insertData);
+            
+        return unwrap(response, 'Falha ao salvar slots do template');
+    },
+
+    async clearMonthScale(unidadeId, month) {
+        const monthStart = `${month}-01`;
+        const [year, rawMonth] = month.split('-');
+        const lastDay = new Date(Date.UTC(Number(year), Number(rawMonth), 0)).getUTCDate();
+        const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}`;
+
+        // Deletar os agendamentos das disponibilidades do mes
+        // O Supabase não suporta delete join direto da API JS facilmente
+        // Pegando as disponibilidades do mes
+        const dispRes = await supabase
+            .from('disponibilidade')
+            .select('id')
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', monthStart)
+            .lte('data_plantao', monthEnd);
+            
+        const dispIds = unwrap(dispRes, 'Erro ao buscar disp')?.map(d => d.id) || [];
+        
+        if (dispIds.length > 0) {
+           await supabase.from('agendamentos').delete().in('disponibilidade_id', dispIds);
+        }
+
+        // Deletar da view/tabelas materializadas se houver (mas parece que a escala é gerada dinâmica)
+        // Só por segurança, apagamos a disponibilidade inteira para zerar a grade.
+        const response = await supabase
+            .from('disponibilidade')
+            .delete()
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', monthStart)
+            .lte('data_plantao', monthEnd);
+
+        return unwrap(response, 'Falha ao limpar mês');
     }
 };
