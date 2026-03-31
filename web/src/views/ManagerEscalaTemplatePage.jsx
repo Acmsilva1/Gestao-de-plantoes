@@ -324,9 +324,6 @@ export default function ManagerEscalaTemplatePage() {
                     <LayoutTemplate className="text-emerald-500" />
                     Modelos de Escala Personalizada
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                    Crie matrizes de escala para importar automaticamente no <span className="text-slate-200">Editor de escala</span>. Modele semanas ou meses ideais para economizar cliques no futuro.
-                </p>
             </div>
 
             {error ? <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}

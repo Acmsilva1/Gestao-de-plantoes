@@ -243,7 +243,6 @@ export default function ManagerAccessControl() {
         <div className="animate-in fade-in zoom-in-95 duration-500 pb-10">
             <div className="mb-8">
                 <h2 className="text-3xl font-black text-white">Controle de Acessos</h2>
-                <p className="mt-2 text-sm text-slate-400">Gerencie em quais unidades cada médico pode visualizar e selecionar plantões.</p>
             </div>
 
             {loading && doctors.length === 0 ? (
@@ -507,11 +506,6 @@ export default function ManagerAccessControl() {
                 <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h3 className="text-2xl font-black text-white">Consulta de Médicos por Unidade</h3>
-                        <p className="mt-1 text-sm text-slate-400">
-                            {isMaster
-                                ? 'Visualize os profissionais por unidade ou todas de uma vez (visão Master).'
-                                : 'Visualize todos os profissionais vinculados a uma unidade específica.'}
-                        </p>
                     </div>
 
                     <div className="w-full md:w-80">

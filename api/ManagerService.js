@@ -900,6 +900,18 @@ const lastDayInMonthKey = (mes) => {
     return new Date(Date.UTC(y, m, 0)).getUTCDate();
 };
 
+const diaDoMesFromDataPlantao = (dataPlantao) => {
+    if (dataPlantao == null) return NaN;
+    if (typeof dataPlantao === 'string') {
+        const s = dataPlantao.slice(0, 10);
+        return Number(s.slice(8, 10));
+    }
+    if (dataPlantao instanceof Date) return dataPlantao.getUTCDate();
+    return Number(String(dataPlantao).slice(8, 10));
+};
+
+const medicoIdFromEscalaRow = (r) => r?.medico_id ?? r?.medicoId ?? r?.medicos?.id ?? null;
+
 export const postImportarMesAnteriorEscala = async (req, res) => {
     const { unidadeId, mesDestino } = req.body ?? {};
 
@@ -920,7 +932,13 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
 
         const origem = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesOrigem);
         const destinoExistente = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesDestino);
-        const existe = new Set((destinoExistente || []).map((r) => `${r.data_plantao}|${r.turno}|${r.medico_id}`));
+        const existe = new Set(
+            (destinoExistente || []).map((r) => {
+                const mid = medicoIdFromEscalaRow(r);
+                const d = typeof r.data_plantao === 'string' ? r.data_plantao.slice(0, 10) : r.data_plantao;
+                return `${d}|${r.turno}|${mid}`;
+            })
+        );
 
         const maxDiaDest = lastDayInMonthKey(mesDestino);
         let importadas = 0;
@@ -932,7 +950,12 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
                 ignoradas += 1;
                 continue;
             }
-            const dia = Number(String(r.data_plantao).slice(8, 10));
+            const medicoId = medicoIdFromEscalaRow(r);
+            if (!medicoId) {
+                ignoradas += 1;
+                continue;
+            }
+            const dia = diaDoMesFromDataPlantao(r.data_plantao);
             if (!Number.isFinite(dia) || dia < 1) {
                 ignoradas += 1;
                 continue;
@@ -942,7 +965,7 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
                 continue;
             }
             const dataNova = `${mesDestino}-${String(dia).padStart(2, '0')}`;
-            const key = `${dataNova}|${r.turno}|${r.medico_id}`;
+            const key = `${dataNova}|${r.turno}|${medicoId}`;
             if (existe.has(key)) {
                 ignoradas += 1;
                 continue;
@@ -950,14 +973,14 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
             try {
                 await dbModel.insertEscalaRow({
                     unidadeId,
-                    medicoId: r.medico_id,
+                    medicoId,
                     data_plantao: dataNova,
                     turno: r.turno
                 });
                 existe.add(key);
                 importadas += 1;
             } catch (err) {
-                if (/duplicate|unique/i.test(err.message)) {
+                if (/duplicate|unique|foreign key|violates|23505|23503/i.test(String(err.message))) {
                     ignoradas += 1;
                 } else {
                     throw err;

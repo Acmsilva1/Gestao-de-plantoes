@@ -512,11 +512,6 @@ export default function ManagerEscalaEditorPage() {
             <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 className="text-3xl font-black text-white">Editor de escala</h2>
-                    <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                        Monte a escala por unidade e ano. Em cada turno, use <span className="text-slate-300">Adicionar</span> e escolha o médico no menu. Use{' '}
-                        <span className="text-slate-300">Liberado</span> para médicos verem o mês mesmo quando for futuro; use <span className="text-slate-300">Bloqueado</span>{' '}
-                        para ocultar a grelha na área do médico.
-                    </p>
                 </div>
             </div>
 

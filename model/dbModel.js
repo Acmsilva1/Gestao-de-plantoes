@@ -289,10 +289,11 @@ export const dbModel = {
                 data_plantao,
                 turno
             })
-            .select('id')
-            .single();
+            .select('id');
 
-        return unwrap(response, 'Falha ao inserir na escala');
+        const data = unwrap(response, 'Falha ao inserir na escala');
+        const rows = Array.isArray(data) ? data : data ? [data] : [];
+        return rows[0] ?? { id: null };
     },
     async getEscalaByUnitAndYear(unidadeId, year) {
         const start = `${year}-01-01`;
