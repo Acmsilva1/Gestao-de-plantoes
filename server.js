@@ -23,6 +23,7 @@ import {
 } from './api/DirecionadorService.js';
 import {
     getDashboardMetrics,
+    getDashboardSummary,
     getManagerProfiles,
     getDoctorAccesses,
     manageDoctorUnitAccess,
@@ -86,6 +87,7 @@ app.post('/api/vagas/:id/selecionar', selectShift);
 
 // --- Rotas do Gestor ---
 app.get('/api/manager/dashboard', getDashboardMetrics);
+app.get('/api/manager/dashboard-summary', getDashboardSummary);
 app.get('/api/manager/perfis', getManagerProfiles);
 app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);

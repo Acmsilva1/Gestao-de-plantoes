@@ -207,6 +207,163 @@ export const getDashboardMetrics = async (req, res) => {
     }
 };
 
+export const getDashboardSummary = async (req, res) => {
+    const { month, unidadeId } = req.query;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: 'Informe month no formato YYYY-MM.' });
+    }
+
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const scopedUnitId = unidadeId || (isMasterManager(manager) ? null : manager.unidade_id);
+        if (scopedUnitId && !assertUnitScope(res, manager, scopedUnitId)) return;
+
+        const [escalaRows, disponibilidadeRows] = await Promise.all([
+            dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
+            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId)
+        ]);
+
+        const unitNameById = new Map();
+        for (const r of disponibilidadeRows || []) {
+            if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
+        }
+        for (const r of escalaRows || []) {
+            if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
+        }
+
+        const availableQ1ByUnit = new Map();
+        const availableQ2ByUnit = new Map();
+        const occupiedQ1ByUnit = new Map();
+        const occupiedQ2ByUnit = new Map();
+        const doctorByUnit = new Map();
+
+        const getQuinzenaMap = (day, firstHalfMap, secondHalfMap) => (day <= 15 ? firstHalfMap : secondHalfMap);
+
+        for (const row of disponibilidadeRows || []) {
+            const unitId = row.unidade_id;
+            const unitName = unitNameById.get(unitId) || row.unidades?.nome || 'Unidade';
+            unitNameById.set(unitId, unitName);
+            const day = Number(String(row.data_plantao).slice(8, 10));
+            const targetMap = getQuinzenaMap(day, availableQ1ByUnit, availableQ2ByUnit);
+            if (!targetMap.has(unitId)) targetMap.set(unitId, new Set());
+            targetMap.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+        }
+
+        for (const row of escalaRows || []) {
+            const unitId = row.unidade_id;
+            const unitName = unitNameById.get(unitId) || 'Unidade';
+            const day = Number(String(row.data_plantao).slice(8, 10));
+            const targetMap = getQuinzenaMap(day, occupiedQ1ByUnit, occupiedQ2ByUnit);
+            if (!targetMap.has(unitId)) targetMap.set(unitId, new Set());
+            targetMap.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+
+            const doctorKey = `${unitId}|${row.medico_id}`;
+            const current = doctorByUnit.get(doctorKey) || {
+                unidadeId: unitId,
+                unidadeNome: unitName,
+                medicoId: row.medico_id,
+                nome: row.medicos?.nome || 'Médico',
+                crm: row.medicos?.crm || '',
+                totalPlantoes: 0
+            };
+            current.totalPlantoes += 1;
+            doctorByUnit.set(doctorKey, current);
+        }
+
+        const toOverviewArray = (availableMap, occupiedMap) => {
+            const unitIds = new Set([...availableMap.keys(), ...occupiedMap.keys()]);
+            return Array.from(unitIds)
+                .map((unitId) => {
+                    const totalSlots = (availableMap.get(unitId) || new Set()).size;
+                    const totalOcupadas = (occupiedMap.get(unitId) || new Set()).size;
+                    const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
+                    return {
+                        unidadeId: unitId,
+                        unidade: unitNameById.get(unitId) || 'Unidade',
+                        totalSlots,
+                        totalOcupadas,
+                        totalVazias,
+                        percentualOcupacao: totalSlots > 0 ? Number(((totalOcupadas / totalSlots) * 100).toFixed(2)) : 0
+                    };
+                })
+                .sort((a, b) => b.totalSlots - a.totalSlots);
+        };
+
+        const acceptedByQuinzena = {
+            q1: toOverviewArray(availableQ1ByUnit, occupiedQ1ByUnit),
+            q2: toOverviewArray(availableQ2ByUnit, occupiedQ2ByUnit)
+        };
+
+        const q1Totals = acceptedByQuinzena.q1.reduce(
+            (acc, row) => {
+                acc.ocupadas += row.totalOcupadas;
+                acc.vazias += row.totalVazias;
+                return acc;
+            },
+            { ocupadas: 0, vazias: 0 }
+        );
+        const q2Totals = acceptedByQuinzena.q2.reduce(
+            (acc, row) => {
+                acc.ocupadas += row.totalOcupadas;
+                acc.vazias += row.totalVazias;
+                return acc;
+            },
+            { ocupadas: 0, vazias: 0 }
+        );
+        const totalOcupadasMes = q1Totals.ocupadas + q2Totals.ocupadas;
+        const totalVaziasMes = q1Totals.vazias + q2Totals.vazias;
+        const totalSlotsMes = totalOcupadasMes + totalVaziasMes;
+        const occupancyBreakdown = [
+            {
+                categoria: 'Ocupadas',
+                total: totalOcupadasMes,
+                percentual: totalSlotsMes > 0 ? Number(((totalOcupadasMes / totalSlotsMes) * 100).toFixed(2)) : 0
+            },
+            {
+                categoria: 'Vazias',
+                total: totalVaziasMes,
+                percentual: totalSlotsMes > 0 ? Number(((totalVaziasMes / totalSlotsMes) * 100).toFixed(2)) : 0
+            }
+        ];
+
+        const groupedDoctors = new Map();
+        for (const row of doctorByUnit.values()) {
+            if (!groupedDoctors.has(row.unidadeId)) {
+                groupedDoctors.set(row.unidadeId, {
+                    unidadeId: row.unidadeId,
+                    unidade: row.unidadeNome,
+                    medicos: []
+                });
+            }
+            groupedDoctors.get(row.unidadeId).medicos.push({
+                medicoId: row.medicoId,
+                nome: row.nome,
+                crm: row.crm,
+                totalPlantoes: row.totalPlantoes
+            });
+        }
+
+        const topDoctorsByUnit = Array.from(groupedDoctors.values())
+            .map((entry) => ({
+                ...entry,
+                medicos: entry.medicos.sort((a, b) => b.totalPlantoes - a.totalPlantoes).slice(0, 10)
+            }))
+            .sort((a, b) => a.unidade.localeCompare(b.unidade, 'pt-BR'));
+
+        res.json({
+            month,
+            acceptedByQuinzena,
+            occupancyBreakdown,
+            topDoctorsByUnit
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar dashboard consolidado.', details: err.message });
+    }
+};
+
 export const getDoctorAccesses = async (req, res) => {
     try {
         const manager = await getScopedManager(req, res);

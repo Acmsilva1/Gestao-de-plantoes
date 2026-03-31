@@ -201,6 +201,46 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar tabela escala');
     },
+    async getEscalaByRange(startDate, endDate, unidadeId = null) {
+        let query = supabase
+            .from('escala')
+            .select(
+                `
+                id,
+                unidade_id,
+                medico_id,
+                data_plantao,
+                turno,
+                unidades(nome),
+                medicos(id, nome, crm, especialidade)
+            `
+            )
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate)
+            .order('data_plantao', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        return unwrap(response, 'Falha ao carregar escala por período');
+    },
+    async getAvailabilityByRange(startDate, endDate, unidadeId = null) {
+        let query = supabase
+            .from('disponibilidade')
+            .select('id, unidade_id, data_plantao, turno, unidades(nome)')
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate)
+            .order('data_plantao', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        return unwrap(response, 'Falha ao carregar disponibilidade por período');
+    },
     async getEscalaAgendaForMedico(medicoId) {
         const response = await supabase
             .from('escala')

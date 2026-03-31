@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
+import ManagerDashboardPage from './ManagerDashboardPage.jsx';
 import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
@@ -159,6 +160,20 @@ function GestorChrome() {
 
                 <nav className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-col">
                     <NavLink
+                        to="/gestor/dashboard"
+                        className={({ isActive }) =>
+                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                isActive
+                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                            }`
+                        }
+                    >
+                        <LayoutDashboard size={18} />
+                        Dashboards
+                    </NavLink>
+
+                    <NavLink
                         to="/gestor/acessos"
                         className={({ isActive }) => 
                             `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
@@ -250,6 +265,7 @@ function GestorChrome() {
                 <div className="px-4 py-6 sm:px-6 lg:p-10">
                     <div className={mainInnerClass}>
                         <Routes>
+                            <Route path="dashboard" element={<ManagerDashboardPage />} />
                             <Route path="acessos" element={<ManagerAccess />} />
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
                             <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
@@ -257,11 +273,10 @@ function GestorChrome() {
                                 path="aceites-assumir"
                                 element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerAceitesAssumirPage />}
                             />
-                            <Route path="dashboard" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="calendario" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="agenda" element={<Navigate to="/gestor/acessos" replace />} />
-                            <Route path="" element={<Navigate to="/gestor/acessos" replace />} />
-                            <Route path="*" element={<Navigate to="/gestor/acessos" replace />} />
+                            <Route path="" element={<Navigate to="/gestor/dashboard" replace />} />
+                            <Route path="*" element={<Navigate to="/gestor/dashboard" replace />} />
                         </Routes>
                     </div>
                 </div>
