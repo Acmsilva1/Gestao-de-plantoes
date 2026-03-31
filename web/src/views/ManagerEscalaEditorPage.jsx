@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, X } from 'lucide-react';
 import { readApiResponse } from '../utils/api';
 
 const UNIT_SHIFT_ORDER = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
@@ -16,6 +16,13 @@ const weekdayIndexByShortName = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5
 const getMonthAnchorDate = (monthKey) => new Date(`${monthKey}-01T12:00:00-03:00`);
 const getMonthTitle = (monthKey) =>
     monthFormatter.format(getMonthAnchorDate(monthKey)).replace(/^\w/, (c) => c.toUpperCase());
+
+const previousMonthKey = (mesDestino) => {
+    const [y, m] = mesDestino.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1, 1));
+    d.setUTCMonth(d.getUTCMonth() - 1);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
 
 const formatDatePt = (isoDate) => {
     if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '';
@@ -241,6 +248,51 @@ export default function ManagerEscalaEditorPage() {
         }
     };
 
+    const importarMesAnterior = async (mesDestino) => {
+        if (!unitId) return;
+        const mesOrigem = previousMonthKey(mesDestino);
+        const tituloOrigem = getMonthTitle(mesOrigem);
+        const tituloDest = getMonthTitle(mesDestino);
+        if (
+            !window.confirm(
+                `Importar todos os plantões de ${tituloOrigem} para ${tituloDest}?\n\n` +
+                    'O dia 1 do mês de origem corresponde ao dia 1 deste mês, com os mesmos turnos (Manhã, Tarde, Noite, Madrugada) e médicos. Linhas que já existirem no destino serão ignoradas.'
+            )
+        ) {
+            return;
+        }
+        setBusyKey(`imp-${mesDestino}`);
+        setError('');
+        try {
+            const r = await fetch('/api/manager/escala/importar-mes-anterior', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unidadeId: unitId, mesDestino })
+            });
+            const data = await readApiResponse(r);
+            if (!r.ok) throw new Error(data.error || data.details || 'Falha ao importar mês anterior.');
+            setExpanded((prev) => ({ ...prev, [mesDestino]: true }));
+            await loadEditor({ preserveUi: true });
+            let msg = `Importadas ${data.importadas} linha(s). Ignoradas (já existentes ou inválidas): ${data.ignoradas}.`;
+            if (data.totalOrigem === 0) {
+                msg = 'Não havia plantões registados no mês anterior para copiar.';
+            }
+            if (data.diasNaoCopiadosMesCurto > 0) {
+                msg += ` Dias do mês anterior sem correspondência no mês destino (mês mais curto): ${data.diasNaoCopiadosMesCurto}.`;
+            }
+            window.alert(msg);
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    document.getElementById(`editor-mes-${mesDestino}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            });
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setBusyKey(null);
+        }
+    };
+
     const toggleMonth = (mesKey) => {
         setExpanded((prev) => ({ ...prev, [mesKey]: !prev[mesKey] }));
     };
@@ -311,7 +363,7 @@ export default function ManagerEscalaEditorPage() {
                                 const isOpen = Boolean(expanded[m.mes]);
                                 const count = m.linhas?.length ?? 0;
                                 return (
-                                    <div key={m.mes} className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40">
+                                    <div key={m.mes} id={`editor-mes-${m.mes}`} className="scroll-mt-24 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40">
                                         <button
                                             type="button"
                                             onClick={() => toggleMonth(m.mes)}
@@ -399,6 +451,25 @@ export default function ManagerEscalaEditorPage() {
                                                             <span className="font-bold text-rose-400/90">Bloqueado:</span> médicos veem mensagem de que a escala não está disponível.
                                                         </p>
                                                     </div>
+                                                </div>
+
+                                                <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/5 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-sky-400/90">Importar padrão</p>
+                                                        <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                                                            Copia todos os plantões de <span className="font-semibold text-slate-300">{getMonthTitle(previousMonthKey(m.mes))}</span> para{' '}
+                                                            <span className="font-semibold text-slate-200">{getMonthTitle(m.mes)}</span>, mantendo dia do mês e turnos (mesmo mapa do calendário).
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        disabled={Boolean(busyKey)}
+                                                        onClick={() => importarMesAnterior(m.mes)}
+                                                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/20 px-4 py-2.5 text-xs font-black text-sky-100 transition hover:bg-sky-500/30 disabled:opacity-50"
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                        Importar mês anterior
+                                                    </button>
                                                 </div>
 
                                                 <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">

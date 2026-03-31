@@ -40,7 +40,8 @@ import {
     getEscalaEditor,
     postEscalaLinha,
     deleteEscalaLinha,
-    putEscalaMesVisibilidade
+    putEscalaMesVisibilidade,
+    postImportarMesAnteriorEscala
 } from './api/ManagerService.js';
 
 const app = express();
@@ -104,6 +105,7 @@ app.get('/api/manager/escala-editor', getEscalaEditor);
 app.post('/api/manager/escala/linha', postEscalaLinha);
 app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);
 app.put('/api/manager/escala/mes-visibilidade', putEscalaMesVisibilidade);
+app.post('/api/manager/escala/importar-mes-anterior', postImportarMesAnteriorEscala);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));

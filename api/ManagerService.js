@@ -523,3 +523,89 @@ export const putEscalaMesVisibilidade = async (req, res) => {
         res.status(500).json({ error: 'Erro ao gravar visibilidade do mes.', details: err.message });
     }
 };
+
+const calPreviousMonthKey = (mesDestino) => {
+    const [y, m] = mesDestino.split('-').map(Number);
+    const anchor = new Date(Date.UTC(y, m - 1, 1));
+    anchor.setUTCMonth(anchor.getUTCMonth() - 1);
+    return `${anchor.getUTCFullYear()}-${String(anchor.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const lastDayInMonthKey = (mes) => {
+    const [y, m] = mes.split('-').map(Number);
+    return new Date(Date.UTC(y, m, 0)).getUTCDate();
+};
+
+export const postImportarMesAnteriorEscala = async (req, res) => {
+    const { unidadeId, mesDestino } = req.body ?? {};
+
+    if (!unidadeId || !mesDestino) {
+        return res.status(400).json({ error: 'Campos obrigatorios: unidadeId, mesDestino (YYYY-MM).' });
+    }
+
+    if (!/^\d{4}-\d{2}$/.test(mesDestino)) {
+        return res.status(400).json({ error: 'mesDestino deve estar no formato YYYY-MM.' });
+    }
+
+    const mesOrigem = calPreviousMonthKey(mesDestino);
+
+    try {
+        const origem = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesOrigem);
+        const destinoExistente = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesDestino);
+        const existe = new Set((destinoExistente || []).map((r) => `${r.data_plantao}|${r.turno}|${r.medico_id}`));
+
+        const maxDiaDest = lastDayInMonthKey(mesDestino);
+        let importadas = 0;
+        let ignoradas = 0;
+        let diasFora = 0;
+
+        for (const r of origem || []) {
+            if (!TURNOS_ESCALA.has(r.turno)) {
+                ignoradas += 1;
+                continue;
+            }
+            const dia = Number(String(r.data_plantao).slice(8, 10));
+            if (!Number.isFinite(dia) || dia < 1) {
+                ignoradas += 1;
+                continue;
+            }
+            if (dia > maxDiaDest) {
+                diasFora += 1;
+                continue;
+            }
+            const dataNova = `${mesDestino}-${String(dia).padStart(2, '0')}`;
+            const key = `${dataNova}|${r.turno}|${r.medico_id}`;
+            if (existe.has(key)) {
+                ignoradas += 1;
+                continue;
+            }
+            try {
+                await dbModel.insertEscalaRow({
+                    unidadeId,
+                    medicoId: r.medico_id,
+                    data_plantao: dataNova,
+                    turno: r.turno
+                });
+                existe.add(key);
+                importadas += 1;
+            } catch (err) {
+                if (/duplicate|unique/i.test(err.message)) {
+                    ignoradas += 1;
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        res.json({
+            mesOrigem,
+            mesDestino,
+            importadas,
+            ignoradas,
+            diasNaoCopiadosMesCurto: diasFora,
+            totalOrigem: (origem || []).length
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao importar escala do mes anterior.', details: err.message });
+    }
+};
