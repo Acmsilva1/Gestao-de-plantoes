@@ -85,6 +85,7 @@ export default function ManagerEscalaEditorPage() {
     const [modalError, setModalError] = useState('');
     const [templates, setTemplates] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [applyTemplateModal, setApplyTemplateModal] = useState(null); // { mesDestino, tpl, selectedPeriods: number[] }
 
     useEffect(() => {
         if (!gestorId) return;
@@ -276,7 +277,7 @@ export default function ManagerEscalaEditorPage() {
         if (
             !window.confirm(
                 `Importar todos os plantões de ${tituloOrigem} para ${tituloDest}?\n\n` +
-                    'O dia 1 do mês de origem corresponde ao dia 1 deste mês, com os mesmos turnos (Manhã, Tarde, Noite, Madrugada) e médicos. Linhas que já existirem no destino serão ignoradas.'
+                    'O dia 1 do mês de origem corresponde ao dia 1 deste mês, com os mesmos turnos (Manhã, Tarde, Noite, Madrugada) e médicos. Linhas que já existirer no destino serão ignoradas.'
             )
         ) {
             return;
@@ -313,32 +314,159 @@ export default function ManagerEscalaEditorPage() {
         }
     };
 
-    const importarModelo = async (mesDestino) => {
-        if (!unitId || !selectedTemplateId) {
-            window.alert('Selecione um Modelo de Escala na lista primeiro.');
+    const importarModelo = (mesDestino, templateIdOverride) => {
+        const targetTplId = templateIdOverride || selectedTemplateId;
+        if (!unitId || !targetTplId) {
+            if (!templateIdOverride) window.alert('Selecione um Modelo de Escala na lista primeiro.');
             return;
         }
-        const tpl = templates.find(t => t.id === selectedTemplateId);
+        const tpl = templates.find(t => t.id === targetTplId);
         if (!tpl) return;
         
-        if (!window.confirm(`Você está prestes a aplicar o modelo "${tpl.nome}" no mês de ${getMonthTitle(mesDestino)}.\n\nATENÇÃO: Este modelo de repetição (${tpl.tipo}) irá SOMAR plantões (ignorando duplicidades exatas) a este mês. Continuar?`)) {
+        // Generate intelligent suggestions based on template type
+        const [year, rowMonth] = mesDestino.split('-').map(Number);
+        const daysInMonth = new Date(Date.UTC(year, rowMonth, 0)).getUTCDate();
+        
+        let suggestions = [];
+
+        if (tpl.tipo === 'FIX_DIA' || tpl.tipo === 'SEMANAL') {
+            // Find all unique weekdays used in the template slots
+            let usedWeekdays = [...new Set((tpl.slots || []).map(s => s.dia))];
+            
+            // "Intelligent Combo": If more than one day is used, suggest the full block
+            if (usedWeekdays.length > 1) {
+                const comboDates = [];
+                usedWeekdays.forEach(wd => {
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dt = new Date(Date.UTC(year, rowMonth - 1, day));
+                        if (dt.getUTCDay() === wd) {
+                            comboDates.push(`${mesDestino}-${String(day).padStart(2, '0')}`);
+                        }
+                    }
+                });
+                
+                suggestions.push({
+                    id: 'combo-full',
+                    label: `Aplicar Modelo Completo (${usedWeekdays.map(d => weekdayLabels[d]).join(' + ')})`,
+                    details: `Preenche todos os ${usedWeekdays.length} dias configurados de uma só vez`,
+                    dates: comboDates,
+                    isCombo: true
+                });
+            }
+
+            // Fallback: If the template is empty, suggest all weekdays as options
+            if (usedWeekdays.length === 0) {
+                usedWeekdays = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+            }
+            
+            // Sort weekdays: Mon(1) to Sun(0)
+            usedWeekdays.sort((a, b) => {
+                const adjA = a === 0 ? 7 : a;
+                const adjB = b === 0 ? 7 : b;
+                return adjA - adjB;
+            });
+
+            for (const wd of usedWeekdays) {
+                const dates = [];
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dt = new Date(Date.UTC(year, rowMonth - 1, day));
+                    if (dt.getUTCDay() === wd) {
+                        dates.push(`${mesDestino}-${String(day).padStart(2, '0')}`);
+                    }
+                }
+                if (dates.length > 0) {
+                    suggestions.push({
+                        id: `wd-${wd}`,
+                        label: `Todas as ${weekdayLabels[wd]}s`,
+                        details: `${dates.length} ocorrências em ${getMonthTitle(mesDestino)}`,
+                        dates
+                    });
+                }
+            }
+        } else if (tpl.tipo === 'FIX_SEMANA') {
+            // Group by Seg-Sex blocks
+            let currentWeek = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dt = new Date(Date.UTC(year, rowMonth - 1, day));
+                const wd = dt.getUTCDay();
+                if (wd >= 1 && wd <= 5) {
+                    currentWeek.push(`${mesDestino}-${String(day).padStart(2, '0')}`);
+                }
+                if (wd === 5 || day === daysInMonth) {
+                    if (currentWeek.length > 0) {
+                        suggestions.push({
+                            id: `week-${day}`,
+                            label: `Semana do dia ${currentWeek[0].split('-')[2]}`,
+                            details: `${currentWeek.length} dias (Seg-Sex)`,
+                            dates: [...currentWeek]
+                        });
+                        currentWeek = [];
+                    }
+                }
+            }
+        } else if (tpl.tipo === 'FIX_QUINZENA' || tpl.tipo === 'QUINZENAL') {
+            const q1 = [];
+            const q2 = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dStr = `${mesDestino}-${String(day).padStart(2, '0')}`;
+                if (day <= 15) q1.push(dStr);
+                else q2.push(dStr);
+            }
+            suggestions.push({ id: 'q1', label: '1ª Quinzena', details: 'Dias 01 a 15', dates: q1 });
+            if (q2.length > 0) {
+                suggestions.push({ id: 'q2', label: '2ª Quinzena', details: `Dias 16 a ${daysInMonth}`, dates: q2 });
+            }
+        } else {
+            // MENSAL or fallback: All days
+            const all = [];
+            for (let day = 1; day <= daysInMonth; day++) all.push(`${mesDestino}-${String(day).padStart(2, '0')}`);
+            suggestions.push({ id: 'all', label: 'Mês Completo', details: `${all.length} dias`, dates: all });
+        }
+
+        setApplyTemplateModal({
+            mesDestino,
+            tpl,
+            suggestions,
+            selectedSuggestionIds: suggestions.map(s => s.id)
+        });
+    };
+
+    const confirmarAplicarModelo = async () => {
+        if (!applyTemplateModal) return;
+        const { mesDestino, tpl, suggestions, selectedSuggestionIds } = applyTemplateModal;
+        
+        if (selectedSuggestionIds.length === 0) {
+            window.alert('Selecione pelo menos um período para aplicar o modelo.');
             return;
         }
-        
+
+        // Coleta todas as datas únicas das sugestões selecionadas
+        const dateSet = new Set();
+        for (const sId of selectedSuggestionIds) {
+            const sugg = suggestions.find(s => s.id === sId);
+            if (sugg) {
+                sugg.dates.forEach(d => dateSet.add(d));
+            }
+        }
+        const dateList = [...dateSet];
+
+        setApplyTemplateModal(null);
         setBusyKey(`tpl-${mesDestino}`);
         setError('');
         try {
+            const bodyPayload = { unidadeId: unitId, mesDestino, templateId: tpl.id, gestorId, dateList };
+
             const r = await fetch('/api/manager/escala/importar-template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ unidadeId: unitId, mesDestino, templateId: selectedTemplateId, gestorId })
+                body: JSON.stringify(bodyPayload)
             });
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Falha ao aplicar modelo.');
+            
             setExpanded((prev) => ({ ...prev, [mesDestino]: true }));
             await loadEditor({ preserveUi: true });
-            
-            window.alert(`Modelo aplicado!\n\nPlantões novos gerados: ${data.sucesso}\nPlantões ignorados (duplicados ou inválidos): ${data.pular}`);
+            window.alert('Modelo aplicado com sucesso!');
         } catch (e) {
             setError(e.message);
         } finally {
@@ -560,7 +688,13 @@ export default function ManagerEscalaEditorPage() {
                                                     <div className="flex shrink-0 flex-col sm:flex-row gap-3 items-center">
                                                         <select
                                                             value={selectedTemplateId}
-                                                            onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setSelectedTemplateId(val);
+                                                                if (val) {
+                                                                    importarModelo(m.mes, val);
+                                                                }
+                                                            }}
                                                             className="w-full sm:w-auto rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-emerald-500"
                                                         >
                                                             <option value="">Escolher Modelo...</option>
@@ -743,6 +877,79 @@ export default function ManagerEscalaEditorPage() {
                                 className="flex-1 rounded-2xl bg-sky-500 py-3 text-sm font-black text-slate-950 hover:bg-sky-400 disabled:opacity-50"
                             >
                                 {busyKey ? 'A gravar…' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {applyTemplateModal ? (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-xl rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+                        <div className="mb-6 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-black text-white">Aplicar Modelo</h3>
+                                <p className="text-sm text-slate-400">Modelo: <span className="text-emerald-400 font-bold">{applyTemplateModal.tpl.nome}</span></p>
+                            </div>
+                            <button onClick={() => setApplyTemplateModal(null)} className="rounded-full bg-slate-800 p-2 text-slate-400 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="mb-8">
+                            <label className="mb-5 block text-xs font-black text-slate-500 uppercase tracking-widest">
+                                Sugestões Inteligentes para {getMonthTitle(applyTemplateModal.mesDestino)}
+                            </label>
+                            
+                            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {applyTemplateModal.suggestions.map((s) => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => {
+                                            const set = new Set(applyTemplateModal.selectedSuggestionIds);
+                                            if (set.has(s.id)) set.delete(s.id);
+                                            else set.add(s.id);
+                                            setApplyTemplateModal(prev => ({ ...prev, selectedSuggestionIds: [...set] }));
+                                        }}
+                                        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition ${
+                                            applyTemplateModal.selectedSuggestionIds.includes(s.id)
+                                                ? 'border-emerald-500 bg-emerald-500/10'
+                                                : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <div className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${
+                                            applyTemplateModal.selectedSuggestionIds.includes(s.id)
+                                                ? 'border-emerald-500 bg-emerald-500 text-slate-900 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                                : 'border-slate-700'
+                                        }`}>
+                                            {applyTemplateModal.selectedSuggestionIds.includes(s.id) && <ChevronDown size={14} className="stroke-[4px]" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white">{s.label}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{s.details}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <div className="mt-4 flex gap-4 text-[10px] font-black uppercase tracking-widest">
+                                <button onClick={() => setApplyTemplateModal(prev => ({ ...prev, selectedSuggestionIds: prev.suggestions.map(s => s.id) }))} className="text-slate-500 hover:text-white underline">Marcar Todos</button>
+                                <button onClick={() => setApplyTemplateModal(prev => ({ ...prev, selectedSuggestionIds: [] }))} className="text-slate-500 hover:text-white underline">Desmarcar Todos</button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => setApplyTemplateModal(null)}
+                                className="flex-1 rounded-2xl bg-slate-800 py-4 font-bold text-slate-400 hover:bg-slate-700 transition"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmarAplicarModelo}
+                                className="flex-1 rounded-2xl bg-emerald-500 py-4 font-black text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
+                            >
+                                Aplicar Agora
                             </button>
                         </div>
                     </div>

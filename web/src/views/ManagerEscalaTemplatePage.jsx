@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { LayoutTemplate, Plus, Trash2, X, Save } from 'lucide-react';
+import { LayoutTemplate, Plus, Trash2, X, Save, Edit3, Check } from 'lucide-react';
 import { readApiResponse } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,9 +29,12 @@ export default function ManagerEscalaTemplatePage() {
     // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newTplName, setNewTplName] = useState('');
-    const [newTplType, setNewTplType] = useState('SEMANAL');
+    const [newTplType, setNewTplType] = useState('FIX_DIA'); // New categories
+    const [selectedWeekdays, setSelectedWeekdays] = useState([1, 2, 3, 4, 5]); // Default Mon-Fri for FIX_DIA
     const [addSlotModal, setAddSlotModal] = useState(null); // { dia, turno }
     const [modalMedicoId, setModalMedicoId] = useState('');
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState('');
 
     // --- Data Fetching ---
     useEffect(() => {
@@ -96,18 +99,56 @@ export default function ManagerEscalaTemplatePage() {
         }
     };
 
+    const handleRenameTemplate = async () => {
+        if (!selectedTemplate || !renameValue.trim()) return;
+        setSaving(true);
+        setError('');
+        try {
+            const r = await fetch(`/api/manager/templates/${selectedTemplate.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gestorId, nome: renameValue.trim() })
+            });
+            if (!r.ok) throw new Error('Falha ao renomear modelo.');
+            
+            // Update local state
+            setSelectedTemplate(prev => ({ ...prev, nome: renameValue.trim() }));
+            setTemplates(prev => prev.map(t => t.id === selectedTemplate.id ? { ...t, nome: renameValue.trim() } : t));
+            setIsRenaming(false);
+            setSuccess('Modelo renomeado com sucesso!');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     // --- Actions ---
     const handleCreateTemplate = async (e) => {
         e.preventDefault();
         setError('');
         try {
+            const payload = { 
+                gestorId, 
+                unidadeId: unitId, 
+                nome: newTplName, 
+                tipo: newTplType,
+                // For FIX_DIA, we might want to store which weekdays are active.
+                // We'll reuse dias_modelo or just save common format.
+                dias_modelo: newTplType === 'FIX_SEMANA' ? 5 : 7 
+            };
+            
             const r = await fetch('/api/manager/templates', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gestorId, unidadeId: unitId, nome: newTplName, tipo: newTplType })
+                body: JSON.stringify(payload)
             });
             const data = await readApiResponse(r);
-            if (!r.ok) throw new Error(data.error || 'Falha ao criar.');
+            if (!r.ok) {
+                const msg = data.details ? `${data.error}: ${data.details}` : (data.error || 'Falha ao criar.');
+                throw new Error(msg);
+            }
             setIsCreateModalOpen(false);
             setNewTplName('');
             await loadTemplates();
@@ -140,10 +181,14 @@ export default function ManagerEscalaTemplatePage() {
         setError('');
         setSuccess('');
         try {
+            // Filter slots: If weekly 5-day, only keep Mon-Fri (1-5)
+            const is5Dias = selectedTemplate.tipo === 'SEMANAL' && selectedTemplate.dias_modelo === 5;
+            const filteredSlots = is5Dias ? localSlots.filter(s => s.dia >= 1 && s.dia <= 5) : localSlots;
+
             const r = await fetch(`/api/manager/templates/${selectedTemplate.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gestorId, slots: localSlots })
+                body: JSON.stringify({ gestorId, slots: filteredSlots })
             });
             if (!r.ok) throw new Error('Falha ao salvar a escalação.');
             setSuccess('Modelo salvo com sucesso!');
@@ -186,14 +231,32 @@ export default function ManagerEscalaTemplatePage() {
     // --- Render Helpers ---
     const renderGridDias = () => {
         if (!selectedTemplate) return null;
-        const isSemanal = selectedTemplate.tipo === 'SEMANAL';
-        const isQuinzenal = selectedTemplate.tipo === 'QUINZENAL';
-        const diasCount = isSemanal ? 7 : (isQuinzenal ? 15 : 31);
         
+        const type = selectedTemplate.tipo;
+        const isFixDia = type === 'FIX_DIA' || type === 'SEMANAL'; // Support legacy
+        const isFixSemana = type === 'FIX_SEMANA';
+        const isFixQuinzena = type === 'FIX_QUINZENA' || type === 'QUINZENAL';
+        
+        // Define which relative "days" we show in the template grid
+        let displayDays = [];
+
+        if (isFixSemana) {
+            displayDays = [1, 2, 3, 4, 5]; // Mon to Fri
+        } else if (isFixQuinzena) {
+            for (let i = 1; i <= 15; i++) displayDays.push(i);
+        } else if (isFixDia) {
+            // For Fixed Days, we show the full week (or could filter to only ones with slots)
+            displayDays = [0, 1, 2, 3, 4, 5, 6]; 
+        } else {
+            // Mensal or others
+            for (let i = 1; i <= 31; i++) displayDays.push(i);
+        }
+
         const cards = [];
         
-        for (let d = (isSemanal ? 0 : 1); d < (isSemanal ? 7 : (isQuinzenal ? 16 : 32)); d++) {
-            const title = isSemanal ? WEEKDAYS[d] : `Dia ${d}`;
+        for (const d of displayDays) {
+            const isWeekBased = isFixDia || isFixSemana;
+            const title = isWeekBased ? WEEKDAYS[d] : `Dia ${d}`;
             
             cards.push(
                 <div key={d} className="flex min-h-[14rem] flex-col rounded-2xl border border-slate-800 bg-slate-950/50 p-2">
@@ -247,7 +310,7 @@ export default function ManagerEscalaTemplatePage() {
         }
         
         return (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 ${displayDays.length <= 7 ? 'xl:grid-cols-7' : 'xl:grid-cols-8'}`}>
                 {cards}
             </div>
         );
@@ -256,7 +319,7 @@ export default function ManagerEscalaTemplatePage() {
     return (
         <div className="w-full max-w-none animate-in fade-in duration-500 pb-20">
             <div className="mb-8">
-                <p className="mb-1 text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">Time de Futebol</p>
+                <p className="mb-1 text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">CRIE SEU MODELO</p>
                 <h2 className="text-3xl font-black text-white flex items-center gap-3">
                     <LayoutTemplate className="text-emerald-500" />
                     Modelos de Escala Personalizada
@@ -317,7 +380,35 @@ export default function ManagerEscalaTemplatePage() {
                                     {selectedTemplate.tipo}
                                 </span>
                             </div>
-                            <h3 className="mt-2 text-3xl font-black text-white">{selectedTemplate.nome}</h3>
+                            {isRenaming ? (
+                                <div className="mt-2 flex items-center gap-2">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={renameValue}
+                                        onChange={e => setRenameValue(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleRenameTemplate()}
+                                        className="rounded-xl border border-emerald-500 bg-slate-950 px-4 py-2 text-xl font-black text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                    />
+                                    <button onClick={handleRenameTemplate} className="rounded-xl bg-emerald-500 p-2.5 text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
+                                        <Check size={20} />
+                                    </button>
+                                    <button onClick={() => setIsRenaming(false)} className="rounded-xl bg-slate-800 p-2.5 text-slate-400 hover:text-white">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="mt-2 flex items-center gap-3 group">
+                                    <h3 className="text-3xl font-black text-white">{selectedTemplate.nome}</h3>
+                                    <button
+                                        onClick={() => { setRenameValue(selectedTemplate.nome); setIsRenaming(true); }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-500 hover:text-emerald-400"
+                                        title="Editar nome do modelo"
+                                    >
+                                        <Edit3 size={20} />
+                                    </button>
+                                </div>
+                            )}
                             <p className="text-xs text-slate-500 mt-1">
                                 {localSlots.length} slot(s) de plantonistas preenchidos no momento. As alterações aguardam salvamento.
                             </p>
@@ -335,7 +426,7 @@ export default function ManagerEscalaTemplatePage() {
                                 disabled={saving}
                                 className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-black text-slate-950 transition hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] disabled:opacity-50"
                             >
-                                <Save size={16} /> {saving ? 'Salvando...' : 'Salvar Matriz Tática'}
+                                <Save size={16} /> {saving ? 'Salvando...' : 'Salvar Modelo'}
                             </button>
                         </div>
                     </div>
@@ -362,29 +453,43 @@ export default function ManagerEscalaTemplatePage() {
                                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white focus:border-emerald-500 outline-none"
                                 />
                             </div>
-                            <div>
-                                <label className="mb-1.5 block text-xs font-bold text-slate-400">Tipo de Repetição</label>
-                                <div className="grid grid-cols-3 gap-3">
+                            <div className="mb-6">
+                                <label className="mb-2 block text-xs font-bold text-slate-400 uppercase tracking-widest">Tipo de Modelo Personalizado</label>
+                                <div className="grid grid-cols-1 gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => setNewTplType('SEMANAL')}
-                                        className={`rounded-xl border p-3 font-bold text-xs flex items-center justify-center ${newTplType === 'SEMANAL' ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-slate-700 bg-slate-800 text-slate-500'}`}
+                                        onClick={() => setNewTplType('FIX_DIA')}
+                                        className={`group relative flex flex-col items-start rounded-2xl border-2 p-4 text-left transition ${newTplType === 'FIX_DIA' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'}`}
                                     >
-                                        Semanal
+                                        <div className="flex w-full items-center justify-between">
+                                            <span className={`text-sm font-black ${newTplType === 'FIX_DIA' ? 'text-white' : 'text-slate-400'}`}>FIXO POR DIA(S)</span>
+                                            <div className={`h-4 w-4 rounded-full border-2 ${newTplType === 'FIX_DIA' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-700'}`} />
+                                        </div>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Escolha dias específicos da semana para repetir sempre.</p>
                                     </button>
+
                                     <button
                                         type="button"
-                                        onClick={() => setNewTplType('QUINZENAL')}
-                                        className={`rounded-xl border p-3 font-bold text-xs flex items-center justify-center ${newTplType === 'QUINZENAL' ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-slate-700 bg-slate-800 text-slate-500'}`}
+                                        onClick={() => setNewTplType('FIX_SEMANA')}
+                                        className={`group relative flex flex-col items-start rounded-2xl border-2 p-4 text-left transition ${newTplType === 'FIX_SEMANA' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'}`}
                                     >
-                                        Quinzenal
+                                        <div className="flex w-full items-center justify-between">
+                                            <span className={`text-sm font-black ${newTplType === 'FIX_SEMANA' ? 'text-white' : 'text-slate-400'}`}>FIXO POR SEMANA</span>
+                                            <div className={`h-4 w-4 rounded-full border-2 ${newTplType === 'FIX_SEMANA' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-700'}`} />
+                                        </div>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Escala de Segunda a Sexta (médicos fixos da semana).</p>
                                     </button>
+
                                     <button
                                         type="button"
-                                        onClick={() => setNewTplType('MENSAL')}
-                                        className={`rounded-xl border p-3 font-bold text-xs flex items-center justify-center ${newTplType === 'MENSAL' ? 'border-purple-500 bg-purple-500/10 text-purple-400' : 'border-slate-700 bg-slate-800 text-slate-500'}`}
+                                        onClick={() => setNewTplType('FIX_QUINZENA')}
+                                        className={`group relative flex flex-col items-start rounded-2xl border-2 p-4 text-left transition ${newTplType === 'FIX_QUINZENA' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'}`}
                                     >
-                                        Mensal
+                                        <div className="flex w-full items-center justify-between">
+                                            <span className={`text-sm font-black ${newTplType === 'FIX_QUINZENA' ? 'text-white' : 'text-slate-400'}`}>FIXO POR QUINZENA</span>
+                                            <div className={`h-4 w-4 rounded-full border-2 ${newTplType === 'FIX_QUINZENA' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-700'}`} />
+                                        </div>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Divisão automática: dias 01-15 e 16-31.</p>
                                     </button>
                                 </div>
                             </div>
@@ -402,7 +507,7 @@ export default function ManagerEscalaTemplatePage() {
                     <div className="w-full max-w-md rounded-[2rem] border border-slate-700 bg-slate-900 p-6 shadow-2xl">
                         <div className="mb-6 flex items-start justify-between">
                             <div>
-                                <h3 className="text-xl font-black text-white">Escalar Jogador</h3>
+                                <h3 className="text-xl font-black text-white">Escalar Médico</h3>
                                 <p className="text-sm text-emerald-400 mt-1 font-bold">
                                     {selectedTemplate?.tipo === 'SEMANAL' ? WEEKDAYS[addSlotModal.dia] : `Dia ${addSlotModal.dia}`} · {addSlotModal.turno}
                                 </p>

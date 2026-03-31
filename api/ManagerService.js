@@ -1083,36 +1083,41 @@ export const getReportsData = async (req, res) => {
 // --- Templates ---
 export const getManagerTemplates = async (req, res) => {
     try {
-        const { gestorId, unidadeId } = req.query;
-        if (!gestorId || !unidadeId) {
-            return res.status(400).json({ error: 'Faltam parametros (gestorId, unidadeId).' });
-        }
-        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        const { unidadeId } = req.query;
+        if (!unidadeId) return res.status(400).json({ error: 'unidadeId é obrigatório.' });
+        if (!assertUnitScope(res, manager, unidadeId)) return;
         const list = await dbModel.getTemplatesByUnit(unidadeId);
         res.json(list);
     } catch (err) {
-        res.status(500).json({ error: 'Falha ao logar templates', details: err.message });
+        res.status(500).json({ error: 'Falha ao listar templates', details: err.message });
     }
 };
 
 export const getManagerTemplateById = async (req, res) => {
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
         const { id } = req.params;
-        const { gestorId } = req.query;
         const tpl = await dbModel.getTemplateById(id);
-        if (!tpl) return res.status(404).json({ error: 'Template nao existe.' });
-        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
+        if (!tpl) return res.status(404).json({ error: 'Template não existe.' });
+        if (!assertUnitScope(res, manager, tpl.unidade_id)) return;
         res.json(tpl);
     } catch (err) {
-        res.status(500).json({ error: 'Falha ao ler', details: err.message });
+        res.status(500).json({ error: 'Falha ao ler template', details: err.message });
     }
 };
 
 export const createManagerTemplate = async (req, res) => {
     try {
-        const { gestorId, unidadeId, nome, tipo } = req.body;
-        await checkManagerUnitScopeAsync(gestorId, unidadeId);
-        const tpl = await dbModel.createTemplate(unidadeId, nome, tipo);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        const { unidadeId, nome, tipo, dias_modelo } = req.body;
+        if (!unidadeId || !nome || !tipo) return res.status(400).json({ error: 'Parâmetros insuficientes.' });
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+        
+        const tpl = await dbModel.createTemplate(unidadeId, nome, tipo, dias_modelo || 7);
         res.json(tpl);
     } catch (err) {
         res.status(500).json({ error: 'Criação falhou', details: err.message });
@@ -1121,12 +1126,22 @@ export const createManagerTemplate = async (req, res) => {
 
 export const updateManagerTemplate = async (req, res) => {
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
         const { id } = req.params;
-        const { gestorId, slots } = req.body;
+        const { slots, nome } = req.body;
         const tpl = await dbModel.getTemplateById(id);
-        if (!tpl) return res.status(404).json({ error: 'Não encontrado.' });
-        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
-        await dbModel.saveTemplateSlots(id, slots);
+        if (!tpl) return res.status(404).json({ error: 'Template não encontrado.' });
+        if (!assertUnitScope(res, manager, tpl.unidade_id)) return;
+        
+        if (nome) {
+            await dbModel.updateTemplate(id, { nome });
+        }
+        
+        if (slots) {
+            await dbModel.saveTemplateSlots(id, slots);
+        }
+        
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Update falhou', details: err.message });
@@ -1135,56 +1150,152 @@ export const updateManagerTemplate = async (req, res) => {
 
 export const deleteManagerTemplate = async (req, res) => {
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
         const { id } = req.params;
-        const { gestorId } = req.query;
         const tpl = await dbModel.getTemplateById(id);
-        if (!tpl) return res.status(404).json({ error: 'Não encontrado.' });
-        await checkManagerUnitScopeAsync(gestorId, tpl.unidade_id);
+        if (!tpl) return res.status(404).json({ error: 'Template não encontrado.' });
+        if (!assertUnitScope(res, manager, tpl.unidade_id)) return;
         await dbModel.deleteTemplate(id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Delta falhou', details: err.message });
+        res.status(500).json({ error: 'Exclusão falhou', details: err.message });
     }
 };
 
 export const postApplyTemplateToMonth = async (req, res) => {
     try {
-        const { gestorId, unidadeId, mesDestino, templateId } = req.body;
-        await checkManagerUnitScopeAsync(gestorId, unidadeId);
-        const tpl = await dbModel.getTemplateById(templateId);
-        if (!tpl || tpl.unidade_id !== unidadeId) return res.status(400).json({ error: 'Template inválido.' });
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        const { unidadeId, mesDestino, templateId, periodsFilter, startDate, endDate, dateList } = req.body;
+        if (!unidadeId || !mesDestino || !templateId) return res.status(400).json({ error: 'Parâmetros insuficientes.' });
+        if (!assertUnitScope(res, manager, unidadeId)) return;
         
-        const [year, rawMonth] = mesDestino.split('-');
-        const y = Number(year);
-        const m = Number(rawMonth);
-        const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        const tpl = await dbModel.getTemplateById(templateId);
+        if (!tpl || String(tpl.unidade_id) !== String(unidadeId)) return res.status(400).json({ error: 'Template inválido.' });
         
         let novasLinhas = [];
-        
-        for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(Date.UTC(y, m - 1, day));
-            // 0=Sun, 1=Mon...6=Sat
-            const weekday = date.getUTCDay();
-            const dateStr = `${mesDestino}-${String(day).padStart(2, '0')}`;
-            
-            const matchingSlots = tpl.slots.filter(s => {
-                if (tpl.tipo === 'SEMANAL') return s.dia === weekday;
-                if (tpl.tipo === 'MENSAL') return s.dia === day;
-                if (tpl.tipo === 'QUINZENAL') {
-                    const qDay = ((day - 1) % 15) + 1;
-                    return s.dia === qDay;
-                }
-                return false;
-            });
-            
-            for (const slot of matchingSlots) {
-                novasLinhas.push({
-                    unidadeId,
-                    medicoId: slot.medico_id,
-                    data_plantao: dateStr,
-                    turno: slot.turno,
-                    gestorId
+
+        if (dateList && Array.isArray(dateList)) {
+            // Apply ONLY to specific dates provided in the list
+            for (const dateStr of dateList) {
+                // Ensure date is valid and in target month
+                if (!dateStr.startsWith(mesDestino)) continue;
+                
+                const d = new Date(`${dateStr}T12:00:00-03:00`);
+                const weekday = d.getUTCDay();
+                const dayOfMonth = d.getUTCDate();
+                
+                const matchingSlots = tpl.slots.filter(s => {
+                    const type = tpl.tipo;
+                    if (type === 'FIX_DIA' || type === 'SEMANAL') return s.dia === weekday;
+                    if (type === 'FIX_SEMANA') return s.dia === weekday;
+                    if (type === 'FIX_QUINZENA' || type === 'QUINZENAL') {
+                        const qDay = ((dayOfMonth - 1) % 15) + 1;
+                        return s.dia === qDay;
+                    }
+                    if (type === 'MENSAL') return s.dia === dayOfMonth;
+                    return false;
                 });
+
+                for (const slot of matchingSlots) {
+                    novasLinhas.push({
+                        unidadeId,
+                        medicoId: slot.medico_id,
+                        data_plantao: dateStr,
+                        turno: slot.turno
+                    });
+                }
+            }
+        } else if (startDate && endDate) {
+            // Apply to specific DATE RANGE (Flexible)
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                if (!dateStr.startsWith(mesDestino)) continue;
+
+                const weekday = d.getUTCDay();
+                const dayOfMonth = d.getUTCDate();
+                
+                const matchingSlots = tpl.slots.filter(s => {
+                    const type = tpl.tipo;
+                    if (type === 'FIX_DIA' || type === 'SEMANAL') {
+                        if (tpl.dias_modelo === 5 && (weekday === 0 || weekday === 6)) return false;
+                        return s.dia === weekday;
+                    }
+                    if (type === 'FIX_SEMANA' || (type === 'SEMANAL' && tpl.dias_modelo === 5)) {
+                        if (weekday === 0 || weekday === 6) return false;
+                        return s.dia === weekday;
+                    }
+                    if (type === 'FIX_QUINZENA' || type === 'QUINZENAL') {
+                        const qDay = ((dayOfMonth - 1) % 15) + 1;
+                        return s.dia === qDay;
+                    }
+                    if (type === 'MENSAL') return s.dia === dayOfMonth;
+                    return false;
+                });
+
+                for (const slot of matchingSlots) {
+                    novasLinhas.push({
+                        unidadeId,
+                        medicoId: slot.medico_id,
+                        data_plantao: dateStr,
+                        turno: slot.turno
+                    });
+                }
+            }
+        } else {
+            // Logic for periods (legacy A/B weeks)
+            const [year, rawMonth] = mesDestino.split('-');
+            const y = Number(year);
+            const m = Number(rawMonth);
+            const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+            
+            const hasPeriodsFilter = Array.isArray(periodsFilter) && periodsFilter.length > 0;
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                if (hasPeriodsFilter) {
+                    let currentPeriodIdx = 0;
+                    if (tpl.tipo === 'SEMANAL' || tpl.tipo === 'FIX_DIA') {
+                        currentPeriodIdx = Math.floor((day - 1) / 7);
+                    } else if (tpl.tipo === 'QUINZENAL' || tpl.tipo === 'FIX_QUINZENA') {
+                        currentPeriodIdx = day <= 15 ? 0 : 1;
+                    }
+                    if (!periodsFilter.includes(currentPeriodIdx)) continue;
+                }
+
+                const date = new Date(Date.UTC(y, m - 1, day));
+                const weekday = date.getUTCDay();
+                const dateStr = `${mesDestino}-${String(day).padStart(2, '0')}`;
+                
+                const matchingSlots = tpl.slots.filter(s => {
+                    const type = tpl.tipo;
+                    if (type === 'FIX_DIA' || type === 'SEMANAL') {
+                        if (tpl.dias_modelo === 5 && (weekday === 0 || weekday === 6)) return false;
+                        return s.dia === weekday;
+                    }
+                    if (type === 'FIX_SEMANA') {
+                        if (weekday === 0 || weekday === 6) return false;
+                        return s.dia === weekday;
+                    }
+                    if (type === 'FIX_QUINZENA' || type === 'QUINZENAL') {
+                        const qDay = ((day - 1) % 15) + 1;
+                        return s.dia === qDay;
+                    }
+                    if (type === 'MENSAL') return s.dia === day;
+                    return false;
+                });
+                
+                for (const slot of matchingSlots) {
+                    novasLinhas.push({
+                        unidadeId,
+                        medicoId: slot.medico_id,
+                        data_plantao: dateStr,
+                        turno: slot.turno
+                    });
+                }
             }
         }
         
@@ -1200,23 +1311,27 @@ export const postApplyTemplateToMonth = async (req, res) => {
                 });
                 sucesso++;
             } catch (err) {
-                // Ignore duplicates
                 pular++;
             }
         }
         res.json({ sucesso, pular, total: novasLinhas.length });
     } catch (err) {
-        res.status(500).json({ error: 'Failed', details: err.message });
+        res.status(500).json({ error: 'Falha ao aplicar template', details: err.message });
     }
 };
 
 export const postClearMonthScale = async (req, res) => {
     try {
-        const { gestorId, unidadeId, mesDestino } = req.body;
-        await checkManagerUnitScopeAsync(gestorId, unidadeId);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        const { unidadeId, mesDestino } = req.body;
+        if (!unidadeId || !mesDestino) return res.status(400).json({ error: 'Parâmetros insuficientes.' });
+        if (!assertUnitScope(res, manager, unidadeId)) return;
         await dbModel.clearMonthScale(unidadeId, mesDestino);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to clear', details: err.message });
+        res.status(500).json({ error: 'Falha ao limpar mês', details: err.message });
     }
 };
+
+

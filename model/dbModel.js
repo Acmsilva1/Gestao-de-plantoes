@@ -1182,7 +1182,7 @@ export const dbModel = {
     async getTemplatesByUnit(unidadeId) {
         const response = await supabase
             .from('escala_templates')
-            .select('id, nome, tipo, created_at')
+            .select('*, slots:escala_template_slots(*, medicos(nome, especialidade))')
             .eq('unidade_id', unidadeId)
             .order('nome', { ascending: true });
         return unwrap(response, 'Falha ao carregar templates');
@@ -1191,7 +1191,7 @@ export const dbModel = {
     async getTemplateById(templateId) {
         const response = await supabase
             .from('escala_templates')
-            .select('id, nome, tipo, unidade_id')
+            .select('id, nome, tipo, unidade_id, dias_modelo')
             .eq('id', templateId)
             .single();
 
@@ -1208,12 +1208,17 @@ export const dbModel = {
         return template;
     },
 
-    async createTemplate(unidadeId, nome, tipo) {
+    async createTemplate(unidadeId, nome, tipo, diasModelo = 7) {
+        console.log('[dbModel] createTemplate:', { unidadeId, nome, tipo, diasModelo });
         const response = await supabase
             .from('escala_templates')
-            .insert([{ unidade_id: unidadeId, nome, tipo }])
+            .insert([{ unidade_id: unidadeId, nome, tipo, dias_modelo: diasModelo }])
             .select()
             .single();
+
+        if (response.error) {
+            console.error('[dbModel] createTemplate Error:', response.error);
+        }
         return unwrap(response, 'Falha ao criar template');
     },
 
@@ -1223,6 +1228,16 @@ export const dbModel = {
             .delete()
             .eq('id', templateId);
         return unwrap(response, 'Falha ao deletar template');
+    },
+
+    async updateTemplate(templateId, data) {
+        const response = await supabase
+            .from('escala_templates')
+            .update(data)
+            .eq('id', templateId)
+            .select()
+            .single();
+        return unwrap(response, 'Falha ao atualizar template');
     },
 
     async saveTemplateSlots(templateId, slotsPayload) {
@@ -1254,26 +1269,8 @@ export const dbModel = {
         const lastDay = new Date(Date.UTC(Number(year), Number(rawMonth), 0)).getUTCDate();
         const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-        // Deletar os agendamentos das disponibilidades do mes
-        // O Supabase não suporta delete join direto da API JS facilmente
-        // Pegando as disponibilidades do mes
-        const dispRes = await supabase
-            .from('disponibilidade')
-            .select('id')
-            .eq('unidade_id', unidadeId)
-            .gte('data_plantao', monthStart)
-            .lte('data_plantao', monthEnd);
-            
-        const dispIds = unwrap(dispRes, 'Erro ao buscar disp')?.map(d => d.id) || [];
-        
-        if (dispIds.length > 0) {
-           await supabase.from('agendamentos').delete().in('disponibilidade_id', dispIds);
-        }
-
-        // Deletar da view/tabelas materializadas se houver (mas parece que a escala é gerada dinâmica)
-        // Só por segurança, apagamos a disponibilidade inteira para zerar a grade.
         const response = await supabase
-            .from('disponibilidade')
+            .from('escala')
             .delete()
             .eq('unidade_id', unidadeId)
             .gte('data_plantao', monthStart)
