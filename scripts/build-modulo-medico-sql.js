@@ -6,8 +6,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const escalaVals = fs.readFileSync(path.join(__dirname, 'escala-values.sql'), 'utf8');
 
-const header = `-- Módulo médico: unidades (UF), medicos (10), escala (mar/2026, com "furos")
+const header = `-- Módulo médico: 9 unidades reais, 10 médicos demo, perfis/gestores demo, escala (mar+abr/2026)
 -- Rode no SQL Editor do Supabase (banco vazio ou após DROP das mesmas tabelas).
+-- Migração de ambiente já populado: ver model/migrate_unidades_reais_supabase.sql
+-- No app: DISABLE_PREDICTOR_SCHEDULER=true no .env evita erros se não houver tasy_raw_history/disponibilidade.
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS unidades (
@@ -21,12 +23,29 @@ CREATE TABLE IF NOT EXISTS unidades (
 CREATE TABLE IF NOT EXISTS medicos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
+    usuario TEXT UNIQUE NOT NULL,
     telefone TEXT,
     especialidade TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL,
     senha TEXT,
     unidade_fixa_id UUID REFERENCES unidades (id) ON DELETE SET NULL,
     atendimento_padrao_por_periodo INT DEFAULT 10,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS perfis (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gestores (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    usuario TEXT UNIQUE NOT NULL,
+    senha TEXT,
+    perfil_id UUID REFERENCES perfis (id) ON DELETE SET NULL,
+    unidade_id UUID UNIQUE REFERENCES unidades (id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -50,26 +69,51 @@ CREATE TABLE IF NOT EXISTS escala (
 
 INSERT INTO unidades (id, nome, endereco, capacidade_media_atendimento)
 VALUES
-    ('b1000001-0000-4000-8000-000000000001', 'ES', 'Regional Espírito Santo', 10),
-    ('b1000001-0000-4000-8000-000000000002', 'RJ', 'Regional Rio de Janeiro', 10),
-    ('b1000001-0000-4000-8000-000000000003', 'SP', 'Regional São Paulo', 10),
-    ('b1000001-0000-4000-8000-000000000004', 'MG', 'Regional Minas Gerais', 10),
-    ('b1000001-0000-4000-8000-000000000005', 'BA', 'Regional Bahia', 10),
-    ('b1000001-0000-4000-8000-000000000006', 'PR', 'Regional Paraná', 10)
+    ('b1000001-0000-4000-8000-000000000001', '001 - PS HOSPITAL VITÓRIA', 'Vitória, ES', 10),
+    ('b1000001-0000-4000-8000-000000000002', '003 - PS VILA VELHA', 'Vila Velha, ES', 10),
+    ('b1000001-0000-4000-8000-000000000003', '013 - PS SIG', 'Brasília, DF', 10),
+    ('b1000001-0000-4000-8000-000000000004', '025 - PS BARRA DA TIJUCA', 'Rio de Janeiro, RJ', 10),
+    ('b1000001-0000-4000-8000-000000000005', '026 - PS BOTAFOGO', 'Rio de Janeiro, RJ', 10),
+    ('b1000001-0000-4000-8000-000000000006', '031 - PS GUTIERREZ', 'Belo Horizonte, MG', 10),
+    ('b1000001-0000-4000-8000-000000000007', '033 - PS PAMPULHA', 'Belo Horizonte, MG', 10),
+    ('b1000001-0000-4000-8000-000000000008', '039 - PS TAGUATINGA', 'Taguatinga, DF', 10),
+    ('b1000001-0000-4000-8000-000000000009', '045 - PS CAMPO GRANDE', 'Rio de Janeiro, RJ', 10)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO medicos (id, nome, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
+INSERT INTO medicos (id, nome, usuario, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
 VALUES
-    ('c1000001-0000-4000-8000-000000000001', 'Ana Paula Ferreira', '10001-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000002', 'Bruno Almeida Costa', '10002-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000003', 'Carla Mendes Rocha', '20001-RJ', '(21) 96666-2003', 'Emergência', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000004', 'Daniel Ribeiro Santos', '20002-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', '30001-SP', '(11) 94444-3005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000006', 'Felipe Nogueira Dias', '30002-SP', '(11) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000007', 'Gabriela Souza Pinto', '40001-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000008', 'Henrique Castro Melo', '40002-MG', '(31) 91111-4008', 'Emergência', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000009', 'Isabela Freitas Araújo', '50001-BA', '(71) 90000-5009', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000010', 'João Victor Prado', '60001-PR', '(41) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10)
+    ('c1000001-0000-4000-8000-000000000001', 'Maria Helena Duarte', 'maria.duarte', '52891-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000002', 'Paulo Sérgio Nunes', 'paulo.nunes', '53902-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000003', 'Amanda Cristina Ferreira', 'amanda.ferreira', '108234-RJ', '(21) 96666-2003', 'Emergência', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000004', 'Rodrigo Antunes Vieira', 'rodrigo.vieira', '109345-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000005', 'Letícia Martins Correia', 'leticia.correia', '45678-DF', '(61) 94444-3005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000006', 'Tiago Albuquerque Reis', 'tiago.reis', '46789-DF', '(61) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000007', 'Beatriz Campos Lacerda', 'beatriz.lacerda', '87654-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000008', 'Felipe Augusto Cunha', 'felipe.cunha', '88765-MG', '(31) 91111-4008', 'Emergência', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000009', 'Larissa Prado Monteiro', 'larissa.monteiro', '112233-RJ', '(21) 90000-5009', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000010', 'Gustavo Henrique Dias', 'gustavo.dias', '223344-RJ', '(21) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO perfis (id, nome)
+VALUES ('d1000001-0000-4000-8000-000000000001', 'GESTOR')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO perfis (id, nome)
+VALUES ('d1000001-0000-4000-8000-000000000099', 'GESTOR_MASTER')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO gestores (id, nome, usuario, senha, perfil_id, unidade_id)
+VALUES
+    ('e1000001-0000-4000-8000-000000000001', 'Gestor administrativo (confirmar nome) — 001 - PS HOSPITAL VITÓRIA', 'gestor.001', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000001'),
+    ('e1000001-0000-4000-8000-000000000002', 'Gestor administrativo (confirmar nome) — 003 - PS VILA VELHA', 'gestor.003', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000002'),
+    ('e1000001-0000-4000-8000-000000000003', 'Gestor administrativo (confirmar nome) — 013 - PS SIG', 'gestor.013', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000003'),
+    ('e1000001-0000-4000-8000-000000000004', 'Gestor administrativo (confirmar nome) — 025 - PS BARRA DA TIJUCA', 'gestor.025', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000004'),
+    ('e1000001-0000-4000-8000-000000000005', 'Gestor administrativo (confirmar nome) — 026 - PS BOTAFOGO', 'gestor.026', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000005'),
+    ('e1000001-0000-4000-8000-000000000006', 'Gestor administrativo (confirmar nome) — 031 - PS GUTIERREZ', 'gestor.031', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000006'),
+    ('e1000001-0000-4000-8000-000000000007', 'Gestor administrativo (confirmar nome) — 033 - PS PAMPULHA', 'gestor.033', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000007'),
+    ('e1000001-0000-4000-8000-000000000008', 'Gestor administrativo (confirmar nome) — 039 - PS TAGUATINGA', 'gestor.039', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000008'),
+    ('e1000001-0000-4000-8000-000000000009', 'Gestor administrativo (confirmar nome) — 045 - PS CAMPO GRANDE', 'gestor.045', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000009'),
+    ('e1000001-0000-4000-8000-000000000099', 'Gestor Master', 'gestor.master', '12345', 'd1000001-0000-4000-8000-000000000099', NULL)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO escala (id, unidade_id, medico_id, data_plantao, turno)
@@ -78,7 +122,8 @@ VALUES
 
 const footer = `;
 
--- Calendário demo: março/2026. Dias 7, 13, 14, 20, 21, 28 sem linhas (furos); vários turnos/dia sem médico.
+-- Calendário demo: março e abril/2026, todas as unidades. Furos por dia do mês (múltiplos de 7 ou 13).
+-- Só o INSERT de escala (sem CREATE/unidades/médicos): model/escala_demo_mar_abr_2026.sql
 `;
 
 const out = header + escalaVals + footer;

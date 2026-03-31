@@ -499,7 +499,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 Confirmar assumir turno
                             </h4>
                             <p id="confirm-assumir-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
-                                Será enviada uma <span className="font-semibold text-emerald-200">solicitação ao gestor</span> da regional para confirmar
+                                Será enviada uma <span className="font-semibold text-emerald-200">solicitação ao gestor</span> da sua unidade para confirmar
                                 que você assume este turno vago. Deseja enviar?
                             </p>
                             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -539,7 +539,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 Confirmar troca de plantão
                             </h4>
                             <p id="confirm-troca-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
-                                O gestor da regional precisa <span className="font-semibold text-amber-200">autorizar</span> esta troca com o colega
+                                O gestor da unidade precisa <span className="font-semibold text-amber-200">autorizar</span> esta troca com o colega
                                 selecionado. Deseja enviar o pedido?
                             </p>
                             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -1138,8 +1138,8 @@ export default function DoctorView() {
                             </p>
                             <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">
                                 {motivoOcultacaoEscala === 'bloqueado_gestor'
-                                    ? 'O gestor indicou que esta escala não está pronta para visualização pelos médicos neste mês. Se precisar de plantão ou esclarecimentos, contacte a coordenação da regional.'
-                                    : 'A escala deste mês ainda não está disponível para visualização. Aguarde a liberação pelo gestor da regional (ou tente novamente mais tarde).'}
+                                    ? 'O gestor indicou que esta escala não está pronta para visualização pelos médicos neste mês. Se precisar de plantão ou esclarecimentos, contacte o gestor da unidade ou a coordenação.'
+                                    : 'A escala deste mês ainda não está disponível para visualização. Aguarde a liberação pelo gestor da unidade (ou tente novamente mais tarde).'}
                             </p>
                         </div>
                     ) : (
@@ -1268,7 +1268,7 @@ export default function DoctorView() {
                                             </svg>
                                         </div>
                                         <h4 className="text-xl font-bold text-slate-300">Nenhum plantão na sua escala</h4>
-                                        <p className="mt-2 text-slate-500">Quando a escala regional o locar, os turnos aparecerão aqui.</p>
+                                        <p className="mt-2 text-slate-500">Quando o gestor da unidade liberar a escala, os turnos aparecerão aqui.</p>
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">

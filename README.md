@@ -10,6 +10,16 @@ O projeto roda:
 - no servidor `Node.js` local ou em máquina própria (API + frontend estático após `npm run build`)
 - como `PWA` instalável no mobile quando acessado por HTTPS em rede confiável
 
+## Dados de demonstração no Supabase
+
+O catálogo de **unidades reais** (9 PS: ES, RJ, MG, DF) e **10 médicos** fictícios está alinhado em:
+
+- `model/modulo_medico.sql` — schema + `INSERT` de unidades, médicos e escala simulada
+- `model/migrate_unidades_reais_supabase.sql` — migração quando o banco já tinha o seed antigo (6 “regionais” por UF)
+- `model/escala_demo_mar_abr_2026.sql` — só `INSERT` na `escala` para **março e abril de 2026** (regenerar com `node scripts/gen-escala-sql.js`)
+
+Unidades de referência: 001 Vitória, 003 Vila Velha, 013 SIG, 025 Barra, 026 Botafogo, 031 Gutierrez, 033 Pampulha, 039 Taguatinga, 045 Campo Grande.
+
 ## Stack
 
 - Backend: `Node.js` + `Express`
@@ -176,11 +186,13 @@ A lógica atual:
 - se encontrar, aplica uma consulta/perfil específico de feriado sobre a base calculada
 - se não encontrar, mantém a heurística padrão por dia da semana + período
 
+A “região” da unidade é inferida a partir de `nome`, `endereco`, `cidade`, `uf`, etc. (ver `PredictionService.js`). Para regras por local, use chaves que apareçam nesses campos (ex.: `Vitória`, `Rio de Janeiro`, `DF`).
+
 Formato provisório aceito pelo arquivo:
 
 - `datas`: datas exatas no formato `YYYY-MM-DD`
 - `datasRecorrentes`: recorrência anual no formato `MM-DD`
-- `regioes`: lista de chaves que combinem com a região/nome/endereço da unidade
+- `regioes`: lista de chaves que combinem com o texto da unidade (nome/endereço/cidade/UF)
 - `metricas`: multiplicadores por período (`Manhã`, `Tarde`, `Noite`, `Madrugada`)
 
 Observação:
