@@ -120,6 +120,7 @@ export default function ManagerView() {
 
 function GestorChrome() {
     const { session, logout } = useAuth();
+    const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
     const location = useLocation();
     const isEscalaRoute = location.pathname === '/gestor/escala';
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -185,33 +186,37 @@ function GestorChrome() {
                         Editor de escala
                     </NavLink>
 
-                    <NavLink
-                        to="/gestor/trocas"
-                        className={({ isActive }) => 
-                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                isActive 
-                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                            }`
-                        }
-                    >
-                        <ArrowLeftRight size={18} />
-                        Trocas
-                    </NavLink>
+                    {!isMaster && (
+                        <NavLink
+                            to="/gestor/trocas"
+                            className={({ isActive }) => 
+                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    isActive 
+                                        ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                                }`
+                            }
+                        >
+                            <ArrowLeftRight size={18} />
+                            Trocas
+                        </NavLink>
+                    )}
 
-                    <NavLink
-                        to="/gestor/aceites-assumir"
-                        className={({ isActive }) => 
-                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                isActive 
-                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                            }`
-                        }
-                    >
-                        <ClipboardCheck size={18} />
-                        Aceites (vagos)
-                    </NavLink>
+                    {!isMaster && (
+                        <NavLink
+                            to="/gestor/aceites-assumir"
+                            className={({ isActive }) => 
+                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    isActive 
+                                        ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                                }`
+                            }
+                        >
+                            <ClipboardCheck size={18} />
+                            Aceites (vagos)
+                        </NavLink>
+                    )}
                 </nav>
             </aside>
 
@@ -247,8 +252,11 @@ function GestorChrome() {
                         <Routes>
                             <Route path="acessos" element={<ManagerAccess />} />
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
-                            <Route path="trocas" element={<ManagerTrocasPage />} />
-                            <Route path="aceites-assumir" element={<ManagerAceitesAssumirPage />} />
+                            <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
+                            <Route
+                                path="aceites-assumir"
+                                element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerAceitesAssumirPage />}
+                            />
                             <Route path="dashboard" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="calendario" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="agenda" element={<Navigate to="/gestor/acessos" replace />} />

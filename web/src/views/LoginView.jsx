@@ -21,9 +21,11 @@ export default function LoginView() {
 
     const [medicoList, setMedicoList] = useState(FALLBACK_MEDICO_PROFILES);
     const [medicoId, setMedicoId] = useState(FALLBACK_MEDICO_PROFILES[0]?.id ?? '');
+    const [managerList, setManagerList] = useState(GESTOR_PROFILES);
     const [gestorId, setGestorId] = useState(GESTOR_PROFILES[0]?.id ?? '');
 
     const [loadingMedicos, setLoadingMedicos] = useState(true);
+    const [loadingManagers, setLoadingManagers] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -75,6 +77,35 @@ export default function LoginView() {
         };
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoadingManagers(true);
+            try {
+                const response = await fetch('/api/manager/perfis');
+                const data = await parseJson(response);
+                if (cancelled) return;
+                if (response.ok && Array.isArray(data) && data.length > 0) {
+                    setManagerList(data);
+                    setGestorId(data[0].id);
+                } else {
+                    setManagerList(GESTOR_PROFILES);
+                    setGestorId(GESTOR_PROFILES[0]?.id ?? '');
+                }
+            } catch {
+                if (!cancelled) {
+                    setManagerList(GESTOR_PROFILES);
+                    setGestorId(GESTOR_PROFILES[0]?.id ?? '');
+                }
+            } finally {
+                if (!cancelled) setLoadingManagers(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const enterMedico = () => {
         const profile = medicoList.find((p) => p.id === medicoId) ?? medicoList[0];
         if (!profile) {
@@ -86,7 +117,7 @@ export default function LoginView() {
     };
 
     const enterGestor = () => {
-        const profile = GESTOR_PROFILES.find((p) => p.id === gestorId) ?? GESTOR_PROFILES[0];
+        const profile = managerList.find((p) => p.id === gestorId) ?? managerList[0];
         if (!profile) {
             setError('Nenhum perfil de gestor configurado em devTestProfiles.js (GESTOR_PROFILES).');
             return;
@@ -173,11 +204,12 @@ export default function LoginView() {
                             <select
                                 value={gestorId}
                                 onChange={(e) => setGestorId(e.target.value)}
+                                disabled={loadingManagers || managerList.length === 0}
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-sky-400"
                             >
-                                {GESTOR_PROFILES.map((p) => (
+                                {managerList.map((p) => (
                                     <option key={p.id} value={p.id}>
-                                        {p.nome} ({p.usuario})
+                                        {p.nome} ({p.unidadeNome || p.usuario})
                                     </option>
                                 ))}
                             </select>
@@ -185,6 +217,7 @@ export default function LoginView() {
                         <button
                             type="button"
                             onClick={enterGestor}
+                            disabled={loadingManagers || managerList.length === 0}
                             className="rounded-2xl bg-sky-400 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-300"
                         >
                             Acessar Painel Gerencial

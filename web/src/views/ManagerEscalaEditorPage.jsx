@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Copy, X } from 'lucide-react';
 import { readApiResponse } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const UNIT_SHIFT_ORDER = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
 
@@ -67,6 +68,8 @@ const buildCalendarDayEntries = (monthKey, monthLinhas) => {
 };
 
 export default function ManagerEscalaEditorPage() {
+    const { session } = useAuth();
+    const gestorId = session?.id || '';
     const [units, setUnits] = useState([]);
     const [unitId, setUnitId] = useState('');
     const [year, setYear] = useState(() => new Date().getFullYear());
@@ -82,18 +85,20 @@ export default function ManagerEscalaEditorPage() {
     const [modalError, setModalError] = useState('');
 
     useEffect(() => {
-        fetch('/api/manager/unidades')
+        if (!gestorId) return;
+        fetch(`/api/manager/unidades?gestorId=${encodeURIComponent(gestorId)}`)
             .then((r) => (r.ok ? r.json() : []))
             .then(setUnits)
             .catch(() => setUnits([]));
-    }, []);
+    }, [gestorId]);
 
     useEffect(() => {
+        if (!gestorId) return undefined;
         let cancelled = false;
         (async () => {
             setDoctorsLoading(true);
             try {
-                const r = await fetch('/api/manager/medicos');
+                const r = await fetch(`/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`);
                 const data = await readApiResponse(r);
                 if (!cancelled) {
                     if (r.ok && Array.isArray(data)) setDoctors(data);
@@ -108,7 +113,7 @@ export default function ManagerEscalaEditorPage() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [gestorId]);
 
     const loadEditor = useCallback(
         async (options = {}) => {
@@ -122,7 +127,9 @@ export default function ManagerEscalaEditorPage() {
             }
             setError('');
             try {
-                const r = await fetch(`/api/manager/escala-editor?unidadeId=${encodeURIComponent(unitId)}&year=${year}`);
+                const r = await fetch(
+                    `/api/manager/escala-editor?unidadeId=${encodeURIComponent(unitId)}&year=${year}&gestorId=${encodeURIComponent(gestorId)}`
+                );
                 const data = await readApiResponse(r);
                 if (!r.ok) throw new Error(data.error || data.details || 'Não foi possível carregar o editor.');
                 setEditor(data);
@@ -137,7 +144,7 @@ export default function ManagerEscalaEditorPage() {
                 }
             }
         },
-        [unitId, year]
+        [unitId, year, gestorId]
     );
 
     useEffect(() => {
@@ -152,7 +159,7 @@ export default function ManagerEscalaEditorPage() {
             const r = await fetch('/api/manager/escala/mes-visibilidade', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ unidadeId: unitId, mes: mesKey, status })
+                body: JSON.stringify({ unidadeId: unitId, mes: mesKey, status, gestorId })
             });
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Falha ao gravar visibilidade.');
@@ -182,7 +189,8 @@ export default function ManagerEscalaEditorPage() {
                     unidadeId: String(unitId),
                     medicoId: String(medicoId),
                     data_plantao: date,
-                    turno
+                    turno,
+                    gestorId
                 })
             });
             const data = await readApiResponse(r);
@@ -235,9 +243,12 @@ export default function ManagerEscalaEditorPage() {
         setBusyKey(`del-${rowId}`);
         setError('');
         try {
-            const r = await fetch(`/api/manager/escala/linha/${rowId}?unidadeId=${encodeURIComponent(unitId)}`, {
+            const r = await fetch(
+                `/api/manager/escala/linha/${rowId}?unidadeId=${encodeURIComponent(unitId)}&gestorId=${encodeURIComponent(gestorId)}`,
+                {
                 method: 'DELETE'
-            });
+                }
+            );
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Falha ao remover.');
             await loadEditor({ preserveUi: true });
@@ -267,7 +278,7 @@ export default function ManagerEscalaEditorPage() {
             const r = await fetch('/api/manager/escala/importar-mes-anterior', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ unidadeId: unitId, mesDestino })
+                body: JSON.stringify({ unidadeId: unitId, mesDestino, gestorId })
             });
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Falha ao importar mês anterior.');

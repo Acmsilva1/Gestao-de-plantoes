@@ -10,6 +10,48 @@ const getMonthDates = (monthStr) => {
     return { startMonthDate, endMonthDate, year, month: rawMonth };
 };
 
+const parseGestorId = (req) => {
+    const qId = typeof req.query?.gestorId === 'string' ? req.query.gestorId.trim() : '';
+    const bId = typeof req.body?.gestorId === 'string' ? req.body.gestorId.trim() : '';
+    const hId = typeof req.headers?.['x-gestor-id'] === 'string' ? req.headers['x-gestor-id'].trim() : '';
+    return qId || bId || hId || '';
+};
+
+const isMasterManager = (manager) => manager?.perfis?.nome === 'GESTOR_MASTER';
+
+const getScopedManager = async (req, res, options = {}) => {
+    const { allowMasterWithoutUnit = true } = options;
+    const managerId = parseGestorId(req);
+    if (!managerId) {
+        res.status(400).json({ error: 'gestorId é obrigatório para esta operação.' });
+        return null;
+    }
+
+    const manager = await dbModel.getManagerById(managerId);
+    if (!manager) {
+        res.status(403).json({ error: 'Gestor não encontrado.' });
+        return null;
+    }
+
+    if (!manager.unidade_id && !(allowMasterWithoutUnit && isMasterManager(manager))) {
+        res.status(403).json({ error: 'Gestor sem unidade vinculada.' });
+        return null;
+    }
+
+    return manager;
+};
+
+const assertUnitScope = (res, manager, unidadeId) => {
+    if (isMasterManager(manager)) {
+        return true;
+    }
+    if (String(unidadeId) !== String(manager.unidade_id)) {
+        res.status(403).json({ error: 'Sem permissão para operar em outra unidade.' });
+        return false;
+    }
+    return true;
+};
+
 export const managerLogin = async (req, res) => {
     const { usuario, senha } = req.body;
 
@@ -31,7 +73,10 @@ export const managerLogin = async (req, res) => {
                 nome: manager.nome,
                 usuario: manager.usuario,
                 senha: manager.senha, // Enviando para que o modal de perfil possa pré-preencher
-                perfil: manager.perfis?.nome || 'GESTOR'
+                perfil: manager.perfis?.nome || 'GESTOR',
+                unidadeId: manager.unidade_id || null,
+                unidadeNome: manager.unidades?.nome || null,
+                isMaster: isMasterManager(manager)
             }
         });
     } catch (err) {
@@ -52,11 +97,33 @@ export const updateManagerProfile = async (req, res) => {
                 nome: updated.nome,
                 usuario: updated.usuario,
                 senha: updated.senha,
-                perfil: updated.perfis?.nome || 'GESTOR'
+                perfil: updated.perfis?.nome || 'GESTOR',
+                unidadeId: updated.unidade_id || null,
+                unidadeNome: updated.unidades?.nome || null,
+                isMaster: isMasterManager(updated)
             }
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao atualizar perfil do gestor.', details: err.message });
+    }
+};
+
+export const getManagerProfiles = async (_req, res) => {
+    try {
+        const managers = await dbModel.ensureManagersPerUnit();
+        const mapped = (managers || []).map((manager) => ({
+            id: manager.id,
+            nome: manager.nome,
+            usuario: manager.usuario,
+            senha: manager.senha || '',
+            perfil: manager.perfis?.nome || 'GESTOR',
+            unidadeId: manager.unidade_id || null,
+            unidadeNome: manager.unidades?.nome || '',
+            isMaster: isMasterManager(manager)
+        }));
+        res.json(mapped);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar perfis de gestor.', details: err.message });
     }
 };
 
@@ -67,9 +134,14 @@ export const getDashboardMetrics = async (req, res) => {
     }
 
     try {
-        const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
 
-        const vacancies = await dbModel.getDashboardsDataStraddle(startMonthDate, endMonthDate, unidadeId);
+        const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const scopedUnitId = unidadeId || manager.unidade_id;
+        if (!assertUnitScope(res, manager, scopedUnitId)) return;
+
+        const vacancies = await dbModel.getDashboardsDataStraddle(startMonthDate, endMonthDate, scopedUnitId);
 
         const endDay = parseInt(endMonthDate.slice(-2), 10);
         
@@ -137,7 +209,12 @@ export const getDashboardMetrics = async (req, res) => {
 
 export const getDoctorAccesses = async (req, res) => {
     try {
-        const list = await dbModel.getDoctorsAccessList();
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        const list = isMasterManager(manager)
+            ? await dbModel.getDoctorsAccessList()
+            : await dbModel.getDoctorsAccessListByUnit(manager.unidade_id);
         
         // Formatar para algo amigável ao frontend
         const mappedList = list.map(doc => ({
@@ -167,7 +244,24 @@ export const manageDoctorUnitAccess = async (req, res) => {
     }
 
     try {
-        await dbModel.saveDoctorAccess(medicoId, unidadesIds, gestorId);
+        const manager = await dbModel.getManagerById(gestorId);
+        if (!manager || (!manager.unidade_id && !isMasterManager(manager))) {
+            return res.status(403).json({ error: 'Gestor sem unidade vinculada.' });
+        }
+
+        const doctor = await dbModel.getDoctorById(medicoId);
+        if (!doctor) {
+            return res.status(404).json({ error: 'Médico não encontrado.' });
+        }
+        if (!isMasterManager(manager) && String(doctor.unidade_fixa_id) !== String(manager.unidade_id)) {
+            return res.status(403).json({ error: 'Este médico não pertence à unidade do gestor.' });
+        }
+
+        const requestedUnits = Array.isArray(unidadesIds) ? unidadesIds : [];
+        const scopedUnits = isMasterManager(manager)
+            ? requestedUnits
+            : requestedUnits.filter((unitId) => String(unitId) === String(manager.unidade_id));
+        await dbModel.saveDoctorAccess(medicoId, scopedUnits, gestorId);
         
         res.json({ message: 'Permissões salvas com sucesso!' });
     } catch (err) {
@@ -177,10 +271,25 @@ export const manageDoctorUnitAccess = async (req, res) => {
 
 export const updateDoctorProfileByManager = async (req, res) => {
     const { id } = req.params;
-    const { nome, telefone, senha } = req.body;
+    const { nome, telefone, senha, unidadeFixaId } = req.body;
 
     try {
-        const updated = await dbModel.updateDoctorProfile(id, { nome, telefone, senha });
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        const doctor = await dbModel.getDoctorById(id);
+        if (!doctor) {
+            return res.status(404).json({ error: 'Médico não encontrado.' });
+        }
+        if (!isMasterManager(manager) && String(doctor.unidade_fixa_id) !== String(manager.unidade_id)) {
+            return res.status(403).json({ error: 'Sem permissão para alterar médico de outra unidade.' });
+        }
+
+        const payload = { nome, telefone, senha };
+        if (isMasterManager(manager) && unidadeFixaId) {
+            payload.unidadeFixaId = unidadeFixaId;
+        }
+        const updated = await dbModel.updateDoctorProfile(id, payload);
         res.json({ message: 'Perfil do medico atualizado pelo gestor.', doctor: updated });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao atualizar perfil do medico pelo gestor.', details: err.message });
@@ -189,8 +298,16 @@ export const updateDoctorProfileByManager = async (req, res) => {
 
 export const getUnitsList = async (req, res) => {
     try {
-        const units = await dbModel.getUnits();
-        res.json(units);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        if (isMasterManager(manager)) {
+            const units = await dbModel.getUnits();
+            return res.json(units);
+        }
+
+        const unit = await dbModel.getUnitById(manager.unidade_id);
+        res.json(unit ? [unit] : []);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao listar unidades.', details: err.message });
     }
@@ -207,6 +324,10 @@ export const getManagerCalendar = async (req, res) => {
     const targetMonth = month || new Date().toISOString().slice(0, 7);
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const shifts = await dbModel.getShiftsByUnitAndMonth(unidadeId, targetMonth);
         const unit = await dbModel.getUnits().then(us => us.find(u => u.id === unidadeId));
 
@@ -242,6 +363,10 @@ export const getManagerAgenda = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const [unit, shifts] = await Promise.all([
             dbModel.getUnitById(unidadeId),
             dbModel.getShiftAgendaByUnitAndDate(unidadeId, date)
@@ -297,6 +422,10 @@ export const getManagerAgendaSummary = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const { startMonthDate, endMonthDate } = getMonthDates(month);
         const rows = await dbModel.getShiftAgendaSummaryByUnitAndMonth(unidadeId, startMonthDate, endMonthDate);
 
@@ -329,9 +458,14 @@ export const createDoctor = async (req, res) => {
     const { nome, crm, especialidade, unidadeFixaId, telefone, senha } = req.body;
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
         if (!nome || !crm || !unidadeFixaId) {
             return res.status(400).json({ error: 'Nome, CRM e Unidade Fixa são obrigatórios.' });
         }
+
+        if (!assertUnitScope(res, manager, unidadeFixaId)) return;
 
         const newDoc = await dbModel.createDoctor({ nome, crm, especialidade, unidadeFixaId, telefone, senha });
         res.status(201).json({
@@ -347,6 +481,17 @@ export const deleteDoctor = async (req, res) => {
     const { id } = req.params;
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        const doctor = await dbModel.getDoctorById(id);
+        if (!doctor) {
+            return res.status(404).json({ error: 'Médico não encontrado.' });
+        }
+        if (!isMasterManager(manager) && String(doctor.unidade_fixa_id) !== String(manager.unidade_id)) {
+            return res.status(403).json({ error: 'Sem permissão para excluir médico de outra unidade.' });
+        }
+
         await dbModel.deleteDoctor(id);
         res.json({ message: 'Médico removido do sistema com sucesso!' });
     } catch (err) {
@@ -358,7 +503,16 @@ export const getTrocasPendentesGestor = async (req, res) => {
     const { unidadeId } = req.query;
 
     try {
-        const pedidos = await dbModel.listPedidosTrocaParaGestor(unidadeId || null);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
+        const scopedUnitId = unidadeId || manager.unidade_id;
+        if (!assertUnitScope(res, manager, scopedUnitId)) return;
+
+        const pedidos = await dbModel.listPedidosTrocaParaGestor(scopedUnitId);
         res.json({ pedidos });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar pedidos de troca.', details: err.message });
@@ -370,9 +524,21 @@ export const postDecidirTrocaGestor = async (req, res) => {
     const { aprovar } = req.body ?? {};
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
         if (typeof aprovar !== 'boolean') {
             return res.status(400).json({ error: 'Informe aprovar: true ou false.' });
         }
+
+        const pedido = await dbModel.getPedidoTrocaById(pedidoId);
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido não encontrado.' });
+        }
+        if (!assertUnitScope(res, manager, pedido.unidade_id)) return;
 
         if (aprovar) {
             await dbModel.aprovarPedidoTrocaGestorRpc(pedidoId);
@@ -390,7 +556,16 @@ export const getAssumirPendentesGestor = async (req, res) => {
     const { unidadeId } = req.query;
 
     try {
-        const pedidos = await dbModel.listPedidosAssumirParaGestor(unidadeId || null);
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
+        const scopedUnitId = unidadeId || manager.unidade_id;
+        if (!assertUnitScope(res, manager, scopedUnitId)) return;
+
+        const pedidos = await dbModel.listPedidosAssumirParaGestor(scopedUnitId);
         res.json({ pedidos });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar pedidos de assumir.', details: err.message });
@@ -402,9 +577,21 @@ export const postDecidirAssumirGestor = async (req, res) => {
     const { aprovar } = req.body ?? {};
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
         if (typeof aprovar !== 'boolean') {
             return res.status(400).json({ error: 'Informe aprovar: true ou false.' });
         }
+
+        const pedido = await dbModel.getPedidoAssumirById(pedidoId);
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido não encontrado.' });
+        }
+        if (!assertUnitScope(res, manager, pedido.unidade_id)) return;
 
         if (aprovar) {
             await dbModel.aprovarPedidoAssumirGestorRpc(pedidoId);
@@ -437,6 +624,10 @@ export const getEscalaEditor = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const [linhas, publicacoes] = await Promise.all([
             dbModel.getEscalaByUnitAndYear(unidadeId, year),
             dbModel.listEscalaMesPublicacaoForUnitYear(unidadeId, year)
@@ -475,6 +666,10 @@ export const postEscalaLinha = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const row = await dbModel.insertEscalaRow({ unidadeId, medicoId, data_plantao, turno });
         res.status(201).json({ id: row.id });
     } catch (err) {
@@ -494,6 +689,10 @@ export const deleteEscalaLinha = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         await dbModel.deleteEscalaRowById(id, unidadeId);
         res.json({ ok: true });
     } catch (err) {
@@ -517,6 +716,10 @@ export const putEscalaMesVisibilidade = async (req, res) => {
     }
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const row = await dbModel.upsertEscalaMesPublicacao({ unidadeId, mes, status });
         res.json({ publicacao: { mes: row.mes, status: row.status, updated_at: row.updated_at } });
     } catch (err) {
@@ -550,6 +753,10 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
     const mesOrigem = calPreviousMonthKey(mesDestino);
 
     try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
         const origem = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesOrigem);
         const destinoExistente = await dbModel.getEscalaByUnitAndMonth(unidadeId, mesDestino);
         const existe = new Set((destinoExistente || []).map((r) => `${r.data_plantao}|${r.turno}|${r.medico_id}`));

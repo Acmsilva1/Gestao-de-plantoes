@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS gestores (
     usuario TEXT UNIQUE NOT NULL,
     senha TEXT,
     perfil_id UUID REFERENCES perfis (id) ON DELETE SET NULL,
+    unidade_id UUID UNIQUE REFERENCES unidades (id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -146,14 +147,23 @@ VALUES
     ('c1000001-0000-4000-8000-000000000005', 'Eduarda Lima Oliveira', '77889-BA', '(71) 94444-5005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10)
 ON CONFLICT (id) DO NOTHING;
 
--- Opcional: um perfil e um gestor de exemplo (painel gerencial / API)
+-- Perfil e gestores por unidade (um gestor por unidade)
 INSERT INTO perfis (id, nome)
 VALUES ('d1000001-0000-4000-8000-000000000001', 'GESTOR')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO gestores (id, nome, usuario, senha, perfil_id)
+INSERT INTO perfis (id, nome)
+VALUES ('d1000001-0000-4000-8000-000000000099', 'GESTOR_MASTER')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO gestores (id, nome, usuario, senha, perfil_id, unidade_id)
 VALUES
-    ('e1000001-0000-4000-8000-000000000001', 'Gestor Demo', 'gestor.demo', '12345', 'd1000001-0000-4000-8000-000000000001')
+    ('e1000001-0000-4000-8000-000000000001', 'Gestor ES', 'gestor.es', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000001'),
+    ('e1000001-0000-4000-8000-000000000002', 'Gestor RJ', 'gestor.rj', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000002'),
+    ('e1000001-0000-4000-8000-000000000003', 'Gestor SP', 'gestor.sp', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000003'),
+    ('e1000001-0000-4000-8000-000000000004', 'Gestor MG', 'gestor.mg', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000004'),
+    ('e1000001-0000-4000-8000-000000000005', 'Gestor BA', 'gestor.ba', '12345', 'd1000001-0000-4000-8000-000000000001', 'b1000001-0000-4000-8000-000000000005'),
+    ('e1000001-0000-4000-8000-000000000099', 'Gestor Master', 'gestor.master', '12345', 'd1000001-0000-4000-8000-000000000099', NULL)
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================

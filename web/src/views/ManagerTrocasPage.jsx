@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { readApiResponse } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
@@ -12,6 +13,8 @@ const formatDisplayDate = (dateString) =>
     fullDateFormatter.format(new Date(`${dateString}T12:00:00-03:00`)).replace(/\//g, '-');
 
 export default function ManagerTrocasPage() {
+    const { session } = useAuth();
+    const gestorId = session?.id || '';
     const [units, setUnits] = useState([]);
     const [unitId, setUnitId] = useState('');
     const [pedidos, setPedidos] = useState([]);
@@ -20,17 +23,20 @@ export default function ManagerTrocasPage() {
     const [busyId, setBusyId] = useState(null);
 
     useEffect(() => {
-        fetch('/api/manager/unidades')
+        if (!gestorId) return;
+        fetch(`/api/manager/unidades?gestorId=${encodeURIComponent(gestorId)}`)
             .then((r) => (r.ok ? r.json() : []))
             .then(setUnits)
             .catch(() => setUnits([]));
-    }, []);
+    }, [gestorId]);
 
     const load = async () => {
         setLoading(true);
         setError('');
         try {
-            const q = unitId ? `?unidadeId=${encodeURIComponent(unitId)}` : '';
+            const q = unitId
+                ? `?unidadeId=${encodeURIComponent(unitId)}&gestorId=${encodeURIComponent(gestorId)}`
+                : `?gestorId=${encodeURIComponent(gestorId)}`;
             const r = await fetch(`/api/manager/trocas-pendentes${q}`);
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Nao foi possivel carregar.');
@@ -44,8 +50,9 @@ export default function ManagerTrocasPage() {
     };
 
     useEffect(() => {
+        if (!gestorId) return;
         load();
-    }, [unitId]);
+    }, [unitId, gestorId]);
 
     const decidir = async (pedidoId, aprovar) => {
         setBusyId(pedidoId);
@@ -54,7 +61,7 @@ export default function ManagerTrocasPage() {
             const r = await fetch(`/api/manager/trocas/${pedidoId}/decidir`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ aprovar })
+                body: JSON.stringify({ aprovar, gestorId })
             });
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Operacao falhou.');

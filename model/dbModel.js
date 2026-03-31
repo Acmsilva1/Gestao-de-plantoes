@@ -36,6 +36,15 @@ const unwrap = (response, defaultMessage) => {
     return response.data;
 };
 
+const normalizeLabelToSlug = (rawLabel) =>
+    String(rawLabel || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 24) || 'unidade';
+
 export const dbModel = {
     async getUnits() {
         const response = await supabase.from('unidades').select('id, nome, endereco').order('nome', { ascending: true });
@@ -471,6 +480,10 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao criar pedido de assumir');
     },
+    async getPedidoAssumirById(pedidoId) {
+        const response = await supabase.from('pedidos_assumir_escala').select('*').eq('id', pedidoId).maybeSingle();
+        return unwrap(response, 'Falha ao carregar pedido de assumir');
+    },
     async listPedidosAssumirParaGestor(unidadeId) {
         let query = supabase
             .from('pedidos_assumir_escala')
@@ -826,12 +839,95 @@ export const dbModel = {
     async managerLogin(usuario, senhaUrlPlaintext) {
         const response = await supabase
             .from('gestores')
-            .select('id, nome, usuario, senha, perfis(nome)')
+            .select('id, nome, usuario, senha, unidade_id, unidades(nome), perfis(nome)')
             .eq('usuario', usuario)
             .eq('senha', senhaUrlPlaintext)
             .maybeSingle();
             
         return unwrap(response, 'Usuário ou senha inválidos.');
+    },
+    async getManagerById(managerId) {
+        const response = await supabase
+            .from('gestores')
+            .select('id, nome, usuario, senha, unidade_id, unidades(nome), perfis(nome)')
+            .eq('id', managerId)
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao carregar gestor');
+    },
+    async listManagerProfiles() {
+        const response = await supabase
+            .from('gestores')
+            .select('id, nome, usuario, senha, unidade_id, unidades(nome), perfis(nome)')
+            .order('nome', { ascending: true });
+
+        return unwrap(response, 'Falha ao listar gestores');
+    },
+    async ensureManagersPerUnit() {
+        const units = await this.getUnits();
+        if (!units?.length) return [];
+
+        const perfilResp = await supabase.from('perfis').select('id').eq('nome', 'GESTOR').maybeSingle();
+        let perfil = unwrap(perfilResp, 'Falha ao carregar perfil GESTOR');
+
+        if (!perfil?.id) {
+            const insertPerfilResp = await supabase.from('perfis').insert({ nome: 'GESTOR' }).select('id').single();
+            perfil = unwrap(insertPerfilResp, 'Falha ao criar perfil GESTOR');
+        }
+        const perfilMasterResp = await supabase.from('perfis').select('id').eq('nome', 'GESTOR_MASTER').maybeSingle();
+        let perfilMaster = unwrap(perfilMasterResp, 'Falha ao carregar perfil GESTOR_MASTER');
+        if (!perfilMaster?.id) {
+            const insertMasterResp = await supabase.from('perfis').insert({ nome: 'GESTOR_MASTER' }).select('id').single();
+            perfilMaster = unwrap(insertMasterResp, 'Falha ao criar perfil GESTOR_MASTER');
+        }
+
+        const existingResp = await supabase.from('gestores').select('id, unidade_id');
+        const existing = unwrap(existingResp, 'Falha ao carregar gestores existentes');
+        const unitsWithManager = new Set((existing || []).map((g) => g.unidade_id).filter(Boolean));
+
+        const rowsToInsert = [];
+        for (const unit of units) {
+            if (unitsWithManager.has(unit.id)) continue;
+            rowsToInsert.push({
+                nome: `Gestor ${unit.nome}`,
+                usuario: `gestor.${normalizeLabelToSlug(unit.nome)}-${unit.id.slice(0, 6)}`,
+                senha: '12345',
+                perfil_id: perfil.id,
+                unidade_id: unit.id
+            });
+        }
+
+        if (rowsToInsert.length > 0) {
+            const insertResp = await supabase.from('gestores').insert(rowsToInsert);
+            if (insertResp.error) {
+                if (/unidade_id|column .* does not exist/i.test(insertResp.error.message || '')) {
+                    throw new Error('Falta coluna gestores.unidade_id. Execute model/gestores_por_unidade.sql no Supabase.');
+                }
+                throw new Error(`Falha ao criar gestores por unidade: ${insertResp.error.message}`);
+            }
+        }
+
+        const masterExistsResp = await supabase
+            .from('gestores')
+            .select('id')
+            .eq('usuario', 'gestor.master')
+            .maybeSingle();
+        const masterExists = unwrap(masterExistsResp, 'Falha ao verificar gestor master');
+
+        if (!masterExists) {
+            const insertMasterManagerResp = await supabase.from('gestores').insert({
+                nome: 'Gestor Master',
+                usuario: 'gestor.master',
+                senha: '12345',
+                perfil_id: perfilMaster.id,
+                unidade_id: null
+            });
+            if (insertMasterManagerResp.error) {
+                throw new Error(`Falha ao criar gestor master: ${insertMasterManagerResp.error.message}`);
+            }
+        }
+
+        return this.listManagerProfiles();
     },
     async updateManagerProfile(managerId, data) {
         const response = await supabase
@@ -842,7 +938,7 @@ export const dbModel = {
                 senha: data.senha
             })
             .eq('id', managerId)
-            .select('id, nome, usuario, senha, perfis(nome)')
+            .select('id, nome, usuario, senha, unidade_id, unidades(nome), perfis(nome)')
             .single();
 
         return unwrap(response, 'Falha ao atualizar perfil do gestor.');
@@ -886,6 +982,15 @@ export const dbModel = {
             .order('nome', { ascending: true });
 
         return unwrap(response, 'Falha ao carregar lista de médicos e acessos.');
+    },
+    async getDoctorsAccessListByUnit(unidadeId) {
+        const response = await supabase
+            .from('medicos')
+            .select('id, nome, crm, especialidade, unidade_fixa_id, telefone, senha, unidades!medicos_unidade_fixa_id_fkey(nome), medico_acessos_unidade(unidade_id)')
+            .eq('unidade_fixa_id', unidadeId)
+            .order('nome', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar lista de médicos da unidade.');
     },
     async saveDoctorAccess(medicoId, unidadesIds, gestorId) {
         // Limpa os acessos anteriores deste medico
@@ -938,13 +1043,15 @@ export const dbModel = {
         return unwrap(response, 'Falha ao recuperar sua agenda de plantões.');
     },
     async updateDoctorProfile(medicoId, data) {
+        const payload = {};
+        if (Object.prototype.hasOwnProperty.call(data, 'nome')) payload.nome = data.nome;
+        if (Object.prototype.hasOwnProperty.call(data, 'telefone')) payload.telefone = data.telefone;
+        if (Object.prototype.hasOwnProperty.call(data, 'senha')) payload.senha = data.senha;
+        if (Object.prototype.hasOwnProperty.call(data, 'unidadeFixaId')) payload.unidade_fixa_id = data.unidadeFixaId;
+
         const response = await supabase
             .from('medicos')
-            .update({
-                nome: data.nome,
-                telefone: data.telefone,
-                senha: data.senha
-            })
+            .update(payload)
             .eq('id', medicoId)
             .select()
             .single();

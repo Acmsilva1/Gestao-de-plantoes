@@ -5,6 +5,7 @@ import { readApiResponse } from '../../utils/api';
 
 export default function ManagerAccessControl() {
     const { session } = useAuth();
+    const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
     
     const [doctors, setDoctors] = useState([]);
     const [units, setUnits] = useState([]);
@@ -30,13 +31,14 @@ export default function ManagerAccessControl() {
         telefone: '',
         senha: ''
     });
+    const gestorId = session?.id || '';
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const [resDocs, resUnits] = await Promise.all([
-                fetch('/api/manager/medicos'),
-                fetch('/api/manager/unidades')
+                fetch(`/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`),
+                fetch(`/api/manager/unidades?gestorId=${encodeURIComponent(gestorId)}`)
             ]);
             
             // Safe-parse: evita crash em respostas vazias ou HTML de erro (Unexpected end of JSON input)
@@ -81,8 +83,9 @@ export default function ManagerAccessControl() {
     };
 
     useEffect(() => {
+        if (!gestorId) return;
         fetchData();
-    }, []);
+    }, [gestorId]);
 
     const handleDoctorChange = (e) => {
         const docId = e.target.value;
@@ -111,7 +114,7 @@ export default function ManagerAccessControl() {
             const response = await fetch('/api/manager/medicos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newDoc)
+                body: JSON.stringify({ ...newDoc, gestorId })
             });
             const data = await readApiResponse(response);
             if (!response.ok) throw new Error(data.error || 'Falha ao cadastrar médico.');
@@ -134,7 +137,8 @@ export default function ManagerAccessControl() {
         setSaving(true);
         try {
             const response = await fetch(`/api/manager/medicos/${selectedDoctorId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'x-gestor-id': gestorId }
             });
             if (!response.ok) throw new Error('Falha ao excluir médico.');
 
@@ -161,7 +165,9 @@ export default function ManagerAccessControl() {
                 body: JSON.stringify({
                     nome: docData.nome,
                     telefone: docData.telefone,
-                    senha: docData.senha
+                    senha: docData.senha,
+                    unidadeFixaId: docData.unidadeFixaId,
+                    gestorId
                 })
             });
 
@@ -395,6 +401,33 @@ export default function ManagerAccessControl() {
                                         />
                                     </div>
                                 </div>
+
+                                {isMaster && (
+                                    <div className="mt-4 space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Unidade Fixa (Master)</label>
+                                        <select
+                                            value={selectedDoctor.unidadeFixaId || ''}
+                                            onChange={(e) => {
+                                                const nextUnitId = e.target.value;
+                                                const nextUnit = units.find((u) => u.id === nextUnitId);
+                                                const newDoctors = doctors.map((d) =>
+                                                    d.id === selectedDoctor.id
+                                                        ? { ...d, unidadeFixaId: nextUnitId, unidadeFixaNome: nextUnit?.nome || '' }
+                                                        : d
+                                                );
+                                                setDoctors(newDoctors);
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition"
+                                        >
+                                            <option value="">-- Selecione a unidade --</option>
+                                            {units.map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.nome}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
 
                                 <button 
                                     onClick={handleDeleteDoctor}

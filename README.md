@@ -405,6 +405,7 @@ A entrada no app é por **seleção de perfil no frontend** (sem `POST` de login
 
 ### Gestor
 
+- `GET /api/manager/perfis`
 - `GET /api/manager/dashboard`
 - `GET /api/manager/medicos`
 - `GET /api/manager/unidades`
@@ -414,6 +415,9 @@ A entrada no app é por **seleção de perfil no frontend** (sem `POST` de login
 - `POST /api/manager/perfil/:id`
 - `POST /api/manager/medicos`
 - `DELETE /api/manager/medicos/:id`
+
+Observação: rotas de gestor que alteram ou consultam dados por unidade exigem `gestorId` (query, body ou header `x-gestor-id`) e ficam restritas à unidade vinculada ao gestor.
+`GESTOR_MASTER` tem escopo global para médicos/unidades/escala; `trocas` e `aceites` ficam indisponíveis para esse perfil.
 
 ## PWA
 
