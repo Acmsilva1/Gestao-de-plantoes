@@ -33,7 +33,13 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{ session, login, logout, loading }}>
-            {!loading && children}
+            {loading ? (
+                <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+                    A carregar sessão…
+                </div>
+            ) : (
+                children
+            )}
         </AuthContext.Provider>
     );
 };

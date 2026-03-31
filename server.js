@@ -34,7 +34,13 @@ import {
     createDoctor,
     deleteDoctor,
     getTrocasPendentesGestor,
-    postDecidirTrocaGestor
+    postDecidirTrocaGestor,
+    getAssumirPendentesGestor,
+    postDecidirAssumirGestor,
+    getEscalaEditor,
+    postEscalaLinha,
+    deleteEscalaLinha,
+    putEscalaMesVisibilidade
 } from './api/ManagerService.js';
 
 const app = express();
@@ -92,6 +98,12 @@ app.post('/api/manager/medicos', createDoctor);
 app.delete('/api/manager/medicos/:id', deleteDoctor);
 app.get('/api/manager/trocas-pendentes', getTrocasPendentesGestor);
 app.post('/api/manager/trocas/:pedidoId/decidir', postDecidirTrocaGestor);
+app.get('/api/manager/assumir-pendentes', getAssumirPendentesGestor);
+app.post('/api/manager/assumir/:pedidoId/decidir', postDecidirAssumirGestor);
+app.get('/api/manager/escala-editor', getEscalaEditor);
+app.post('/api/manager/escala/linha', postEscalaLinha);
+app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);
+app.put('/api/manager/escala/mes-visibilidade', putEscalaMesVisibilidade);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));

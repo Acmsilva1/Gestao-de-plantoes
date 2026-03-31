@@ -1,0 +1,23 @@
+---
+description: Preferência do utilizador — modo Plan económico e autorização antes de alterações
+alwaysApply: true
+---
+
+## Modo Plan económico
+
+- O utilizador prefere trabalhar no **modo Plan de forma económica**: planos **curtos**, focados só no pedido, sem expansão desnecessária de âmbito.
+- Em **Plan**: **não executar** implementação nem editar código/configurações até o utilizador pedir **explícita** execução (por exemplo «implementa», «executa o plano», «podes aplicar», «pode fazer»).
+
+## Só o que foi pedido
+
+- Fazer **apenas** o que foi solicitado na mensagem; **não** acrescentar melhorias, refactors ou ficheiros extra sem pedido explícito.
+
+## Autorização antes de mudanças (Agent / execução)
+
+- Antes de **começar** alterações em ficheiros, comandos ou commits, **pedir confirmação** quando o pedido for ambíguo ou não incluir ordem clara de execução.
+- Se o utilizador disser explicitamente para aplicar/implementar/executar, **pode iniciar** sem novo pedido de confirmação.
+- Se houver ambiguidade entre «refinar o plano» e «executar», **assumir refinamento** (Plan) e não editar até estar claro.
+
+## Idioma
+
+- Respostas ao utilizador em **português**, salvo pedido em contrário.

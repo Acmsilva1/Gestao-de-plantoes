@@ -740,15 +740,24 @@ export default function DoctorView() {
                 throw new Error(msg);
             }
 
+            setState((current) => {
+                if (current.selectedMonth !== month) {
+                    return { ...current, loadingCalendar: false };
+                }
+                return {
+                    ...current,
+                    loadingCalendar: false,
+                    calendar: data,
+                    bookedShiftIds: data?.bookedShiftIds || [],
+                    shiftDetailModal: null
+                };
+            });
+        } catch (error) {
             setState((current) => ({
                 ...current,
                 loadingCalendar: false,
-                calendar: data,
-                bookedShiftIds: data?.bookedShiftIds || [],
-                shiftDetailModal: null
+                error: error.message
             }));
-        } catch (error) {
-            setState((current) => ({ ...current, loadingCalendar: false, error: error.message }));
         }
     };
 
@@ -782,13 +791,14 @@ export default function DoctorView() {
     };
 
     useEffect(() => {
-        if (session?.id) {
-            loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
-            loadTrocasResumo(session.id);
+        if (!session?.id) return;
 
-            if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
-                setState((prev) => ({ ...prev, showPasswordSuggestion: true }));
-            }
+        loadCalendar(session.id, state.selectedMonth, state.selectedUnitId);
+
+        loadTrocasResumo(session.id);
+
+        if (session.senha === '12345' && !localStorage.getItem(`hide_pass_suggest_${session.id}`)) {
+            setState((prev) => ({ ...prev, showPasswordSuggestion: true }));
         }
     }, [session?.id, state.selectedMonth, state.selectedUnitId]);
 
@@ -824,7 +834,9 @@ export default function DoctorView() {
     } = state;
 
     const calendarDays = buildCalendarDayEntries(selectedMonth, calendar?.shifts || []);
-    const outsideForecast = isOutsideForecastWindow(selectedMonth);
+    const monthEmProcessamento = Boolean(calendar && calendar.escalaVisivel === false);
+    const motivoOcultacaoEscala = calendar?.motivoOcultacao ?? null;
+    const outsideForecast = !monthEmProcessamento && isOutsideForecastWindow(selectedMonth);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
 
     if (!session) return null;
@@ -950,7 +962,10 @@ export default function DoctorView() {
                 </header>
 
                 <section className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
-                    <div className="text-sm text-slate-300">Navegue pelo mês. A escala é definida pelo gestor da regional; pedidos de troca virão depois.</div>
+                    <div className="text-sm text-slate-300">
+                        Navegue pelo mês. A visibilidade da escala é definida pelo gestor: meses futuros podem aparecer como «Em processamento» até existir liberação explícita;
+                        se o gestor bloquear o mês, verá uma mensagem a indicar o bloqueio.
+                    </div>
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
@@ -1012,6 +1027,17 @@ export default function DoctorView() {
 
                     {loadingCalendar ? (
                         <div className="rounded-3xl bg-slate-950/50 p-10 text-center text-slate-300">Carregando escala...</div>
+                    ) : monthEmProcessamento ? (
+                        <div className="rounded-3xl border border-slate-700/80 bg-slate-950/60 px-6 py-16 text-center">
+                            <p className="text-xl font-black text-white">
+                                {motivoOcultacaoEscala === 'bloqueado_gestor' ? 'Escala bloqueada' : 'Em processamento'}
+                            </p>
+                            <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">
+                                {motivoOcultacaoEscala === 'bloqueado_gestor'
+                                    ? 'O gestor da regional bloqueou a visualização deste mês. Entre em contacto com a coordenação se precisar de esclarecimentos.'
+                                    : 'A escala deste mês ainda não está disponível para visualização. Aguarde a liberação pelo gestor da regional (ou tente novamente mais tarde).'}
+                            </p>
+                        </div>
                     ) : (
                         <>
                             <div className="mb-4 hidden grid-cols-7 gap-3 md:grid">

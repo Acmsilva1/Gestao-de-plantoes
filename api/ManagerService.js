@@ -1,4 +1,5 @@
 import { dbModel } from '../model/dbModel.js';
+import { TURNOS_ESCALA } from './DirecionadorService.js';
 
 const getMonthDates = (monthStr) => {
     // monthStr format "YYYY-MM"
@@ -382,5 +383,143 @@ export const postDecidirTrocaGestor = async (req, res) => {
         }
     } catch (err) {
         res.status(400).json({ error: err.message });
+    }
+};
+
+export const getAssumirPendentesGestor = async (req, res) => {
+    const { unidadeId } = req.query;
+
+    try {
+        const pedidos = await dbModel.listPedidosAssumirParaGestor(unidadeId || null);
+        res.json({ pedidos });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar pedidos de assumir.', details: err.message });
+    }
+};
+
+export const postDecidirAssumirGestor = async (req, res) => {
+    const { pedidoId } = req.params;
+    const { aprovar } = req.body ?? {};
+
+    try {
+        if (typeof aprovar !== 'boolean') {
+            return res.status(400).json({ error: 'Informe aprovar: true ou false.' });
+        }
+
+        if (aprovar) {
+            await dbModel.aprovarPedidoAssumirGestorRpc(pedidoId);
+            res.json({ message: 'Pedido aprovado. O medico foi locado na escala.' });
+        } else {
+            await dbModel.recusarPedidoAssumirGestor(pedidoId);
+            res.json({ message: 'Pedido de assumir recusado pelo gestor.' });
+        }
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+const monthBounds = (mes) => {
+    const [y, mo] = mes.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    return { start: `${mes}-01`, end: `${mes}-${String(lastDay).padStart(2, '0')}` };
+};
+
+export const getEscalaEditor = async (req, res) => {
+    const { unidadeId, year: yearStr } = req.query;
+
+    if (!unidadeId || !yearStr) {
+        return res.status(400).json({ error: 'Informe unidadeId e year (YYYY).' });
+    }
+
+    const year = parseInt(yearStr, 10);
+    if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+        return res.status(400).json({ error: 'Ano invalido.' });
+    }
+
+    try {
+        const [linhas, publicacoes] = await Promise.all([
+            dbModel.getEscalaByUnitAndYear(unidadeId, year),
+            dbModel.listEscalaMesPublicacaoForUnitYear(unidadeId, year)
+        ]);
+
+        const pubByMes = new Map((publicacoes || []).map((p) => [p.mes, p]));
+        const months = [];
+
+        for (let m = 1; m <= 12; m += 1) {
+            const mes = `${year}-${String(m).padStart(2, '0')}`;
+            const { start, end } = monthBounds(mes);
+            const mesLinhas = (linhas || []).filter((r) => r.data_plantao >= start && r.data_plantao <= end);
+            const pub = pubByMes.get(mes);
+            months.push({
+                mes,
+                publicacao: pub ? { status: pub.status, updated_at: pub.updated_at } : null,
+                linhas: mesLinhas
+            });
+        }
+
+        res.json({ year, unidadeId, months });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar editor de escala.', details: err.message });
+    }
+};
+
+export const postEscalaLinha = async (req, res) => {
+    const { unidadeId, medicoId, data_plantao, turno } = req.body ?? {};
+
+    if (!unidadeId || !medicoId || !data_plantao || !turno) {
+        return res.status(400).json({ error: 'Campos obrigatorios: unidadeId, medicoId, data_plantao, turno.' });
+    }
+
+    if (!TURNOS_ESCALA.has(turno)) {
+        return res.status(400).json({ error: 'Turno invalido. Use: Manhã, Tarde, Noite ou Madrugada.' });
+    }
+
+    try {
+        const row = await dbModel.insertEscalaRow({ unidadeId, medicoId, data_plantao, turno });
+        res.status(201).json({ id: row.id });
+    } catch (err) {
+        if (/duplicate|unique/i.test(err.message)) {
+            return res.status(409).json({ error: 'Este medico ja esta locado neste turno.' });
+        }
+        res.status(500).json({ error: 'Erro ao inserir linha na escala.', details: err.message });
+    }
+};
+
+export const deleteEscalaLinha = async (req, res) => {
+    const { id } = req.params;
+    const { unidadeId } = req.query;
+
+    if (!unidadeId) {
+        return res.status(400).json({ error: 'Informe unidadeId na query string.' });
+    }
+
+    try {
+        await dbModel.deleteEscalaRowById(id, unidadeId);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+export const putEscalaMesVisibilidade = async (req, res) => {
+    const { unidadeId, mes, status } = req.body ?? {};
+
+    if (!unidadeId || !mes || !status) {
+        return res.status(400).json({ error: 'Campos obrigatorios: unidadeId, mes (YYYY-MM), status.' });
+    }
+
+    if (!/^\d{4}-\d{2}$/.test(mes)) {
+        return res.status(400).json({ error: 'mes deve estar no formato YYYY-MM.' });
+    }
+
+    if (status !== 'LIBERADO' && status !== 'BLOQUEADO') {
+        return res.status(400).json({ error: 'status deve ser LIBERADO ou BLOQUEADO.' });
+    }
+
+    try {
+        const row = await dbModel.upsertEscalaMesPublicacao({ unidadeId, mes, status });
+        res.json({ publicacao: { mes: row.mes, status: row.status, updated_at: row.updated_at } });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao gravar visibilidade do mes.', details: err.message });
     }
 };

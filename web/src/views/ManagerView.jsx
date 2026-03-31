@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, CalendarDays, ShieldCheck, Lock, UserCog, ArrowLeftRight } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ManagerDashboard from '../components/Manager/Dashboard';
+import { ManagerEscalaSidebarProvider, useManagerEscalaSidebar } from '../context/ManagerEscalaSidebarContext.jsx';
 import ManagerAccess from '../components/Manager/AccessControl';
-import CalendarPage from './CalendarPage';
 import ManagerTrocasPage from './ManagerTrocasPage';
+import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
+import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
 import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
@@ -115,7 +116,16 @@ const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
 };
 
 export default function ManagerView() {
+    return (
+        <ManagerEscalaSidebarProvider>
+            <GestorChrome />
+        </ManagerEscalaSidebarProvider>
+    );
+}
+
+function GestorChrome() {
     const { session, logout } = useAuth();
+    const { doctors, doctorsLoading, selectedMedicoId, setSelectedMedicoId, isEscalaRoute } = useManagerEscalaSidebar();
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
 
@@ -124,6 +134,12 @@ export default function ManagerView() {
             setShowPasswordSuggestion(true);
         }
     }, [session?.id, session?.senha]);
+
+    const asideWidthClass = isEscalaRoute
+        ? 'lg:w-80 lg:min-w-[20rem] xl:min-w-[22rem]'
+        : 'lg:w-64 lg:min-w-64';
+
+    const mainInnerClass = isEscalaRoute ? 'mx-auto w-full max-w-none' : 'mx-auto max-w-7xl lg:max-w-[100rem]';
 
     return (
         <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.15),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100 lg:flex">
@@ -142,27 +158,15 @@ export default function ManagerView() {
             )}
 
             {/* Sidebar */}
-            <aside className="w-full border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:w-64 lg:min-w-64 lg:border-b-0 lg:border-r lg:p-6">
-                <div className="mb-4 lg:mb-10">
+            <aside
+                className={`flex w-full flex-col border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:max-h-screen lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-6 ${asideWidthClass}`}
+            >
+                <div className="mb-4 shrink-0 lg:mb-6">
                     <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">GESTÃO DE PLANTÕES</p>
                     <h1 className="text-2xl font-black tracking-tight text-white">Central do Gestor</h1>
                 </div>
 
-                <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-1 lg:flex-col">
-                    <NavLink
-                        to="/gestor/dashboard"
-                        className={({ isActive }) => 
-                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                isActive 
-                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                            }`
-                        }
-                    >
-                        <LayoutDashboard size={18} />
-                        Dashboards
-                    </NavLink>
-                    
+                <nav className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-col">
                     <NavLink
                         to="/gestor/acessos"
                         className={({ isActive }) => 
@@ -178,7 +182,7 @@ export default function ManagerView() {
                     </NavLink>
 
                     <NavLink
-                        to="/gestor/calendario"
+                        to="/gestor/escala"
                         className={({ isActive }) => 
                             `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                                 isActive 
@@ -187,8 +191,8 @@ export default function ManagerView() {
                             }`
                         }
                     >
-                        <CalendarDays size={18} />
-                        Calendário
+                        <CalendarRange size={18} />
+                        Editor de escala
                     </NavLink>
 
                     <NavLink
@@ -204,8 +208,51 @@ export default function ManagerView() {
                         <ArrowLeftRight size={18} />
                         Trocas
                     </NavLink>
+
+                    <NavLink
+                        to="/gestor/aceites-assumir"
+                        className={({ isActive }) => 
+                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                isActive 
+                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                            }`
+                        }
+                    >
+                        <ClipboardCheck size={18} />
+                        Aceites (vagos)
+                    </NavLink>
                 </nav>
 
+                {isEscalaRoute ? (
+                    <div className="mt-6 flex min-h-0 flex-1 flex-col border-t border-slate-800 pt-4 lg:mt-6">
+                        <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Médicos</p>
+                        <p className="mb-3 text-xs text-slate-500">Selecione na lista antes de confirmar num turno.</p>
+                        <div className="max-h-[40vh] min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 lg:max-h-[calc(100vh-12rem)]">
+                            {doctorsLoading ? (
+                                <p className="text-xs text-slate-500">A carregar…</p>
+                            ) : doctors.length === 0 ? (
+                                <p className="text-sm text-slate-500">Nenhum médico listado.</p>
+                            ) : (
+                                doctors.map((d) => (
+                                    <button
+                                        key={d.id}
+                                        type="button"
+                                        onClick={() => setSelectedMedicoId(d.id)}
+                                        className={`flex w-full flex-col rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
+                                            selectedMedicoId === d.id
+                                                ? 'border-sky-400/50 bg-sky-500/15 text-sky-100'
+                                                : 'border-transparent bg-slate-950/60 text-slate-300 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <span className="font-bold break-words leading-tight">{d.nome}</span>
+                                        <span className="text-xs text-slate-500">CRM {d.crm}</span>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                ) : null}
             </aside>
 
             {/* Main Content Area */}
@@ -236,14 +283,17 @@ export default function ManagerView() {
                 </header>
 
                 <div className="px-4 py-6 sm:px-6 lg:p-10">
-                    <div className="mx-auto max-w-6xl">
+                    <div className={mainInnerClass}>
                         <Routes>
-                            <Route path="dashboard" element={<ManagerDashboard />} />
                             <Route path="acessos" element={<ManagerAccess />} />
-                            <Route path="calendario" element={<CalendarPage />} />
+                            <Route path="escala" element={<ManagerEscalaEditorPage />} />
                             <Route path="trocas" element={<ManagerTrocasPage />} />
-                            <Route path="agenda" element={<Navigate to="/gestor/calendario" replace />} />
-                            <Route path="*" element={<Navigate to="dashboard" replace />} />
+                            <Route path="aceites-assumir" element={<ManagerAceitesAssumirPage />} />
+                            <Route path="dashboard" element={<Navigate to="/gestor/acessos" replace />} />
+                            <Route path="calendario" element={<Navigate to="/gestor/acessos" replace />} />
+                            <Route path="agenda" element={<Navigate to="/gestor/acessos" replace />} />
+                            <Route path="" element={<Navigate to="/gestor/acessos" replace />} />
+                            <Route path="*" element={<Navigate to="/gestor/acessos" replace />} />
                         </Routes>
                     </div>
                 </div>

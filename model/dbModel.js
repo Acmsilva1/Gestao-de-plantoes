@@ -226,6 +226,86 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao inserir na escala');
     },
+    async getEscalaByUnitAndYear(unidadeId, year) {
+        const start = `${year}-01-01`;
+        const end = `${year}-12-31`;
+        const response = await supabase
+            .from('escala')
+            .select(
+                `
+                id,
+                unidade_id,
+                medico_id,
+                data_plantao,
+                turno,
+                unidades(nome),
+                medicos(id, nome, crm, especialidade)
+            `
+            )
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', start)
+            .lte('data_plantao', end)
+            .order('data_plantao', { ascending: true });
+
+        return unwrap(response, 'Falha ao carregar escala do ano');
+    },
+    async getEscalaMesPublicacao(unidadeId, mes) {
+        const response = await supabase
+            .from('escala_mes_publicacao')
+            .select('*')
+            .eq('unidade_id', unidadeId)
+            .eq('mes', mes)
+            .maybeSingle();
+
+        if (response.error && /relation|does not exist/i.test(response.error.message)) {
+            return null;
+        }
+
+        return unwrap(response, 'Falha ao carregar publicacao do mes');
+    },
+    async listEscalaMesPublicacaoForUnitYear(unidadeId, year) {
+        const mesMin = `${year}-01`;
+        const mesMax = `${year}-12`;
+        const response = await supabase
+            .from('escala_mes_publicacao')
+            .select('*')
+            .eq('unidade_id', unidadeId)
+            .gte('mes', mesMin)
+            .lte('mes', mesMax);
+
+        if (response.error && /relation|does not exist/i.test(response.error.message)) {
+            return [];
+        }
+
+        const rows = unwrap(response, 'Falha ao listar publicacoes do ano');
+        return rows || [];
+    },
+    async upsertEscalaMesPublicacao({ unidadeId, mes, status }) {
+        const response = await supabase
+            .from('escala_mes_publicacao')
+            .upsert(
+                {
+                    unidade_id: unidadeId,
+                    mes,
+                    status,
+                    updated_at: new Date().toISOString()
+                },
+                { onConflict: 'unidade_id,mes' }
+            )
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao gravar publicacao do mes');
+    },
+    async deleteEscalaRowById(escalaId, unidadeId) {
+        const response = await supabase.from('escala').delete().eq('id', escalaId).eq('unidade_id', unidadeId).select('id').maybeSingle();
+
+        const row = unwrap(response, 'Falha ao remover linha da escala');
+        if (!row) {
+            throw new Error('Linha nao encontrada ou unidade diferente.');
+        }
+        return row;
+    },
     async getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId) {
         const response = await supabase
             .from('escala')
@@ -347,6 +427,74 @@ export const dbModel = {
     async recusarPedidoTrocaGestor(pedidoId) {
         const response = await supabase
             .from('pedidos_troca_escala')
+            .update({
+                status: 'RECUSADO_GESTOR',
+                gestor_respondeu_em: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId)
+            .eq('status', 'AGUARDANDO_GESTOR')
+            .select('*')
+            .maybeSingle();
+
+        const row = unwrap(response, 'Falha ao recusar pedido');
+        if (!row) {
+            throw new Error('Pedido nao encontrado ou ja decidido.');
+        }
+        return row;
+    },
+    async _enrichPedidosAssumirComMedicos(rows) {
+        if (!rows?.length) return [];
+        const ids = [...new Set(rows.map((r) => r.medico_solicitante_id))];
+        const { data: meds, error } = await supabase.from('medicos').select('id, nome, crm, especialidade').in('id', ids);
+        if (error) {
+            throw new Error(`Falha ao carregar medicos dos pedidos: ${error.message}`);
+        }
+        const byId = Object.fromEntries((meds || []).map((m) => [m.id, m]));
+        return rows.map((r) => ({
+            ...r,
+            solicitante: byId[r.medico_solicitante_id]
+        }));
+    },
+    async createPedidoAssumirEscala(row) {
+        const response = await supabase
+            .from('pedidos_assumir_escala')
+            .insert({
+                unidade_id: row.unidadeId,
+                data_plantao: row.dataPlantao,
+                turno: row.turno,
+                medico_solicitante_id: row.solicitanteId,
+                status: 'AGUARDANDO_GESTOR'
+            })
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao criar pedido de assumir');
+    },
+    async listPedidosAssumirParaGestor(unidadeId) {
+        let query = supabase
+            .from('pedidos_assumir_escala')
+            .select('*, unidades(nome)')
+            .eq('status', 'AGUARDANDO_GESTOR')
+            .order('created_at', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        const rows = unwrap(response, 'Falha ao listar pedidos de assumir');
+        return this._enrichPedidosAssumirComMedicos(rows || []);
+    },
+    async aprovarPedidoAssumirGestorRpc(pedidoId) {
+        const response = await supabase.rpc('aprovar_pedido_assumir_gestor', { p_pedido_id: pedidoId });
+        if (response.error) {
+            throw new Error(response.error.message || 'Falha ao aprovar pedido de assumir');
+        }
+    },
+    async recusarPedidoAssumirGestor(pedidoId) {
+        const response = await supabase
+            .from('pedidos_assumir_escala')
             .update({
                 status: 'RECUSADO_GESTOR',
                 gestor_respondeu_em: new Date().toISOString(),

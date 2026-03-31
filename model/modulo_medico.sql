@@ -243,3 +243,5 @@ VALUES
 -- Calendário demo: março/2026. Dias 7, 13, 14, 20, 21, 28 sem linhas (furos); vários turnos/dia sem médico.
 
 -- Pedidos de troca (colega → gestor → escala): executar também model/pedidos_troca_escala.sql no Supabase.
+-- Pedidos assumir vago (gestor → escala): executar também model/pedidos_assumir_escala.sql no Supabase.
+-- Publicação da escala por mês (Liberado/Bloqueado): executar também model/escala_mes_publicacao.sql no Supabase.

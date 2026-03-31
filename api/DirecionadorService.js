@@ -6,7 +6,7 @@ const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const PUBLIC_SHIFTS_TTL_MS = 30_000;
 const isReservationHoldTableMissing = (message = '') => /Could not find the table 'public\.reserva_holds'|relation "reserva_holds" does not exist/i.test(message);
 const shiftTurnOrder = { Madrugada: 0, Manhã: 1, Tarde: 2, Noite: 3 };
-const TURNOS_ESCALA = new Set(['Manhã', 'Tarde', 'Noite', 'Madrugada']);
+export const TURNOS_ESCALA = new Set(['Manhã', 'Tarde', 'Noite', 'Madrugada']);
 
 const resolveDoctorAuthorizedUnit = async (medicoId, unidadeId) => {
     const doctor = await dbModel.getDoctorById(medicoId);
@@ -193,7 +193,41 @@ export const getDoctorCalendar = async (req, res) => {
                 month,
                 unit: null,
                 specialty: doctor.especialidade,
-                shifts: []
+                shifts: [],
+                bookedShiftIds: [],
+                escalaVisivel: true,
+                motivoOcultacao: null
+            });
+        }
+
+        const currentMonthKey = getTodayKey().slice(0, 7);
+        let escalaVisivel = true;
+        let motivoOcultacao = null;
+
+        const pubRow = await dbModel.getEscalaMesPublicacao(selectedUnit.id, month);
+        if (pubRow?.status === 'BLOQUEADO') {
+            escalaVisivel = false;
+            motivoOcultacao = 'bloqueado_gestor';
+        } else if (pubRow?.status === 'LIBERADO') {
+            escalaVisivel = true;
+        } else if (month > currentMonthKey) {
+            escalaVisivel = false;
+            motivoOcultacao = 'mes_futuro';
+        }
+
+        if (!escalaVisivel) {
+            return res.json({
+                doctor: mappedDoctor,
+                month,
+                unit: {
+                    id: selectedUnit.id,
+                    nome: selectedUnit.nome
+                },
+                specialty: doctor.especialidade,
+                shifts: [],
+                bookedShiftIds: [],
+                escalaVisivel: false,
+                motivoOcultacao
             });
         }
 
@@ -212,7 +246,9 @@ export const getDoctorCalendar = async (req, res) => {
             },
             specialty: doctor.especialidade,
             bookedShiftIds,
-            shifts
+            shifts,
+            escalaVisivel: true,
+            motivoOcultacao: null
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar calendario do medico.', details: err.message });
@@ -328,9 +364,25 @@ export const postPedidoAssumirEscala = async (req, res) => {
             });
         }
 
-        res.json({
-            message: 'Solicitacao para assumir o turno enviada ao gestor para confirmacao.'
-        });
+        try {
+            const pedido = await dbModel.createPedidoAssumirEscala({
+                unidadeId,
+                dataPlantao: data_plantao,
+                turno,
+                solicitanteId: medicoId
+            });
+
+            res.status(201).json({
+                id: pedido.id,
+                status: pedido.status,
+                message: 'Solicitacao para assumir o turno enviada ao gestor para confirmacao.'
+            });
+        } catch (insertErr) {
+            if (/duplicate|unique|23505/i.test(String(insertErr.message))) {
+                return res.status(409).json({ error: 'Ja existe pedido pendente para este turno vago.' });
+            }
+            throw insertErr;
+        }
     } catch (err) {
         res.status(500).json({ error: 'Erro ao registar solicitacao de assumir.', details: err.message });
     }
