@@ -11,10 +11,10 @@ const initialState = {
     selectedMonth: new Date().toISOString().slice(0, 7),
     selectedUnitId: '',
     bookedShiftIds: [],
-    showAgendaModal: false,
+    showEscalaModal: false,
     showProfileModal: false,
     showPasswordSuggestion: false,
-    myAgenda: [],
+    myEscala: [],
     calendar: null,
     bookingConfigs: {},
     shiftDetailModal: null,
@@ -122,23 +122,23 @@ const buildBookingConfigLabel = (config) => {
     return 'Completo';
 };
 
-const buildAgendaBookingLabel = (agendaItem, fallbackConfig) => {
-    if (agendaItem?.tipoPlantao === 'PARCIAL') {
-        return agendaItem.horaInicio && agendaItem.horaFim
-            ? `Parcial • ${agendaItem.horaInicio.slice(0, 5)} às ${agendaItem.horaFim.slice(0, 5)}`
+const buildEscalaBookingLabel = (escalaItem, fallbackConfig) => {
+    if (escalaItem?.tipoPlantao === 'PARCIAL') {
+        return escalaItem.horaInicio && escalaItem.horaFim
+            ? `Parcial • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`
             : 'Parcial';
     }
 
-    if (agendaItem?.tipoPlantao === 'FIXO') {
+    if (escalaItem?.tipoPlantao === 'FIXO') {
         const rangeLabel =
-            agendaItem.dataInicioFixo && agendaItem.dataFimFixo
-                ? `${formatDisplayDate(agendaItem.dataInicioFixo)} até ${formatDisplayDate(agendaItem.dataFimFixo)}`
-                : agendaItem.dataFimFixo
-                  ? `até ${formatDisplayDate(agendaItem.dataFimFixo)}`
+            escalaItem.dataInicioFixo && escalaItem.dataFimFixo
+                ? `${formatDisplayDate(escalaItem.dataInicioFixo)} até ${formatDisplayDate(escalaItem.dataFimFixo)}`
+                : escalaItem.dataFimFixo
+                  ? `até ${formatDisplayDate(escalaItem.dataFimFixo)}`
                   : 'Sequência fixa';
 
-        if (agendaItem.horaInicio && agendaItem.horaFim) {
-            return `Fixo parcial • ${rangeLabel} • ${agendaItem.horaInicio.slice(0, 5)} às ${agendaItem.horaFim.slice(0, 5)}`;
+        if (escalaItem.horaInicio && escalaItem.horaFim) {
+            return `Fixo parcial • ${rangeLabel} • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`;
         }
 
         return `Fixo completo • ${rangeLabel}`;
@@ -777,17 +777,127 @@ export default function DoctorView() {
         }
     };
 
-    const fetchMyAgenda = async () => {
+    const fetchMyEscala = async () => {
         if (!session?.id) return;
         try {
             const response = await fetch(`/api/medicos/${session.id}/agenda`);
             const data = await parseJsonSafely(response);
             if (response.ok) {
-                setState((prev) => ({ ...prev, myAgenda: data || [], showAgendaModal: true }));
+                setState((prev) => ({ ...prev, myEscala: data || [], showEscalaModal: true }));
             }
         } catch (err) {
-            console.error('Erro ao buscar agenda:', err);
+            console.error('Erro ao buscar escala:', err);
         }
+    };
+
+    const handleDownloadEscalaHTML = () => {
+        if (!myEscala || myEscala.length === 0) return;
+
+        const sortedEscala = [...myEscala].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+        const rows = sortedEscala.map((item) => {
+            const label = buildEscalaBookingLabel(item, bookingConfigs[item.disponibilidadeId]);
+            return `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td class="py-4 px-6 font-mono text-sm text-blue-600 font-bold">${formatDisplayDate(item.data)}</td>
+                <td class="py-4 px-6 font-black uppercase tracking-tight text-blue-900">${item.unidade}</td>
+                <td class="py-4 px-6">
+                    <span class="inline-flex rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-[10px] font-black uppercase text-blue-600">
+                        ${item.turno}
+                    </span>
+                </td>
+                <td class="py-4 px-6 text-xs text-slate-500 font-bold uppercase tracking-widest">${label}</td>
+                <td class="py-4 px-6 text-xs text-slate-400 font-bold">${item.especialidade || '—'}</td>
+            </tr>
+            `;
+        }).join('');
+
+        const htmlReport = `
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escala Médica Individual - André Standard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased p-8 lg:p-20">
+    <div class="max-w-5xl mx-auto">
+        <!-- HEADER PADRÃO -->
+        <header class="flex flex-col gap-8 md:flex-row md:items-end md:justify-between border-b-8 border-blue-900 pb-12 transition-all">
+            <div>
+                <div class="flex items-center gap-3 text-blue-600 mb-4 animate-pulse">
+                    <i class="fas fa-user-md text-2xl"></i>
+                    <span class="text-xs font-black uppercase tracking-[0.4em]">Gestão Operacional de TI</span>
+                </div>
+                <h1 class="text-6xl font-black uppercase tracking-tight text-blue-900 leading-none">Escala Individual</h1>
+            </div>
+            <div class="text-right">
+                <div class="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Processamento de Dados</div>
+                <div class="text-3xl font-black text-blue-900 tracking-tighter">${new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+        </header>
+
+        <!-- INFO GRID -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12 mb-20">
+            <div class="bg-white p-8 rounded-2xl shadow-md border-l-8 border-blue-600">
+                <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Profissional</div>
+                <div class="text-2xl font-black text-blue-900 uppercase tracking-tight">${session.nome.toUpperCase()}</div>
+                <div class="text-sm font-bold text-slate-500 mt-1">CRM: ${session.crm}</div>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-md border-l-8 border-green-500">
+                <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Total de Plantões Confirmados</div>
+                <div class="text-4xl font-black text-blue-900 uppercase tracking-tight">${myEscala.length}</div>
+            </div>
+        </div>
+
+        <!-- ESCALA TABLE -->
+        <section class="mb-20">
+            <div class="flex items-center gap-4 mb-10 border-l-8 border-blue-900 pl-6">
+                <div class="h-14 w-14 rounded-2xl bg-blue-900 flex items-center justify-center text-white text-2xl">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-black uppercase tracking-tight text-blue-900">Plantões Confirmados</h2>
+                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Sua agenda na rede</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-blue-900 text-white text-[10px] font-black uppercase tracking-widest">
+                        <tr>
+                            <th class="py-6 px-6">Data</th>
+                            <th class="py-6 px-6">Unidade</th>
+                            <th class="py-6 px-6">Turno</th>
+                            <th class="py-6 px-6">Tipo de Alocação</th>
+                            <th class="py-6 px-6">Especialidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- FOOTER SIMPLES -->
+        <footer class="mt-20 border-t-2 border-slate-200 pt-8 text-center pb-20">
+            <div class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Fim do Relatório Operacional</div>
+        </footer>
+    </div>
+</body>
+</html>
+        `;
+
+        const blob = new Blob([htmlReport], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ESCALA_${session.nome.replace(/\s+/g, '_')}_${new Date().getTime()}.html`;
+        a.click();
     };
 
     useEffect(() => {
@@ -822,10 +932,10 @@ export default function DoctorView() {
         selectedMonth,
         selectedUnitId,
         bookedShiftIds,
-        showAgendaModal,
+        showEscalaModal,
         showProfileModal,
         showPasswordSuggestion,
-        myAgenda,
+        myEscala,
         calendar,
         bookingConfigs,
         shiftDetailModal,
@@ -911,8 +1021,8 @@ export default function DoctorView() {
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
-                            onClick={fetchMyAgenda}
-                            title="Ver meus plantões na agenda"
+                            onClick={fetchMyEscala}
+                            title="Ver meus plantões na escala"
                             className="group relative flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 p-4 transition hover:border-emerald-400/40 hover:bg-slate-800"
                         >
                             <svg className="h-6 w-6 text-emerald-400 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1112,10 +1222,10 @@ export default function DoctorView() {
                     }}
                 />
 
-                {showAgendaModal && (
+                {showEscalaModal && (
                     <div
                         className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md"
-                        onClick={() => setState((p) => ({ ...p, showAgendaModal: false }))}
+                        onClick={() => setState((p) => ({ ...p, showEscalaModal: false }))}
                     >
                         <div
                             className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2.5rem] border border-slate-700 bg-slate-900 shadow-2xl"
@@ -1124,20 +1234,28 @@ export default function DoctorView() {
                             <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-8">
                                 <div>
                                     <p className="mb-1 text-xs font-bold uppercase tracking-[0.3em] text-emerald-400">Meus plantões</p>
-                                    <h3 className="text-3xl font-black text-white">Agenda locada para você</h3>
+                                    <h3 className="text-3xl font-black text-white">Escala locada para você</h3>
                                 </div>
-                                <button
-                                    onClick={() => setState((p) => ({ ...p, showAgendaModal: false }))}
-                                    className="rounded-2xl bg-slate-800 p-3 text-slate-400 transition hover:text-white"
-                                >
-                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={handleDownloadEscalaHTML}
+                                        disabled={myEscala.length === 0}
+                                        className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                                    >
+                                        BAIXAR ESCALA (HTML)
+                                    </button>
+                                    <button
+                                        onClick={() => setState((p) => ({ ...p, showEscalaModal: false }))}
+                                        className="rounded-2xl bg-slate-800 p-3 text-slate-400 transition hover:text-white"
+                                    >
+                                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>                            </div>
 
                             <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-                                {myAgenda.length === 0 ? (
+                                {myEscala.length === 0 ? (
                                     <div className="py-20 text-center">
                                         <div className="mb-6 inline-flex rounded-full bg-slate-800/50 p-6">
                                             <svg className="h-12 w-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1149,7 +1267,7 @@ export default function DoctorView() {
                                                 />
                                             </svg>
                                         </div>
-                                        <h4 className="text-xl font-bold text-slate-300">Nenhum plantão na sua agenda</h4>
+                                        <h4 className="text-xl font-bold text-slate-300">Nenhum plantão na sua escala</h4>
                                         <p className="mt-2 text-slate-500">Quando a escala regional o locar, os turnos aparecerão aqui.</p>
                                     </div>
                                 ) : (
@@ -1165,7 +1283,7 @@ export default function DoctorView() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-800/50">
-                                                {myAgenda.map((item) => (
+                                                {myEscala.map((item) => (
                                                     <tr key={item.id} className="group transition-colors hover:bg-slate-800/30">
                                                         <td className="px-6 py-4 font-mono text-sm text-emerald-400">{formatDisplayDate(item.data)}</td>
                                                         <td className="px-6 py-4 font-bold text-white">{item.unidade}</td>
@@ -1175,7 +1293,7 @@ export default function DoctorView() {
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-xs text-slate-300">
-                                                            {buildAgendaBookingLabel(item, bookingConfigs[item.disponibilidadeId])}
+                                                            {buildEscalaBookingLabel(item, bookingConfigs[item.disponibilidadeId])}
                                                         </td>
                                                         <td className="px-6 py-4 text-slate-400 group-hover:text-slate-200">{item.especialidade}</td>
                                                     </tr>
