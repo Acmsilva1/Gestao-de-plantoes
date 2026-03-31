@@ -1030,11 +1030,13 @@ export default function DoctorView() {
                     ) : monthEmProcessamento ? (
                         <div className="rounded-3xl border border-slate-700/80 bg-slate-950/60 px-6 py-16 text-center">
                             <p className="text-xl font-black text-white">
-                                {motivoOcultacaoEscala === 'bloqueado_gestor' ? 'Escala bloqueada' : 'Em processamento'}
+                                {motivoOcultacaoEscala === 'bloqueado_gestor'
+                                    ? 'Escala ainda não disponível'
+                                    : 'Em processamento'}
                             </p>
                             <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">
                                 {motivoOcultacaoEscala === 'bloqueado_gestor'
-                                    ? 'O gestor da regional bloqueou a visualização deste mês. Entre em contacto com a coordenação se precisar de esclarecimentos.'
+                                    ? 'O gestor indicou que esta escala não está pronta para visualização pelos médicos neste mês. Se precisar de plantão ou esclarecimentos, contacte a coordenação da regional.'
                                     : 'A escala deste mês ainda não está disponível para visualização. Aguarde a liberação pelo gestor da regional (ou tente novamente mais tarde).'}
                             </p>
                         </div>

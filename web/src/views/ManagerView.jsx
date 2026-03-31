@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { ManagerEscalaSidebarProvider, useManagerEscalaSidebar } from '../context/ManagerEscalaSidebarContext.jsx';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
@@ -116,16 +115,13 @@ const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
 };
 
 export default function ManagerView() {
-    return (
-        <ManagerEscalaSidebarProvider>
-            <GestorChrome />
-        </ManagerEscalaSidebarProvider>
-    );
+    return <GestorChrome />;
 }
 
 function GestorChrome() {
     const { session, logout } = useAuth();
-    const { doctors, doctorsLoading, selectedMedicoId, setSelectedMedicoId, isEscalaRoute } = useManagerEscalaSidebar();
+    const location = useLocation();
+    const isEscalaRoute = location.pathname === '/gestor/escala';
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
 
@@ -134,10 +130,6 @@ function GestorChrome() {
             setShowPasswordSuggestion(true);
         }
     }, [session?.id, session?.senha]);
-
-    const asideWidthClass = isEscalaRoute
-        ? 'lg:w-80 lg:min-w-[20rem] xl:min-w-[22rem]'
-        : 'lg:w-64 lg:min-w-64';
 
     const mainInnerClass = isEscalaRoute ? 'mx-auto w-full max-w-none' : 'mx-auto max-w-7xl lg:max-w-[100rem]';
 
@@ -158,10 +150,8 @@ function GestorChrome() {
             )}
 
             {/* Sidebar */}
-            <aside
-                className={`flex w-full flex-col border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:max-h-screen lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-6 ${asideWidthClass}`}
-            >
-                <div className="mb-4 shrink-0 lg:mb-6">
+            <aside className="flex w-full flex-col border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:w-64 lg:min-w-64 lg:max-h-screen lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-6">
+                <div className="mb-4 shrink-0 lg:mb-10">
                     <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">GESTÃO DE PLANTÕES</p>
                     <h1 className="text-2xl font-black tracking-tight text-white">Central do Gestor</h1>
                 </div>
@@ -223,36 +213,6 @@ function GestorChrome() {
                         Aceites (vagos)
                     </NavLink>
                 </nav>
-
-                {isEscalaRoute ? (
-                    <div className="mt-6 flex min-h-0 flex-1 flex-col border-t border-slate-800 pt-4 lg:mt-6">
-                        <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Médicos</p>
-                        <p className="mb-3 text-xs text-slate-500">Selecione na lista antes de confirmar num turno.</p>
-                        <div className="max-h-[40vh] min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 lg:max-h-[calc(100vh-12rem)]">
-                            {doctorsLoading ? (
-                                <p className="text-xs text-slate-500">A carregar…</p>
-                            ) : doctors.length === 0 ? (
-                                <p className="text-sm text-slate-500">Nenhum médico listado.</p>
-                            ) : (
-                                doctors.map((d) => (
-                                    <button
-                                        key={d.id}
-                                        type="button"
-                                        onClick={() => setSelectedMedicoId(d.id)}
-                                        className={`flex w-full flex-col rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
-                                            selectedMedicoId === d.id
-                                                ? 'border-sky-400/50 bg-sky-500/15 text-sky-100'
-                                                : 'border-transparent bg-slate-950/60 text-slate-300 hover:border-slate-700'
-                                        }`}
-                                    >
-                                        <span className="font-bold break-words leading-tight">{d.nome}</span>
-                                        <span className="text-xs text-slate-500">CRM {d.crm}</span>
-                                    </button>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                ) : null}
             </aside>
 
             {/* Main Content Area */}
