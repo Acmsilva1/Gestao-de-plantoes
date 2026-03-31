@@ -1162,5 +1162,19 @@ export const dbModel = {
             .eq('id', medicoId);
 
         return unwrap(response, 'Falha ao excluir médico do sistema.');
+    },
+    async getSwapDemandsByRange(startDate, endDate, unidadeId = null) {
+        let query = supabase
+            .from('pedidos_troca_escala')
+            .select('*, unidade:unidades(nome), solicitante:medicos!medico_solicitante_id(nome), alvo:medicos!medico_alvo_id(nome)')
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate);
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query.order('created_at', { ascending: false });
+        return unwrap(response, 'Falha ao carregar demanda de trocas por período');
     }
 };

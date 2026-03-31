@@ -878,10 +878,6 @@ export default function DoctorView() {
                     <div className="flex flex-col gap-1">
                         <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
                         <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Escala da unidade</h1>
-                        <p className="mt-1 max-w-xl text-sm text-slate-400">
-                            Visualize o mês com os quatro turnos por dia (<span className="font-semibold text-slate-300">manhã, tarde, noite, madrugada</span>).
-                            Toque num turno para ver detalhes e plantonistas. Seus plantões aparecem em destaque.
-                        </p>
 
                         <div className="mt-4 flex flex-wrap items-center gap-4">
                             <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Unidade</div>
@@ -961,11 +957,7 @@ export default function DoctorView() {
                     </div>
                 </header>
 
-                <section className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
-                    <div className="text-sm text-slate-300">
-                        Navegue pelo mês. A visibilidade da escala é definida pelo gestor: meses futuros podem aparecer como «Em processamento» até existir liberação explícita;
-                        se o gestor bloquear o mês, verá uma mensagem a indicar o bloqueio.
-                    </div>
+                <section className="mb-8 flex flex-wrap items-center justify-end gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
                     <div className="flex items-center gap-3">
                         <button
                             type="button"

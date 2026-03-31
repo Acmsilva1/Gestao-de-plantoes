@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
 import ManagerDashboardPage from './ManagerDashboardPage.jsx';
+import ManagerRelatoriosPage from './ManagerRelatoriosPage.jsx';
 import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
@@ -243,6 +244,20 @@ function GestorChrome() {
                         <CalendarRange size={18} />
                         Editor de escala
                     </NavLink>
+                    
+                    <NavLink
+                        to="/gestor/relatorios"
+                        className={({ isActive }) => 
+                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                isActive 
+                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                            }`
+                        }
+                    >
+                        <FileText size={18} />
+                        Relatórios
+                    </NavLink>
 
                     {!isMaster && (
                         <NavLink
@@ -321,6 +336,7 @@ function GestorChrome() {
                             <Route path="dashboard" element={<ManagerDashboardPage />} />
                             <Route path="acessos" element={<ManagerAccess />} />
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
+                            <Route path="relatorios" element={<ManagerRelatoriosPage />} />
                             <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
                             <Route
                                 path="aceites-assumir"

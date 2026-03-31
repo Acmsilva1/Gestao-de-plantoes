@@ -977,3 +977,105 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
         res.status(500).json({ error: 'Erro ao importar escala do mes anterior.', details: err.message });
     }
 };
+
+export const getReportsData = async (req, res) => {
+    const { month, unidadeId } = req.query;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: 'Informe month no formato YYYY-MM.' });
+    }
+
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+
+        const isMaster = isMasterManager(manager);
+        let scopedUnitId = unidadeId;
+
+        // If not Master, force the unit to be the manager's assigned unit
+        if (!isMaster) {
+            scopedUnitId = manager.unidade_id;
+        } else {
+            // Master can see 'all' or a specific unit
+            scopedUnitId = unidadeId !== 'all' ? unidadeId : null;
+        }
+
+        const { startMonthDate, endMonthDate } = getMonthDates(month);
+
+        const [escalaRows, disponibilidadeRows, swapRequests] = await Promise.all([
+            dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
+            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId),
+            dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitId)
+        ]);
+
+        // 1. Occupancy Data (Reuse logic from getDashboardSummary)
+        const unitNameById = new Map();
+        disponibilidadeRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
+        escalaRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
+
+        const availableByUnit = new Map();
+        const occupiedByUnit = new Map();
+
+        disponibilidadeRows.forEach(row => {
+            const unitId = row.unidade_id;
+            if (!availableByUnit.has(unitId)) availableByUnit.set(unitId, new Set());
+            availableByUnit.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+        });
+
+        escalaRows.forEach(row => {
+            const unitId = row.unidade_id;
+            if (!occupiedByUnit.has(unitId)) occupiedByUnit.set(unitId, new Set());
+            occupiedByUnit.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+        });
+
+        const unitIds = new Set([...availableByUnit.keys(), ...occupiedByUnit.keys()]);
+        const occupancyByUnit = Array.from(unitIds).map(unitId => {
+            const totalSlots = (availableByUnit.get(unitId) || new Set()).size;
+            const totalOcupadas = (occupiedByUnit.get(unitId) || new Set()).size;
+            const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
+            return {
+                unidade: unitNameById.get(unitId) || 'Unidade',
+                totalSlots,
+                totalOcupadas,
+                totalVazias,
+                percentual: totalSlots > 0 ? Number(((totalOcupadas / totalSlots) * 100).toFixed(2)) : 0
+            };
+        }).sort((a, b) => b.totalSlots - a.totalSlots);
+
+        // 2. Doctor Shifts Table
+        const doctorByUnit = new Map();
+        escalaRows.forEach(row => {
+            const key = `${row.unidade_id}|${row.medico_id}`;
+            if (!doctorByUnit.has(key)) {
+                doctorByUnit.set(key, {
+                    unidade: unitNameById.get(row.unidade_id) || 'Unidade',
+                    medico: row.medicos?.nome || 'Médico',
+                    crm: row.medicos?.crm || '',
+                    total: 0
+                });
+            }
+            doctorByUnit.get(key).total += 1;
+        });
+        const doctorShifts = Array.from(doctorByUnit.values()).sort((a, b) => b.total - a.total);
+
+        // 3. Swap Demands
+        const swapDemands = (swapRequests || []).map(r => ({
+            id: r.id,
+            unidade: r.unidade?.nome || 'Unidade',
+            data: r.data_plantao,
+            turno: r.turno,
+            solicitante: r.solicitante?.nome || 'Médico',
+            alvo: r.alvo?.nome || 'Médico',
+            status: r.status,
+            criado_em: r.created_at
+        }));
+
+        res.json({
+            month,
+            occupancyByUnit,
+            doctorShifts,
+            swapDemands
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao gerar dados do relatório.', details: err.message });
+    }
+};
