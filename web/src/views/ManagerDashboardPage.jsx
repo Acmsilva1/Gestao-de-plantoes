@@ -225,11 +225,20 @@ export default function ManagerDashboardPage() {
                                 <BarChart3 size={18} className="text-sky-400" />
                                 <h3 className="text-lg font-black">Escalas Ocupadas x Vazias - 1ª quinzena</h3>
                             </div>
-                            <div className="h-80">
+                            <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.acceptedByQuinzena?.q1 || []} margin={{ top: 18, right: 8, left: -20, bottom: 24 }}>
+                                    <BarChart data={data.acceptedByQuinzena?.q1 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                        <XAxis dataKey="unidade" stroke="#94a3b8" angle={-15} textAnchor="end" height={55} interval={0} />
+                                        <XAxis
+                                            dataKey="unidade"
+                                            stroke="#94a3b8"
+                                            tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                            angle={-28}
+                                            textAnchor="end"
+                                            height={78}
+                                            interval={0}
+                                            tickMargin={8}
+                                        />
                                         <YAxis stroke="#94a3b8" />
                                         <Tooltip content={<ChartTooltip />} />
                                         <Legend />
@@ -249,11 +258,20 @@ export default function ManagerDashboardPage() {
                                 <BarChart3 size={18} className="text-emerald-400" />
                                 <h3 className="text-lg font-black">Escalas Ocupadas x Vazias - 2ª quinzena</h3>
                             </div>
-                            <div className="h-80">
+                            <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.acceptedByQuinzena?.q2 || []} margin={{ top: 18, right: 8, left: -20, bottom: 24 }}>
+                                    <BarChart data={data.acceptedByQuinzena?.q2 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                        <XAxis dataKey="unidade" stroke="#94a3b8" angle={-15} textAnchor="end" height={55} interval={0} />
+                                        <XAxis
+                                            dataKey="unidade"
+                                            stroke="#94a3b8"
+                                            tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                            angle={-28}
+                                            textAnchor="end"
+                                            height={78}
+                                            interval={0}
+                                            tickMargin={8}
+                                        />
                                         <YAxis stroke="#94a3b8" />
                                         <Tooltip content={<ChartTooltip />} />
                                         <Legend />

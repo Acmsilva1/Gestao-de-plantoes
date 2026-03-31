@@ -28,13 +28,13 @@ const header = `-- =============================================================
 --   • Apaga dados operacionais: pedidos, agendamentos, reservas, disponibilidade, templates
 --     de escala, publicação por mês, escala, histórico Tasy, acessos médico-unidade, e TODOS
 --     os gestores (recria os 9 + master com UUIDs fixos).
---   • Faz UPSERT de perfis, unidades e dos 10 médicos demo (IDs c1000001…000001–010).
+--   • Faz UPSERT de perfis, unidades e dos 19 médicos demo (IDs c1000001…000001–019).
 --   • Recria gestores canónicos (e1000001… + master).
 --   • Recria medico_acessos_unidade (cada médico → sua unidade_fixa_id).
 --   • Insere escala mar/abr 2026 (mesmo conteúdo que model/escala_demo_mar_abr_2026.sql).
 --
--- NÃO use em produção com dados reais sem backup. Médicos fora dos 10 IDs demo não são
--- removidos; apenas os 10 seeds são sobrescritos por UPSERT.
+-- NÃO use em produção com dados reais sem backup. Médicos fora dos 19 IDs demo não são
+-- removidos; apenas os 19 seeds são sobrescritos por UPSERT.
 --
 -- Regenerar este ficheiro após alterar escala demo:
 --   node scripts/build-super-migrate-sql.js
@@ -122,20 +122,29 @@ ON CONFLICT (id) DO UPDATE SET
     capacidade_media_atendimento = EXCLUDED.capacidade_media_atendimento;
 
 -- -----------------------------------------------------------------------------
--- 10 médicos demo (alinhados ao app / supabase_schema_completo.sql)
+-- 19 médicos demo (Clínico geral; unidade_fixa por CRM / UF)
 -- -----------------------------------------------------------------------------
 INSERT INTO medicos (id, nome, usuario, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
 VALUES
-    ('c1000001-0000-4000-8000-000000000001', 'Maria Helena Duarte', 'maria.duarte', '52891-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000002', 'Paulo Sérgio Nunes', 'paulo.nunes', '53902-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000003', 'Amanda Cristina Ferreira', 'amanda.ferreira', '108234-RJ', '(21) 96666-2003', 'Emergência', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000004', 'Rodrigo Antunes Vieira', 'rodrigo.vieira', '109345-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000005', 'Letícia Martins Correia', 'leticia.correia', '45678-DF', '(61) 94444-3005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000006', 'Tiago Albuquerque Reis', 'tiago.reis', '46789-DF', '(61) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000007', 'Beatriz Campos Lacerda', 'beatriz.lacerda', '87654-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000008', 'Felipe Augusto Cunha', 'felipe.cunha', '88765-MG', '(31) 91111-4008', 'Emergência', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000009', 'Larissa Prado Monteiro', 'larissa.monteiro', '112233-RJ', '(21) 90000-5009', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000010', 'Gustavo Henrique Dias', 'gustavo.dias', '223344-RJ', '(21) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10)
+    ('c1000001-0000-4000-8000-000000000001', 'Maria Helena Duarte', 'maria.duarte', '52891-ES', '(27) 98888-1001', 'Clínico geral', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000002', 'Paulo Sérgio Nunes', 'paulo.nunes', '53902-ES', '(27) 97777-1002', 'Clínico geral', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000003', 'Amanda Cristina Ferreira', 'amanda.ferreira', '108234-RJ', '(21) 96666-2003', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000004', 'Rodrigo Antunes Vieira', 'rodrigo.vieira', '109345-RJ', '(21) 95555-2004', 'Clínico geral', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000005', 'Letícia Martins Correia', 'leticia.correia', '45678-DF', '(61) 94444-3005', 'Clínico geral', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000006', 'Tiago Albuquerque Reis', 'tiago.reis', '46789-DF', '(61) 93333-3006', 'Clínico geral', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000007', 'Beatriz Campos Lacerda', 'beatriz.lacerda', '87654-MG', '(31) 92222-4007', 'Clínico geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000008', 'Felipe Augusto Cunha', 'felipe.cunha', '88765-MG', '(31) 91111-4008', 'Clínico geral', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000009', 'Larissa Prado Monteiro', 'larissa.monteiro', '112233-RJ', '(21) 90000-5009', 'Clínico geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000010', 'Gustavo Henrique Dias', 'gustavo.dias', '223344-RJ', '(21) 98888-6010', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000011', 'Carla Mendes Souza', 'carla.mendes', '52901-ES', '(27) 98888-1011', 'Clínico geral', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000012', 'Ricardo Fonseca Lima', 'ricardo.fonseca', '53911-ES', '(27) 97777-1012', 'Clínico geral', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000013', 'Fernanda Rocha Dias', 'fernanda.rocha', '45688-DF', '(61) 94444-1013', 'Clínico geral', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000014', 'Diego Cardoso Meyer', 'diego.cardoso', '108400-RJ', '(21) 96666-1014', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000015', 'Juliana Torres Rezende', 'juliana.torres', '109400-RJ', '(21) 95555-1015', 'Clínico geral', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000016', 'Renata Silveira Costa', 'renata.silveira', '87660-MG', '(31) 92222-1016', 'Clínico geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000017', 'Marcelo Pires Barbosa', 'marcelo.pires', '88770-MG', '(31) 91111-1017', 'Clínico geral', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000018', 'Camila Freitas Nogueira', 'camila.freitas', '46799-DF', '(61) 93333-1018', 'Clínico geral', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000019', 'Patrícia Azevedo Linhares', 'patricia.azevedo', '112244-RJ', '(21) 90000-1019', 'Clínico geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10)
 ON CONFLICT (id) DO UPDATE SET
     nome = EXCLUDED.nome,
     usuario = EXCLUDED.usuario,
@@ -173,7 +182,12 @@ WHERE id IN (
     'c1000001-0000-4000-8000-000000000003', 'c1000001-0000-4000-8000-000000000004',
     'c1000001-0000-4000-8000-000000000005', 'c1000001-0000-4000-8000-000000000006',
     'c1000001-0000-4000-8000-000000000007', 'c1000001-0000-4000-8000-000000000008',
-    'c1000001-0000-4000-8000-000000000009', 'c1000001-0000-4000-8000-000000000010'
+    'c1000001-0000-4000-8000-000000000009', 'c1000001-0000-4000-8000-000000000010',
+    'c1000001-0000-4000-8000-000000000011', 'c1000001-0000-4000-8000-000000000012',
+    'c1000001-0000-4000-8000-000000000013', 'c1000001-0000-4000-8000-000000000014',
+    'c1000001-0000-4000-8000-000000000015', 'c1000001-0000-4000-8000-000000000016',
+    'c1000001-0000-4000-8000-000000000017', 'c1000001-0000-4000-8000-000000000018',
+    'c1000001-0000-4000-8000-000000000019'
 )
   AND unidade_fixa_id IS NOT NULL
 ON CONFLICT (medico_id, unidade_id) DO NOTHING;
@@ -186,7 +200,7 @@ ON CONFLICT (medico_id, unidade_id) DO NOTHING;
 const footer = `
 COMMIT;
 
--- Fim. Verifique no Table Editor: unidades (9), medicos (≥10), gestores (10), escala (316 linhas).
+-- Fim. Verifique no Table Editor: unidades (9), medicos (19), gestores (10), escala (595 linhas).
 `;
 
 const out = header + escalaBlock + footer;

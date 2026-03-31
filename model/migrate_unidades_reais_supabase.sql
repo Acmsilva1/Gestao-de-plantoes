@@ -4,6 +4,9 @@
 -- Para RESET COMPLETO (todas as tabelas alinhadas + escala demo mar/abr 2026 numa só
 -- transação), prefira: model/migrate_super_unidades_reais_completo.sql
 --
+-- Só faltam os 9 médicos extra (c011–c019) e a escala deles? Use o patch incremental:
+--   model/supabase_patch_medicos_extra_c011_c019.sql
+--
 -- Use ESTE ficheiro no SQL Editor quando o banco JÁ foi criado com os UUIDs antigos
 -- (b1000001…000001 a 000006). Amplia para …000007–000009 e remapeia FKs.
 --

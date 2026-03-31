@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS tasy_raw_history (
 );
 
 -- =============================================================================
--- DADOS INICIAIS: 9 unidades reais + 10 médicos demo (alinhado a modulo_medico.sql)
+-- DADOS INICIAIS: 9 unidades reais + 19 médicos demo (alinhado a modulo_medico.sql)
 -- =============================================================================
 
 INSERT INTO unidades (id, nome, endereco, capacidade_media_atendimento)
@@ -145,16 +145,25 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO medicos (id, nome, usuario, crm, telefone, especialidade, unidade_fixa_id, senha, atendimento_padrao_por_periodo)
 VALUES
-    ('c1000001-0000-4000-8000-000000000001', 'Maria Helena Duarte', 'maria.duarte', '52891-ES', '(27) 98888-1001', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000002', 'Paulo Sérgio Nunes', 'paulo.nunes', '53902-ES', '(27) 97777-1002', 'Pediatria', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000003', 'Amanda Cristina Ferreira', 'amanda.ferreira', '108234-RJ', '(21) 96666-2003', 'Emergência', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000004', 'Rodrigo Antunes Vieira', 'rodrigo.vieira', '109345-RJ', '(21) 95555-2004', 'Cardiologia', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000005', 'Letícia Martins Correia', 'leticia.correia', '45678-DF', '(61) 94444-3005', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000006', 'Tiago Albuquerque Reis', 'tiago.reis', '46789-DF', '(61) 93333-3006', 'Ortopedia', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000007', 'Beatriz Campos Lacerda', 'beatriz.lacerda', '87654-MG', '(31) 92222-4007', 'Pediatria', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000008', 'Felipe Augusto Cunha', 'felipe.cunha', '88765-MG', '(31) 91111-4008', 'Emergência', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000009', 'Larissa Prado Monteiro', 'larissa.monteiro', '112233-RJ', '(21) 90000-5009', 'Clínica Médica', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
-    ('c1000001-0000-4000-8000-000000000010', 'Gustavo Henrique Dias', 'gustavo.dias', '223344-RJ', '(21) 98888-6010', 'Cirurgia Geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10)
+    ('c1000001-0000-4000-8000-000000000001', 'Maria Helena Duarte', 'maria.duarte', '52891-ES', '(27) 98888-1001', 'Clínico geral', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000002', 'Paulo Sérgio Nunes', 'paulo.nunes', '53902-ES', '(27) 97777-1002', 'Clínico geral', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000003', 'Amanda Cristina Ferreira', 'amanda.ferreira', '108234-RJ', '(21) 96666-2003', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000004', 'Rodrigo Antunes Vieira', 'rodrigo.vieira', '109345-RJ', '(21) 95555-2004', 'Clínico geral', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000005', 'Letícia Martins Correia', 'leticia.correia', '45678-DF', '(61) 94444-3005', 'Clínico geral', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000006', 'Tiago Albuquerque Reis', 'tiago.reis', '46789-DF', '(61) 93333-3006', 'Clínico geral', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000007', 'Beatriz Campos Lacerda', 'beatriz.lacerda', '87654-MG', '(31) 92222-4007', 'Clínico geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000008', 'Felipe Augusto Cunha', 'felipe.cunha', '88765-MG', '(31) 91111-4008', 'Clínico geral', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000009', 'Larissa Prado Monteiro', 'larissa.monteiro', '112233-RJ', '(21) 90000-5009', 'Clínico geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000010', 'Gustavo Henrique Dias', 'gustavo.dias', '223344-RJ', '(21) 98888-6010', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000011', 'Carla Mendes Souza', 'carla.mendes', '52901-ES', '(27) 98888-1011', 'Clínico geral', 'b1000001-0000-4000-8000-000000000001', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000012', 'Ricardo Fonseca Lima', 'ricardo.fonseca', '53911-ES', '(27) 97777-1012', 'Clínico geral', 'b1000001-0000-4000-8000-000000000002', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000013', 'Fernanda Rocha Dias', 'fernanda.rocha', '45688-DF', '(61) 94444-1013', 'Clínico geral', 'b1000001-0000-4000-8000-000000000003', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000014', 'Diego Cardoso Meyer', 'diego.cardoso', '108400-RJ', '(21) 96666-1014', 'Clínico geral', 'b1000001-0000-4000-8000-000000000004', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000015', 'Juliana Torres Rezende', 'juliana.torres', '109400-RJ', '(21) 95555-1015', 'Clínico geral', 'b1000001-0000-4000-8000-000000000005', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000016', 'Renata Silveira Costa', 'renata.silveira', '87660-MG', '(31) 92222-1016', 'Clínico geral', 'b1000001-0000-4000-8000-000000000006', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000017', 'Marcelo Pires Barbosa', 'marcelo.pires', '88770-MG', '(31) 91111-1017', 'Clínico geral', 'b1000001-0000-4000-8000-000000000007', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000018', 'Camila Freitas Nogueira', 'camila.freitas', '46799-DF', '(61) 93333-1018', 'Clínico geral', 'b1000001-0000-4000-8000-000000000008', '12345', 10),
+    ('c1000001-0000-4000-8000-000000000019', 'Patrícia Azevedo Linhares', 'patricia.azevedo', '112244-RJ', '(21) 90000-1019', 'Clínico geral', 'b1000001-0000-4000-8000-000000000009', '12345', 10)
 ON CONFLICT (id) DO NOTHING;
 
 -- Perfil e gestores por unidade (um gestor por unidade)

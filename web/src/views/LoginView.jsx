@@ -13,6 +13,20 @@ const parseJson = async (response) => {
     }
 };
 
+/** Evita "Nome — Unidade (Unidade)": se o nome já contém a unidade, não repete entre parênteses. */
+function gestorSelectLabel(p) {
+    const nome = (p.nome ?? '').trim();
+    const unidade = (p.unidadeNome ?? '').trim();
+    const user = (p.usuario ?? '').trim();
+    if (unidade && nome.includes(unidade)) {
+        return nome;
+    }
+    if (nome && user) {
+        return `${nome} (${user})`;
+    }
+    return nome || user || String(p.id ?? '');
+}
+
 export default function LoginView() {
     const { login } = useAuth();
     const navigate = useNavigate();
@@ -209,7 +223,7 @@ export default function LoginView() {
                             >
                                 {managerList.map((p) => (
                                     <option key={p.id} value={p.id}>
-                                        {p.nome} ({p.unidadeNome || p.usuario})
+                                        {gestorSelectLabel(p)}
                                     </option>
                                 ))}
                             </select>

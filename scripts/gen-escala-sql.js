@@ -1,3 +1,5 @@
+// CUIDADO: modelo simplificado (até 2 médicos/unidade). A escala oficial está em
+// model/escala_demo_mar_abr_2026.sql (19 médicos). Não sobrescrever esse ficheiro sem revisar.
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

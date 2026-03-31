@@ -1,7 +1,10 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Users, CheckCircle, Search, Save, AlertTriangle } from 'lucide-react';
 import { readApiResponse } from '../../utils/api';
+
+/** Valor do select "Consulta por unidade" para listar todas as unidades (só gestor master) */
+const FILTER_TODAS_UNIDADES = '__ALL_UNITS__';
 
 export default function ManagerAccessControl() {
     const { session } = useAuth();
@@ -98,6 +101,12 @@ export default function ManagerAccessControl() {
         if (!gestorId) return;
         fetchData();
     }, [gestorId]);
+
+    useEffect(() => {
+        if (!isMaster && selectedUnitIdFilter === FILTER_TODAS_UNIDADES) {
+            setSelectedUnitIdFilter('');
+        }
+    }, [isMaster, selectedUnitIdFilter]);
 
     const handleDoctorChange = (e) => {
         const docId = e.target.value;
@@ -498,7 +507,11 @@ export default function ManagerAccessControl() {
                 <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h3 className="text-2xl font-black text-white">Consulta de Médicos por Unidade</h3>
-                        <p className="mt-1 text-sm text-slate-400">Visualize todos os profissionais vinculados a uma unidade específica.</p>
+                        <p className="mt-1 text-sm text-slate-400">
+                            {isMaster
+                                ? 'Visualize os profissionais por unidade ou todas de uma vez (visão Master).'
+                                : 'Visualize todos os profissionais vinculados a uma unidade específica.'}
+                        </p>
                     </div>
 
                     <div className="w-full md:w-80">
@@ -509,6 +522,9 @@ export default function ManagerAccessControl() {
                             className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
                         >
                             <option value="">-- Selecione uma Unidade --</option>
+                            {isMaster && (
+                                <option value={FILTER_TODAS_UNIDADES}>Todos — todas as unidades</option>
+                            )}
                             {units.map(u => (
                                 <option key={u.id} value={u.id}>{u.nome}</option>
                             ))}
@@ -520,6 +536,81 @@ export default function ManagerAccessControl() {
                     <div className="flex h-48 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-800 bg-slate-950/30 text-slate-500">
                         <Search size={40} className="mb-4 opacity-20" />
                         <p className="text-sm">Selecione uma unidade acima para listar os médicos.</p>
+                    </div>
+                ) : isMaster && selectedUnitIdFilter === FILTER_TODAS_UNIDADES ? (
+                    <div className="space-y-8">
+                        {units.map((unit) => {
+                            const porUnidade = doctors.filter(
+                                (doc) =>
+                                    doc.unidadeFixaId === unit.id ||
+                                    (Array.isArray(doc.unidadesLiberadas) &&
+                                        doc.unidadesLiberadas.includes(unit.id))
+                            );
+                            return (
+                                <div
+                                    key={unit.id}
+                                    className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50"
+                                >
+                                    <div className="border-b border-slate-800 bg-slate-900/90 px-6 py-3">
+                                        <h4 className="text-sm font-black uppercase tracking-widest text-sky-400">
+                                            {unit.nome}
+                                        </h4>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-[720px] w-full text-left text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-900/80 text-xs font-bold uppercase tracking-widest text-slate-400 border-b border-slate-800">
+                                                    <th className="px-6 py-4">Médico</th>
+                                                    <th className="px-6 py-4">CRM</th>
+                                                    <th className="px-6 py-4">Especialidade</th>
+                                                    <th className="px-6 py-4">Vínculo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/50">
+                                                {porUnidade.map((doc) => {
+                                                    const isBase = doc.unidadeFixaId === unit.id;
+                                                    return (
+                                                        <tr
+                                                            key={`${unit.id}-${doc.id}`}
+                                                            className="group hover:bg-slate-800/30 transition-colors"
+                                                        >
+                                                            <td className="px-6 py-4 font-semibold text-white group-hover:text-sky-300 transition-colors">
+                                                                {doc.nome}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-slate-300 font-mono text-xs">
+                                                                {doc.crm}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-slate-400">{doc.especialidade}</td>
+                                                            <td className="px-6 py-4">
+                                                                <span
+                                                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                                                        isBase
+                                                                            ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30'
+                                                                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                                    }`}
+                                                                >
+                                                                    <div
+                                                                        className={`h-1.5 w-1.5 rounded-full ${
+                                                                            isBase ? 'bg-sky-400' : 'bg-emerald-400'
+                                                                        }`}
+                                                                    ></div>
+                                                                    {isBase ? 'Base Fixa' : 'Auxiliar'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                        {porUnidade.length === 0 && (
+                                            <div className="py-8 text-center text-sm text-slate-500 italic">
+                                                Nenhum médico vinculado a esta unidade no momento.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/50">
@@ -536,7 +627,7 @@ export default function ManagerAccessControl() {
                                 {doctors
                                     .filter(doc => 
                                         doc.unidadeFixaId === selectedUnitIdFilter || 
-                                        doc.unidadesLiberadas.includes(selectedUnitIdFilter)
+                                        (Array.isArray(doc.unidadesLiberadas) && doc.unidadesLiberadas.includes(selectedUnitIdFilter))
                                     )
                                     .map(doc => {
                                         const isBase = doc.unidadeFixaId === selectedUnitIdFilter;
@@ -561,7 +652,7 @@ export default function ManagerAccessControl() {
                             </tbody>
                         </table>
                         
-                        {doctors.filter(doc => doc.unidadeFixaId === selectedUnitIdFilter || doc.unidadesLiberadas.includes(selectedUnitIdFilter)).length === 0 && (
+                        {doctors.filter(doc => doc.unidadeFixaId === selectedUnitIdFilter || (Array.isArray(doc.unidadesLiberadas) && doc.unidadesLiberadas.includes(selectedUnitIdFilter))).length === 0 && (
                             <div className="py-12 text-center text-slate-500 italic">
                                 Nenhum médico vinculado a esta unidade no momento.
                             </div>
