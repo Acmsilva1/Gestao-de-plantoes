@@ -124,6 +124,76 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao carregar historico');
     },
+    async getHistoricalTasy(startDate = null) {
+        let query = supabase.from('historico_tasy').select('*');
+
+        if (startDate) {
+            query = query.gte('data', startDate);
+        }
+
+        const response = await query.order('data', { ascending: true });
+        return unwrap(response, 'Falha ao carregar historico_tasy');
+    },
+    async getHistoricalTasyMl() {
+        const response = await supabase.from('historico_tasy_ml').select('*');
+        return unwrap(response, 'Falha ao carregar historico_tasy_ml');
+    },
+    async getPredictionData({ startDate = null, endDate = null, unidade = null, regional = null, turno = null } = {}) {
+        let query = supabase.from('dados_predicao').select('*');
+
+        if (startDate) {
+            query = query.gte('data_prevista', startDate);
+        }
+        if (endDate) {
+            query = query.lte('data_prevista', endDate);
+        }
+        if (unidade) {
+            query = query.eq('unidade', unidade);
+        }
+        if (regional) {
+            query = query.eq('regional', regional);
+        }
+        if (turno) {
+            query = query.eq('turno', turno);
+        }
+
+        const response = await query.order('data_prevista', { ascending: true });
+        return unwrap(response, 'Falha ao carregar dados_predicao');
+    },
+    async deletePredictionDataByRange(startDate, endDate) {
+        let query = supabase.from('dados_predicao').delete();
+
+        if (startDate) {
+            query = query.gte('data_prevista', startDate);
+        }
+        if (endDate) {
+            query = query.lte('data_prevista', endDate);
+        }
+
+        const response = await query.select('data_prevista');
+        return unwrap(response, 'Falha ao limpar dados_predicao');
+    },
+    async clearPredictionData() {
+        const response = await supabase.from('dados_predicao').delete().not('data_prevista', 'is', null).select('data_prevista');
+        return unwrap(response, 'Falha ao limpar todos os dados_predicao');
+    },
+    async upsertPredictionData(rows) {
+        const sanitizedRows = (rows || []).map((row) => ({
+            data_prevista: row.data_prevista,
+            turno: row.turno,
+            demanda_estimada: row.demanda_estimada,
+            unidade: row.unidade,
+            regional: row.regional,
+            executado_em: row.executado_em
+        }));
+
+        const response = await supabase
+            .from('dados_predicao')
+            .insert(sanitizedRows)
+            .select('*');
+
+        return unwrap(response, 'Falha ao salvar dados_predicao');
+    },
     async upsertHistoryRows(rows) {
         const sanitizedRows = (rows || []).map((row) => ({
             unidade_id: row.unidade_id,

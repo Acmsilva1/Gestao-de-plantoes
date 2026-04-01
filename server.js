@@ -30,6 +30,7 @@ import {
     getDoctorAccesses,
     manageDoctorUnitAccess,
     getUnitsList,
+    getAnalyticalPredictionData,
     getManagerCalendar,
     getManagerAgenda,
     getManagerAgendaSummary,
@@ -47,6 +48,7 @@ import {
     putEscalaMesVisibilidade,
     postImportarMesAnteriorEscala,
     getReportsData,
+    postRecalculateAnalyticalPrediction,
     getManagerTemplates,
     getManagerTemplateById,
     createManagerTemplate,
@@ -105,6 +107,7 @@ app.get('/api/manager/dashboard-summary', getDashboardSummary);
 app.get('/api/manager/perfis', getManagerProfiles);
 app.get('/api/manager/medicos', getDoctorAccesses);
 app.get('/api/manager/unidades', getUnitsList);
+app.get('/api/manager/predicao-analitica', getAnalyticalPredictionData);
 app.get('/api/manager/calendario/:unidadeId', getManagerCalendar);
 app.get('/api/manager/agenda', getManagerAgenda);
 app.get('/api/manager/agenda/resumo', getManagerAgendaSummary);
@@ -127,6 +130,7 @@ app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);
 app.put('/api/manager/escala/mes-visibilidade', putEscalaMesVisibilidade);
 app.post('/api/manager/escala/importar-mes-anterior', postImportarMesAnteriorEscala);
 app.get('/api/manager/reports', getReportsData);
+app.post('/api/manager/predicao-analitica/recalcular', postRecalculateAnalyticalPrediction);
 
 // --- Rotas Templates Customizados ---
 app.get('/api/manager/templates', getManagerTemplates);

@@ -1,5 +1,6 @@
 import { dbModel } from '../model/dbModel.js';
 import { TURNOS_ESCALA } from './DirecionadorService.js';
+import { getAnalyticalPredictionSnapshotV2, recalculateAnalyticalPredictionV2 } from './AnalyticalPredictionServiceV2.js';
 
 const getMonthDates = (monthStr) => {
     // monthStr format "YYYY-MM"
@@ -471,6 +472,41 @@ export const getUnitsList = async (req, res) => {
         res.json(unit ? [unit] : []);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao listar unidades.', details: err.message });
+    }
+};
+
+export const getAnalyticalPredictionData = async (req, res) => {
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Funcao disponivel apenas para gestor master.' });
+        }
+
+        const payload = await getAnalyticalPredictionSnapshotV2({
+            unidade: typeof req.query?.unidade === 'string' ? req.query.unidade.trim() : '',
+            regional: typeof req.query?.regional === 'string' ? req.query.regional.trim() : '',
+            turno: typeof req.query?.turno === 'string' ? req.query.turno.trim() : ''
+        });
+
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar predicao analitica.', details: err.message });
+    }
+};
+
+export const postRecalculateAnalyticalPrediction = async (req, res) => {
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Funcao disponivel apenas para gestor master.' });
+        }
+
+        const payload = await recalculateAnalyticalPredictionV2();
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao recalcular predicao analitica.', details: err.message });
     }
 };
 
@@ -1432,5 +1468,3 @@ export const postClearMonthScale = async (req, res) => {
         res.status(500).json({ error: 'Falha ao limpar mês', details: err.message });
     }
 };
-
-

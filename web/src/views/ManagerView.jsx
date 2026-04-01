@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard, FileText, LayoutTemplate, Ban } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard, FileText, LayoutTemplate, Ban, BrainCircuit } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
@@ -8,6 +8,7 @@ import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
 import ManagerCancelamentosPage from './ManagerCancelamentosPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
 import ManagerDashboardPage from './ManagerDashboardPage.jsx';
+import ManagerPredicaoPage from './ManagerPredicaoPage.jsx';
 import ManagerRelatoriosPage from './ManagerRelatoriosPage.jsx';
 import ManagerEscalaTemplatePage from './ManagerEscalaTemplatePage.jsx';
 import { readApiResponse } from '../utils/api';
@@ -281,6 +282,22 @@ function GestorChrome() {
                         Relatórios
                     </NavLink>
 
+                    {isMaster && (
+                        <NavLink
+                            to="/gestor/predicao"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    isActive
+                                        ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
+                                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                                }`
+                            }
+                        >
+                            <BrainCircuit size={18} />
+                            Predição Analítica
+                        </NavLink>
+                    )}
+
                     {!isMaster && (
                         <NavLink
                             to="/gestor/trocas"
@@ -380,6 +397,7 @@ function GestorChrome() {
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
                             <Route path="escala-modelos" element={<ManagerEscalaTemplatePage />} />
                             <Route path="relatorios" element={<ManagerRelatoriosPage />} />
+                            <Route path="predicao" element={isMaster ? <ManagerPredicaoPage /> : <Navigate to="/gestor/acessos" replace />} />
                             <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
                             <Route
                                 path="aceites-assumir"
