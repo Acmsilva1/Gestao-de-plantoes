@@ -10,7 +10,8 @@ import {
     TrendingUp,
     FileText,
     Zap,
-    CalendarDays
+    CalendarDays,
+    Ban
 } from 'lucide-react';
 import { 
     BarChart, 
@@ -318,6 +319,17 @@ export default function ManagerRelatoriosPage() {
                                 <Users size={18} />
                                 2. Produtividade
                             </button>
+                            <button
+                                onClick={() => setActiveTab('cancelamentos')}
+                                className={`flex items-center gap-2.5 rounded-xl px-6 py-3 text-sm font-black transition-all ${
+                                    activeTab === 'cancelamentos'
+                                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20'
+                                        : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                            >
+                                <Ban size={18} />
+                                3. Cancelamentos
+                            </button>
                         </div>
                     </div>
 
@@ -554,6 +566,71 @@ export default function ManagerRelatoriosPage() {
                                         </tbody>
                                     </table>
                                 </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {activeTab === 'cancelamentos' && (
+                        <div className="grid gap-6">
+                            <section className={cardClass}>
+                                <div className="mb-6 flex items-center gap-3">
+                                    <div className="rounded-2xl bg-rose-500/10 p-2.5 text-rose-400">
+                                        <Ban size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">Cancelamentos de Plantão</h2>
+                                        <p className="text-sm text-slate-400 uppercase font-bold tracking-widest">Pedidos de saída da escala no período</p>
+                                    </div>
+                                </div>
+
+                                {(!reportData.cancelamentos || reportData.cancelamentos.length === 0) ? (
+                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/30 py-12 text-center">
+                                        <p className="text-slate-500 font-bold">Nenhum cancelamento registado neste período.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/20">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-900/60 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-800">
+                                                <tr>
+                                                    <th className="px-6 py-5">Médico</th>
+                                                    <th className="px-6 py-5">Unidade</th>
+                                                    <th className="px-6 py-5 text-center">Data</th>
+                                                    <th className="px-6 py-5 text-center">Turno</th>
+                                                    <th className="px-6 py-5 text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/40">
+                                                {reportData.cancelamentos.map((c, i) => {
+                                                    const statusColor = c.status === 'APROVADO'
+                                                        ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                                        : c.status === 'RECUSADO'
+                                                        ? 'text-slate-400 bg-slate-800 border-slate-700'
+                                                        : 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-800/20 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-black text-slate-200 text-xs uppercase tracking-tight">{c.medico}</div>
+                                                                <div className="text-[10px] font-bold text-slate-500">CRM: {c.crm}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-slate-400 font-bold text-[10px] uppercase tracking-widest">{c.unidade}</td>
+                                                            <td className="px-6 py-4 text-center font-mono text-sm text-slate-300">
+                                                                {new Date(`${c.data}T12:00:00-03:00`).toLocaleDateString('pt-BR')}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="inline-flex rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-black uppercase text-slate-400">{c.turno}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className={`inline-block rounded-lg border px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${statusColor}`}>
+                                                                    {c.status === 'PENDENTE' ? 'Pendente' : c.status === 'APROVADO' ? 'Aprovado' : 'Recusado'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </section>
                         </div>
                     )}

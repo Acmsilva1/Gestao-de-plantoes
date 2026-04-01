@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard, FileText, LayoutTemplate } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, ClipboardCheck, CalendarRange, LayoutDashboard, FileText, LayoutTemplate, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerAceitesAssumirPage from './ManagerAceitesAssumirPage';
+import ManagerCancelamentosPage from './ManagerCancelamentosPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
 import ManagerDashboardPage from './ManagerDashboardPage.jsx';
 import ManagerRelatoriosPage from './ManagerRelatoriosPage.jsx';
@@ -130,25 +131,30 @@ function GestorChrome() {
     const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
     const [pendingTrocas, setPendingTrocas] = useState(0);
     const [pendingAceites, setPendingAceites] = useState(0);
+    const [pendingCancelamentos, setPendingCancelamentos] = useState(0);
     const loadPendingCounts = useCallback(async () => {
         if (!session?.id || isMaster) {
             setPendingTrocas(0);
             setPendingAceites(0);
+            setPendingCancelamentos(0);
             return;
         }
         try {
             const gestorId = encodeURIComponent(session.id);
-            const [trocasResp, aceitesResp] = await Promise.all([
+            const [trocasResp, aceitesResp, cancelamentosResp] = await Promise.all([
                 fetch(`/api/manager/trocas-pendentes?gestorId=${gestorId}`),
-                fetch(`/api/manager/assumir-pendentes?gestorId=${gestorId}`)
+                fetch(`/api/manager/assumir-pendentes?gestorId=${gestorId}`),
+                fetch(`/api/manager/cancelamentos-pendentes?gestorId=${gestorId}`)
             ]);
 
-            const [trocasData, aceitesData] = await Promise.all([readApiResponse(trocasResp), readApiResponse(aceitesResp)]);
+            const [trocasData, aceitesData, cancelamentosData] = await Promise.all([readApiResponse(trocasResp), readApiResponse(aceitesResp), readApiResponse(cancelamentosResp)]);
             setPendingTrocas(trocasResp.ok ? (trocasData?.pedidos?.length || 0) : 0);
             setPendingAceites(aceitesResp.ok ? (aceitesData?.pedidos?.length || 0) : 0);
+            setPendingCancelamentos(cancelamentosResp.ok ? (cancelamentosData?.pedidos?.length || 0) : 0);
         } catch {
             setPendingTrocas(0);
             setPendingAceites(0);
+            setPendingCancelamentos(0);
         }
     }, [session?.id, isMaster]);
 
@@ -162,6 +168,7 @@ function GestorChrome() {
         if (!session?.id || isMaster) {
             setPendingTrocas(0);
             setPendingAceites(0);
+            setPendingCancelamentos(0);
             return;
         }
         let timer = null;
@@ -315,6 +322,26 @@ function GestorChrome() {
                             ) : null}
                         </NavLink>
                     )}
+                    {!isMaster && (
+                        <NavLink
+                            to="/gestor/cancelamentos"
+                            className={({ isActive }) => 
+                                `relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    isActive 
+                                        ? 'bg-rose-500/10 text-rose-300 border border-rose-400/20 shadow-[0_0_15px_rgba(244,63,94,0.1)]'
+                                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                                }`
+                            }
+                        >
+                            <Ban size={18} />
+                            Cancelamentos
+                            {pendingCancelamentos > 0 ? (
+                                <span className="absolute right-3 top-1/2 flex h-5 min-w-[1.25rem] -translate-y-1/2 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
+                                    {pendingCancelamentos > 9 ? '9+' : pendingCancelamentos}
+                                </span>
+                            ) : null}
+                        </NavLink>
+                    )}
                 </nav>
             </aside>
 
@@ -357,6 +384,10 @@ function GestorChrome() {
                             <Route
                                 path="aceites-assumir"
                                 element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerAceitesAssumirPage />}
+                            />
+                            <Route
+                                path="cancelamentos"
+                                element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerCancelamentosPage />}
                             />
                             <Route path="calendario" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="agenda" element={<Navigate to="/gestor/acessos" replace />} />

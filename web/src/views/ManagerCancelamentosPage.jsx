@@ -12,7 +12,7 @@ const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', {
 const formatDisplayDate = (dateString) =>
     fullDateFormatter.format(new Date(`${dateString}T12:00:00-03:00`)).replace(/\//g, '-');
 
-export default function ManagerTrocasPage() {
+export default function ManagerCancelamentosPage() {
     const { session } = useAuth();
     const gestorId = session?.id || '';
     const [units, setUnits] = useState([]);
@@ -37,7 +37,7 @@ export default function ManagerTrocasPage() {
             const q = unitId
                 ? `?unidadeId=${encodeURIComponent(unitId)}&gestorId=${encodeURIComponent(gestorId)}`
                 : `?gestorId=${encodeURIComponent(gestorId)}`;
-            const r = await fetch(`/api/manager/trocas-pendentes${q}`);
+            const r = await fetch(`/api/manager/cancelamentos-pendentes${q}`);
             const data = await readApiResponse(r);
             if (!r.ok) throw new Error(data.error || data.details || 'Nao foi possivel carregar.');
             setPedidos(data.pedidos || []);
@@ -58,7 +58,7 @@ export default function ManagerTrocasPage() {
         setBusyId(pedidoId);
         setError('');
         try {
-            const r = await fetch(`/api/manager/trocas/${pedidoId}/decidir`, {
+            const r = await fetch(`/api/manager/cancelamentos/${pedidoId}/decidir`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ aprovar, gestorId })
@@ -78,9 +78,9 @@ export default function ManagerTrocasPage() {
         <div className="animate-in fade-in zoom-in-95 duration-500">
             <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-3xl font-black text-white">Trocas pendentes</h2>
+                    <h2 className="text-3xl font-black text-rose-500">Cancelamentos pendentes</h2>
                     <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                        Trocas entre colegas que não foram auto-aprovadas (especialidades distintas). Aqui você tem o log visual e pode decidir manualmente — a regra das 12h ainda é aplicada.
+                        Pedidos de médicos solicitando cancelamento de plantão. Aprovar removerá o médico da escala e deixará o turno vago.
                     </p>
                 </div>
                 {units.length > 0 ? (
@@ -89,7 +89,7 @@ export default function ManagerTrocasPage() {
                         <select
                             value={unitId}
                             onChange={(e) => setUnitId(e.target.value)}
-                            className="min-w-[200px] rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-bold text-white outline-none focus:border-sky-400"
+                            className="min-w-[200px] rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-bold text-white outline-none focus:border-rose-400"
                         >
                             <option value="">Todas</option>
                             {units.map((u) => (
@@ -110,53 +110,42 @@ export default function ManagerTrocasPage() {
                 <p className="text-sm text-slate-500">A carregar...</p>
             ) : pedidos.length === 0 ? (
                 <div className="rounded-3xl border border-slate-800 bg-slate-950/40 px-6 py-16 text-center">
-                    <p className="text-lg font-bold text-slate-400">Nenhum pedido aguardando o gestor</p>
-                    <p className="mt-2 text-sm text-slate-600">Quando um colega aceitar uma troca, o pedido aparecerá aqui.</p>
+                    <p className="text-lg font-bold text-slate-400">Nenhum pedido de cancelamento pendente</p>
                 </div>
             ) : (
                 <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
                     <table className="min-w-[720px] w-full text-left">
                         <thead>
                             <tr className="border-b border-slate-800 bg-slate-900 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                <th className="px-5 py-4">Plant&atilde;o Alvo</th>
+                                <th className="px-5 py-4">Data</th>
                                 <th className="px-5 py-4">Turno</th>
                                 <th className="px-5 py-4">Unidade</th>
-                                <th className="px-5 py-4">Solicitante</th>
-                                <th className="px-5 py-4">Colega / Oferta em troca</th>
+                                <th className="px-5 py-4">Médico Solicitante</th>
                                 <th className="px-5 py-4 text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
                             {pedidos.map((p) => {
                                 const unidadeNome = p.unidades?.nome || '—';
-                                const sol = p.solicitante?.nome || '—';
-                                const alvo = p.alvo?.nome || '—';
+                                const medicoNome = p.medicos?.nome || '—';
                                 const busy = busyId === p.id;
                                 return (
                                     <tr key={p.id} className="transition-colors hover:bg-slate-800/20">
-                                        <td className="px-5 py-4 font-mono text-sm text-sky-300">{formatDisplayDate(p.data_plantao)}</td>
+                                        <td className="px-5 py-4 font-mono text-sm text-rose-300">{formatDisplayDate(p.data_plantao)}</td>
                                         <td className="px-5 py-4">
-                                            <span className="inline-flex rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase text-sky-400">
+                                            <span className="inline-flex rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[10px] font-black uppercase text-rose-400">
                                                 {p.turno}
                                             </span>
                                         </td>
                                         <td className="px-5 py-4 text-sm text-slate-300">{unidadeNome}</td>
-                                        <td className="px-5 py-4 text-sm font-semibold text-white">{sol}</td>
-                                        <td className="px-5 py-4 text-sm text-slate-300">
-                                            <div>{alvo}</div>
-                                            {p.data_plantao_oferecida && (
-                                                <div className="mt-1 text-[10px] text-amber-300 font-bold">
-                                                    Oferece: {formatDisplayDate(p.data_plantao_oferecida)} ({p.turno_oferecido})
-                                                </div>
-                                            )}
-                                        </td>
+                                        <td className="px-5 py-4 text-sm font-semibold text-white">{medicoNome}</td>
                                         <td className="px-5 py-4 text-right">
                                             <div className="flex flex-wrap justify-end gap-2">
                                                 <button
                                                     type="button"
                                                     disabled={busy}
                                                     onClick={() => decidir(p.id, true)}
-                                                    className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                                                    className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-400 disabled:opacity-50"
                                                 >
                                                     {busy ? '...' : 'Aprovar'}
                                                 </button>

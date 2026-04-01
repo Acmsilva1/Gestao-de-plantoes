@@ -19,7 +19,9 @@ import {
     generateUnitForecast,
     holdShift,
     releaseShiftHold,
-    selectShift
+    selectShift,
+    postPedidoCancelamento,
+    getDoctorFutureShiftsForSwap
 } from './api/DirecionadorService.js';
 import {
     getDashboardMetrics,
@@ -51,7 +53,9 @@ import {
     updateManagerTemplate,
     deleteManagerTemplate,
     postApplyTemplateToMonth,
-    postClearMonthScale
+    postClearMonthScale,
+    getCancelamentosPendentesGestor,
+    postDecidirCancelamentoGestor
 } from './api/ManagerService.js';
 
 const app = express();
@@ -82,9 +86,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/medicos', getDoctors);
 app.get('/api/medicos/:medicoId/calendario', getDoctorCalendar);
 app.get('/api/medicos/:medicoId/agenda', getDoctorAgenda);
+app.get('/api/medicos/:medicoId/escala/opcoes-troca', getDoctorFutureShiftsForSwap);
 app.post('/api/medicos/:medicoId/escala/assumir', postAssumirEscala);
 app.post('/api/medicos/:medicoId/escala/pedido-assumir', postPedidoAssumirEscala);
 app.post('/api/medicos/:medicoId/escala/pedido-troca', postPedidoTrocaEscala);
+app.post('/api/medicos/:medicoId/escala/pedido-cancelamento', postPedidoCancelamento);
 app.get('/api/medicos/:medicoId/trocas', getDoctorTrocas);
 app.post('/api/medicos/:medicoId/trocas/:pedidoId/responder', postResponderTrocaColega);
 app.post('/api/medicos/:medicoId/perfil', updateDoctorProfile);
@@ -113,6 +119,8 @@ app.get('/api/manager/trocas-pendentes', getTrocasPendentesGestor);
 app.post('/api/manager/trocas/:pedidoId/decidir', postDecidirTrocaGestor);
 app.get('/api/manager/assumir-pendentes', getAssumirPendentesGestor);
 app.post('/api/manager/assumir/:pedidoId/decidir', postDecidirAssumirGestor);
+app.get('/api/manager/cancelamentos-pendentes', getCancelamentosPendentesGestor);
+app.post('/api/manager/cancelamentos/:pedidoId/decidir', postDecidirCancelamentoGestor);
 app.get('/api/manager/escala-editor', getEscalaEditor);
 app.post('/api/manager/escala/linha', postEscalaLinha);
 app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);

@@ -373,10 +373,13 @@ export const postPedidoAssumirEscala = async (req, res) => {
                 solicitanteId: medicoId
             });
 
+            // Auto-aprovação imediata
+            await dbModel.aprovarPedidoAssumirGestorRpc(pedido.id);
+
             res.status(201).json({
                 id: pedido.id,
-                status: pedido.status,
-                message: 'Solicitacao para assumir o turno enviada ao gestor para confirmacao.'
+                status: 'APROVADO',
+                message: 'Turno assumido com sucesso. Atualizando escala imediamente.'
             });
         } catch (insertErr) {
             if (/duplicate|unique|23505/i.test(String(insertErr.message))) {
@@ -391,7 +394,7 @@ export const postPedidoAssumirEscala = async (req, res) => {
 
 export const postPedidoTrocaEscala = async (req, res) => {
     const { medicoId } = req.params;
-    const { unidadeId, data_plantao, turno, colegaMedicoId } = req.body ?? {};
+    const { unidadeId, data_plantao, turno, colegaMedicoId, escalaOferecidaId } = req.body ?? {};
 
     try {
         if (!unidadeId || !data_plantao || !turno) {
@@ -428,6 +431,14 @@ export const postPedidoTrocaEscala = async (req, res) => {
             return res.status(400).json({ error: 'Linha da escala do colega nao encontrada.' });
         }
 
+        let escalaLinhaOferecida = null;
+        if (escalaOferecidaId) {
+            escalaLinhaOferecida = await dbModel.getEscalaById(escalaOferecidaId);
+            if (!escalaLinhaOferecida || escalaLinhaOferecida.medico_id !== medicoId || escalaLinhaOferecida.unidade_id !== unidadeId) {
+                return res.status(400).json({ error: 'Plantão oferecido inválido ou não pertence a você nesta unidade.' });
+            }
+        }
+
         try {
             const pedido = await dbModel.createPedidoTrocaEscala({
                 unidadeId,
@@ -435,7 +446,10 @@ export const postPedidoTrocaEscala = async (req, res) => {
                 turno,
                 solicitanteId: medicoId,
                 alvoId: colegaMedicoId,
-                escalaAlvoId: escalaLinha.id
+                escalaAlvoId: escalaLinha.id,
+                escalaOferecidaId: escalaLinhaOferecida ? escalaLinhaOferecida.id : null,
+                dataPlantaoOferecida: escalaLinhaOferecida ? escalaLinhaOferecida.data_plantao : null,
+                turnoOferecido: escalaLinhaOferecida ? escalaLinhaOferecida.turno : null
             });
 
             res.status(201).json({
@@ -451,6 +465,53 @@ export const postPedidoTrocaEscala = async (req, res) => {
         }
     } catch (err) {
         res.status(500).json({ error: 'Erro ao registar pedido de troca.', details: err.message });
+    }
+};
+
+export const postPedidoCancelamento = async (req, res) => {
+    const { medicoId } = req.params;
+    const { unidadeId, data_plantao, turno } = req.body ?? {};
+
+    try {
+        if (!unidadeId || !data_plantao || !turno) {
+            return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
+        }
+        if (!TURNOS_ESCALA.has(turno)) {
+            return res.status(400).json({ error: 'Turno invalido.' });
+        }
+
+        const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
+        if (!resolved) {
+            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+        }
+
+        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId);
+        if (!escalaLinha?.id) {
+            return res.status(400).json({ error: 'Voce nao esta locado num turno correspondente na escala desta unidade.' });
+        }
+
+        try {
+            const pedido = await dbModel.createPedidoCancelamento({
+                unidadeId,
+                escalaId: escalaLinha.id,
+                medicoId,
+                dataPlantao: data_plantao,
+                turno
+            });
+
+            res.status(201).json({
+                id: pedido.id,
+                status: pedido.status,
+                message: 'Pedido de cancelamento enviado. Aguarde aprovacao do gestor.'
+            });
+        } catch (insertErr) {
+            if (/duplicate|unique|23505/i.test(String(insertErr.message))) {
+                return res.status(409).json({ error: 'Ja existe um pedido de cancelamento ativo para este plantao.' });
+            }
+            throw insertErr;
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao registar cancelamento.', details: err.message });
     }
 };
 
@@ -627,5 +688,21 @@ export const selectShift = async (req, res) => {
 
         const statusCode = /CONFLITO|nao encontrado|indisponivel|sem vagas|ja reservou|confirmacao expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
         res.status(statusCode).json({ error: err.message });
+    }
+};
+
+export const getDoctorFutureShiftsForSwap = async (req, res) => {
+    const { medicoId } = req.params;
+    const { unidadeId } = req.query;
+
+    if (!unidadeId) {
+        return res.status(400).json({ error: 'Unidade inespecífica.' });
+    }
+
+    try {
+        const shifts = await dbModel.getFutureShiftsForSwap(medicoId, unidadeId);
+        res.json({ shifts });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao buscar plantões futuros.', details: err.message });
     }
 };

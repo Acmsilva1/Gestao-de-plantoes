@@ -169,13 +169,13 @@ const trocaStatusLabel = (status, souSolicitante) => {
         case 'AGUARDANDO_COLEGA':
             return souSolicitante ? 'Aguardando confirmação do colega' : 'Aguardando a sua resposta';
         case 'AGUARDANDO_GESTOR':
-            return 'Aguardando o gestor';
+            return 'Em processamento';
         case 'APROVADO':
             return 'Aprovado — escala atualizada';
         case 'RECUSADO_COLEGA':
             return 'Recusado pelo colega';
         case 'RECUSADO_GESTOR':
-            return 'Recusado pelo gestor';
+            return 'Recusado';
         default:
             return status || '—';
     }
@@ -281,10 +281,12 @@ const ProfileModal = ({ doctor, pedidosTroca, onRefreshTrocas, onClose, onUpdate
                                             {souSolicitante ? (
                                                 <>
                                                     Troca com <span className="font-semibold text-white">{outroNome}</span>
+                                                    {p.data_plantao_oferecida && <span>, oferecendo <span className="font-semibold text-amber-200">{formatDisplayDate(p.data_plantao_oferecida)} ({p.turno_oferecido})</span></span>}
                                                 </>
                                             ) : (
                                                 <>
                                                     <span className="font-semibold text-white">{p.solicitante?.nome || 'Colega'}</span> pediu trocar com você
+                                                    {p.data_plantao_oferecida && <span>, oferecendo o dia <span className="font-semibold text-amber-200">{formatDisplayDate(p.data_plantao_oferecida)} ({p.turno_oferecido})</span> em troca</span>}
                                                 </>
                                             )}
                                         </p>
@@ -379,8 +381,11 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
     const [colegaParaTrocaId, setColegaParaTrocaId] = useState(null);
     const [confirmTrocaOpen, setConfirmTrocaOpen] = useState(false);
     const [confirmAssumirOpen, setConfirmAssumirOpen] = useState(false);
+    const [confirmCancelarOpen, setConfirmCancelarOpen] = useState(false);
     const [pedidoGestorSucesso, setPedidoGestorSucesso] = useState(false);
     const [pedidoSucessoTipo, setPedidoSucessoTipo] = useState(null);
+    const [futureShifts, setFutureShifts] = useState([]);
+    const [offeredShiftId, setOfferedShiftId] = useState('');
 
     const { date, turno, shift, unidadeId } = modal || {};
     const list = shift?.plantonistas || [];
@@ -389,17 +394,30 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
     const isMine = isMyTurn(shift, medicoId, bookedShiftIds);
     const showAssumir = Boolean(modal && unidadeId) && (!shift || (shift && list.length === 0 && !isMine));
     const showTroca = Boolean(modal && shift && list.length > 0 && !isMine);
+    const showCancelar = Boolean(modal && shift && isMine);
 
     useEffect(() => {
         if (!modal) return;
         setActionError('');
         setConfirmTrocaOpen(false);
         setConfirmAssumirOpen(false);
+        setConfirmCancelarOpen(false);
         setPedidoGestorSucesso(false);
         setPedidoSucessoTipo(null);
+        setOfferedShiftId('');
         const cols = (modal.shift?.plantonistas || []).filter((p) => p.id !== medicoId);
         setColegaParaTrocaId(cols.length === 1 ? cols[0].id : null);
     }, [modal, medicoId]);
+
+    useEffect(() => {
+        if (!modal?.unidadeId || !medicoId) return;
+        fetch(`/api/medicos/${medicoId}/escala/opcoes-troca?unidadeId=${modal.unidadeId}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.shifts) setFutureShifts(data.shifts);
+            })
+            .catch(console.error);
+    }, [modal?.unidadeId, medicoId]);
 
     if (!modal) return null;
 
@@ -445,7 +463,8 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                     unidadeId,
                     data_plantao: date,
                     turno,
-                    colegaMedicoId: colegaParaTrocaId
+                    colegaMedicoId: colegaParaTrocaId,
+                    escalaOferecidaId: offeredShiftId || null
                 })
             });
             const data = await parseJsonSafely(response);
@@ -454,6 +473,33 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
             }
             setConfirmTrocaOpen(false);
             setPedidoSucessoTipo('troca');
+            setPedidoGestorSucesso(true);
+        } catch (err) {
+            setActionError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const enviarPedidoCancelamento = async () => {
+        setActionError('');
+        setBusy(true);
+        try {
+            const response = await fetch(`/api/medicos/${medicoId}/escala/pedido-cancelamento`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    unidadeId,
+                    data_plantao: date,
+                    turno
+                })
+            });
+            const data = await parseJsonSafely(response);
+            if (!response.ok) {
+                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+            }
+            setConfirmCancelarOpen(false);
+            setPedidoSucessoTipo('cancelamento');
             setPedidoGestorSucesso(true);
         } catch (err) {
             setActionError(err.message);
@@ -499,8 +545,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 Confirmar assumir turno
                             </h4>
                             <p id="confirm-assumir-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
-                                Será enviada uma <span className="font-semibold text-emerald-200">solicitação ao gestor</span> da sua unidade para confirmar
-                                que você assume este turno vago. Deseja enviar?
+                                Você será alocado neste turno <span className="font-semibold text-emerald-200">automaticamente</span>. Deseja confirmar?
                             </p>
                             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
                                 <button
@@ -539,8 +584,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 Confirmar troca de plantão
                             </h4>
                             <p id="confirm-troca-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
-                                O gestor da unidade precisa <span className="font-semibold text-amber-200">autorizar</span> esta troca com o colega
-                                selecionado. Deseja enviar o pedido?
+                                O pedido será enviado ao colega selecionado. Se aceite, a troca será <span className="font-semibold text-amber-200">processada automaticamente</span> caso esteja dentro das regras (mesma especialidade e antecedência mínima de 12h).
                             </p>
                             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
                                 <button
@@ -558,6 +602,45 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                     className="rounded-xl border border-amber-500/50 bg-amber-500/25 px-4 py-3 text-sm font-black text-amber-50 transition hover:bg-amber-500/35 disabled:opacity-50"
                                 >
                                     {busy ? 'A enviar...' : 'Sim'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : confirmCancelarOpen ? (
+                    <div
+                        className="absolute inset-0 z-[1] flex items-center justify-center rounded-[2rem] bg-slate-950/85 px-4 backdrop-blur-sm"
+                        role="presentation"
+                        onClick={() => !busy && setConfirmCancelarOpen(false)}
+                    >
+                        <div
+                            className="w-full max-w-sm rounded-2xl border border-rose-500/35 bg-slate-900 p-6 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                            role="alertdialog"
+                            aria-labelledby="confirm-cancelar-title"
+                            aria-describedby="confirm-cancelar-desc"
+                        >
+                            <h4 id="confirm-cancelar-title" className="text-lg font-black text-rose-500">
+                                Confirmar cancelamento
+                            </h4>
+                            <p id="confirm-cancelar-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
+                                Será enviada uma solicitação ao gestor da unidade para <span className="font-semibold text-rose-300">cancelar sua participação</span> neste turno. Deseja enviar?
+                            </p>
+                            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => setConfirmCancelarOpen(false)}
+                                    className="rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Não
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={enviarPedidoCancelamento}
+                                    className="rounded-xl border border-rose-500/50 bg-rose-500/25 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/35 disabled:opacity-50"
+                                >
+                                    {busy ? 'A enviar...' : 'Sim, cancelar'}
                                 </button>
                             </div>
                         </div>
@@ -603,13 +686,15 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                         <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-6 text-center">
                             {pedidoSucessoTipo === 'troca' ? (
                                 <>
-                                    <p className="text-base font-bold text-emerald-100">Aguardando confirmação!</p>
+                                    <p className="text-base font-bold text-emerald-100">Pedido enviado ao colega!</p>
                                     <p className="mt-2 text-sm text-slate-400">
-                                        O colega precisa aceitar; depois o gestor aprovará a troca na escala.
+                                        Se o colega aceitar e as regras forem atendidas (mesma especialidade, antecedência &gt; 12h), a troca será efetivada automaticamente na escala.
                                     </p>
                                 </>
+                            ) : pedidoSucessoTipo === 'cancelamento' ? (
+                                <p className="text-base font-bold text-emerald-100">Pedido enviado ao gestor, aguarde aprovação.</p>
                             ) : (
-                                <p className="text-base font-bold text-emerald-100">Em análise com o gestor, aguarde retorno.</p>
+                                <p className="text-base font-bold text-emerald-100">Atualizado com sucesso!</p>
                             )}
                             <button
                                 type="button"
@@ -665,11 +750,34 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                     );
                                 })}
                             </ul>
+
+                            {showTroca && list.some(p => p.id !== medicoId) && (
+                                <div className="mt-5 rounded-2xl border border-amber-500/20 bg-slate-950/50 p-4">
+                                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-amber-200/80">
+                                        Oferecer plantão em troca (Opcional)
+                                    </label>
+                                    <select
+                                        value={offeredShiftId}
+                                        onChange={(e) => setOfferedShiftId(e.target.value)}
+                                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-slate-100 outline-none focus:border-amber-400"
+                                    >
+                                        <option value="">Nenhum plantão (Apenas pedir a vaga)</option>
+                                        {futureShifts.map((fs) => (
+                                            <option key={fs.id} value={fs.id}>
+                                                {formatDisplayDate(fs.data_plantao)} - {fs.turno}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-2 text-xs text-slate-500 font-medium">
+                                        Se a troca for aprovada, você assume este plantão vago e o colega assume automaticamente a vaga oferecida.
+                                    </p>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
 
-                {!pedidoGestorSucesso && (showAssumir || showTroca) ? (
+                {!pedidoGestorSucesso && (showAssumir || showTroca || showCancelar) ? (
                     <div className="border-t border-slate-800 p-4">
                         {actionError ? (
                             <p className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{actionError}</p>
@@ -699,6 +807,19 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                     className="flex-1 rounded-2xl border border-amber-500/50 bg-amber-500/15 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50"
                                 >
                                     Troca de plantão
+                                </button>
+                            ) : null}
+                            {showCancelar ? (
+                                <button
+                                    type="button"
+                                    disabled={busy || !unidadeId}
+                                    onClick={() => {
+                                        setActionError('');
+                                        setConfirmCancelarOpen(true);
+                                    }}
+                                    className="flex-1 rounded-2xl border border-rose-500/50 bg-rose-500/20 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/30 disabled:opacity-50"
+                                >
+                                    Cancelar Plantão
                                 </button>
                             ) : null}
                         </div>

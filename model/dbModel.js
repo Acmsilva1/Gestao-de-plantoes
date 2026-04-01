@@ -402,6 +402,9 @@ export const dbModel = {
                 medico_solicitante_id: row.solicitanteId,
                 medico_alvo_id: row.alvoId,
                 escala_alvo_id: row.escalaAlvoId,
+                escala_oferecida_id: row.escalaOferecidaId || null,
+                data_plantao_oferecida: row.dataPlantaoOferecida || null,
+                turno_oferecido: row.turnoOferecido || null,
                 status: 'AGUARDANDO_COLEGA'
             })
             .select('*')
@@ -458,7 +461,61 @@ export const dbModel = {
             throw new Error('Este pedido nao esta aguardando resposta do colega.');
         }
 
-        const novoStatus = aceitar ? 'AGUARDANDO_GESTOR' : 'RECUSADO_COLEGA';
+        let novoStatus = aceitar ? 'AGUARDANDO_GESTOR' : 'RECUSADO_COLEGA';
+        let isAutoApproved = false;
+
+        if (aceitar) {
+            try {
+                const solicitante = await this.getDoctorById(pedido.medico_solicitante_id);
+                const alvo = await this.getDoctorById(pedido.medico_alvo_id);
+                
+                if (solicitante && alvo && solicitante.especialidade === alvo.especialidade) {
+                    const shiftTurnConfigs = { 'Madrugada': '01:00:00', 'Manhã': '07:00:00', 'Tarde': '13:00:00', 'Noite': '19:00:00' };
+                    const shiftTime = shiftTurnConfigs[pedido.turno];
+                    let hoursDiffValid = false;
+
+                    if (shiftTime) {
+                        const shiftDateTime = new Date(`${pedido.data_plantao}T${shiftTime}-03:00`);
+                        const hoursDiff = (shiftDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+                        hoursDiffValid = hoursDiff >= 12;
+                    }
+
+                    let offeredShiftValid = true;
+                    if (pedido.escala_oferecida_id && pedido.turno_oferecido) {
+                        const offeredShiftTime = shiftTurnConfigs[pedido.turno_oferecido];
+                        if (offeredShiftTime) {
+                            const offeredShiftDateTime = new Date(`${pedido.data_plantao_oferecida}T${offeredShiftTime}-03:00`);
+                            const offeredHoursDiff = (offeredShiftDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+                            offeredShiftValid = offeredHoursDiff >= 12;
+                        } else {
+                            offeredShiftValid = false;
+                        }
+                    }
+
+                    if (hoursDiffValid && offeredShiftValid) {
+                        isAutoApproved = true;
+                    }
+                }
+            } catch (err) {
+                console.error('Error checking auto-approve rules', err);
+            }
+        }
+
+        if (isAutoApproved) {
+            // Must transition to AGUARDANDO_GESTOR first so the RPC constraint is satisfied
+            await supabase
+                .from('pedidos_troca_escala')
+                .update({
+                    status: 'AGUARDANDO_GESTOR',
+                    colega_respondeu_em: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', pedidoId);
+            
+            await this.aprovarPedidoTrocaGestorRpc(pedidoId);
+            return await this.getPedidoTrocaById(pedidoId);
+        }
+
         const response = await supabase
             .from('pedidos_troca_escala')
             .update({
@@ -583,6 +640,75 @@ export const dbModel = {
             throw new Error('Pedido nao encontrado ou ja decidido.');
         }
         return row;
+    },
+    async createPedidoCancelamento(row) {
+        const response = await supabase
+            .from('pedidos_cancelamento_escala')
+            .insert({
+                unidade_id: row.unidadeId,
+                escala_id: row.escalaId,
+                medico_id: row.medicoId,
+                data_plantao: row.dataPlantao,
+                turno: row.turno,
+                status: 'PENDENTE'
+            })
+            .select('*')
+            .single();
+        return unwrap(response, 'Falha ao criar pedido de cancelamento');
+    },
+    async listPedidosCancelamentoParaGestor(unidadeId) {
+        let query = supabase
+            .from('pedidos_cancelamento_escala')
+            .select('*, unidades(nome), medicos(id, nome, crm, especialidade)')
+            .eq('status', 'PENDENTE')
+            .order('created_at', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        return unwrap(response, 'Falha ao listar pedidos de cancelamento');
+    },
+    async aprovarPedidoCancelamentoGestorRpc(pedidoId) {
+        const response = await supabase.rpc('aprovar_pedido_cancelamento_gestor', { p_pedido_id: pedidoId });
+        if (response.error) {
+            throw new Error(response.error.message || 'Falha ao aprovar cancelamento de plantão');
+        }
+    },
+    async recusarPedidoCancelamentoGestor(pedidoId) {
+        const response = await supabase
+            .from('pedidos_cancelamento_escala')
+            .update({
+                status: 'RECUSADO',
+                gestor_respondeu_em: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId)
+            .eq('status', 'PENDENTE')
+            .select('*')
+            .maybeSingle();
+
+        const row = unwrap(response, 'Falha ao recusar pedido de cancelamento');
+        if (!row) {
+            throw new Error('Pedido de cancelamento nao encontrado ou ja decidido.');
+        }
+        return row;
+    },
+    async getCancelamentosByRange(startDate, endDate, unidadeId) {
+        let query = supabase
+            .from('pedidos_cancelamento_escala')
+            .select('*, unidades(nome), medicos(id, nome, crm)')
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate)
+            .order('data_plantao', { ascending: true });
+
+        if (unidadeId) {
+            query = query.eq('unidade_id', unidadeId);
+        }
+
+        const response = await query;
+        return unwrap(response, 'Falha ao listar cancelamentos por período') || [];
     },
     async getShiftAgendaByUnitAndDate(unidadeId, dataPlantao) {
         const response = await supabase
@@ -1278,5 +1404,34 @@ export const dbModel = {
             .lte('data_plantao', monthEnd);
 
         return unwrap(response, 'Falha ao limpar mês');
+    },
+
+    async getEscalaById(id) {
+        const response = await supabase.from('escala').select('*').eq('id', id).maybeSingle();
+        return unwrap(response, 'Falha ao buscar linha da escala');
+    },
+
+    async getFutureShiftsForSwap(medicoId, unidadeId) {
+        const now = new Date();
+        const yyyyMmDd = now.toISOString().split('T')[0];
+        
+        const response = await supabase
+            .from('escala')
+            .select('id, data_plantao, turno')
+            .eq('medico_id', medicoId)
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', yyyyMmDd)
+            .order('data_plantao', { ascending: true });
+            
+        const rows = unwrap(response, 'Falha ao listar plantões futuros') || [];
+        
+        // Filter out shifts that are specifically in the past today
+        const shiftTurnConfigs = { 'Madrugada': '01:00:00', 'Manhã': '07:00:00', 'Tarde': '13:00:00', 'Noite': '19:00:00' };
+        return rows.filter(r => {
+            const time = shiftTurnConfigs[r.turno];
+            if (!time) return false;
+            const shiftDate = new Date(`${r.data_plantao}T${time}-03:00`);
+            return shiftDate.getTime() > now.getTime();
+        });
     }
 };

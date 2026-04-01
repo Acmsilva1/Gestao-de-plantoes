@@ -702,6 +702,21 @@ export const postDecidirTrocaGestor = async (req, res) => {
         if (!assertUnitScope(res, manager, pedido.unidade_id)) return;
 
         if (aprovar) {
+            // Enforce 12h rule even on manual approval
+            const shiftTurnConfigs = { 'Madrugada': '01:00:00', 'Manhã': '07:00:00', 'Tarde': '13:00:00', 'Noite': '19:00:00' };
+            const now = new Date();
+            const checkShift = (data, turno) => {
+                const time = shiftTurnConfigs[turno];
+                if (!time || !data) return true; // can't validate, allow
+                const shiftDateTime = new Date(`${data}T${time}-03:00`);
+                return (shiftDateTime.getTime() - now.getTime()) / (1000 * 60 * 60) >= 12;
+            };
+            const targetOk = checkShift(pedido.data_plantao, pedido.turno);
+            const offeredOk = !pedido.escala_oferecida_id || checkShift(pedido.data_plantao_oferecida, pedido.turno_oferecido);
+            if (!targetOk || !offeredOk) {
+                return res.status(400).json({ error: 'Não é possível aprovar: um dos plantões envolvidos está a menos de 12h de distância.' });
+            }
+
             await dbModel.aprovarPedidoTrocaGestorRpc(pedidoId);
             res.json({ message: 'Troca aprovada. A escala foi atualizada.' });
         } else {
@@ -760,6 +775,53 @@ export const postDecidirAssumirGestor = async (req, res) => {
         } else {
             await dbModel.recusarPedidoAssumirGestor(pedidoId);
             res.json({ message: 'Pedido de assumir recusado pelo gestor.' });
+        }
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+export const getCancelamentosPendentesGestor = async (req, res) => {
+    const { unidadeId } = req.query;
+
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
+        const scopedUnitId = unidadeId || manager.unidade_id;
+        if (!assertUnitScope(res, manager, scopedUnitId)) return;
+
+        const pedidos = await dbModel.listPedidosCancelamentoParaGestor(scopedUnitId);
+        res.json({ pedidos });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao carregar pedidos de cancelamento.', details: err.message });
+    }
+};
+
+export const postDecidirCancelamentoGestor = async (req, res) => {
+    const { pedidoId } = req.params;
+    const { aprovar } = req.body ?? {};
+
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Função não disponível para gestor master.' });
+        }
+
+        if (typeof aprovar !== 'boolean') {
+            return res.status(400).json({ error: 'Informe aprovar: true ou false.' });
+        }
+
+        if (aprovar) {
+            await dbModel.aprovarPedidoCancelamentoGestorRpc(pedidoId);
+            res.json({ message: 'Cancelamento aprovado. Médico removido da escala.' });
+        } else {
+            await dbModel.recusarPedidoCancelamentoGestor(pedidoId);
+            res.json({ message: 'Pedido de cancelamento recusado. Médico mantido na escala.' });
         }
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -1024,10 +1086,11 @@ export const getReportsData = async (req, res) => {
 
         const { startMonthDate, endMonthDate } = getMonthDates(month);
 
-        const [escalaRows, disponibilidadeRows, swapRequests] = await Promise.all([
+        const [escalaRows, disponibilidadeRows, swapRequests, cancelamentoRows] = await Promise.all([
             dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
             dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitId)
+            dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitId),
+            dbModel.getCancelamentosByRange(startMonthDate, endMonthDate, scopedUnitId)
         ]);
 
         // 1. Occupancy Data (Reuse logic from getDashboardSummary)
@@ -1092,11 +1155,24 @@ export const getReportsData = async (req, res) => {
             criado_em: r.created_at
         }));
 
+        // 4. Cancelamentos
+        const cancelamentos = (cancelamentoRows || []).map(r => ({
+            id: r.id,
+            unidade: r.unidades?.nome || 'Unidade',
+            data: r.data_plantao,
+            turno: r.turno,
+            medico: r.medicos?.nome || 'Médico',
+            crm: r.medicos?.crm || '',
+            status: r.status,
+            criado_em: r.created_at
+        }));
+
         res.json({
             month,
             occupancyByUnit,
             doctorShifts,
-            swapDemands
+            swapDemands,
+            cancelamentos
         });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao gerar dados do relatório.', details: err.message });
