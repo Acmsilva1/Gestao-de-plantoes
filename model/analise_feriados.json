@@ -1,38 +1,127 @@
 {
   "analise_feriados": {
-    "descricao": "Estrutura provisoria para analise de feriados. Substituir pelos dados reais do ETL quando estiver pronto.",
+    "descricao": "Configuração de Feriados Nacionais (Brasil) 2024-2026. Multiplicadores baseados na demanda histórica de Pronto-Socorro.",
     "fallbackRegiao": "geral",
     "regras": [
       {
-        "nome": "placeholder_ano_novo",
+        "nome": "Ano Novo",
         "escopo": "nacional",
-        "regioes": ["geral"],
-        "datas": ["2026-01-01"],
+        "datas": ["2024-01-01", "2025-01-01", "2026-01-01"],
         "metricas": {
-          "Manhã": {
-            "meanPatientsMultiplier": 1,
-            "stdDevPatientsMultiplier": 1,
-            "predictedPatientsMultiplier": 1,
-            "neededDoctorsMultiplier": 1
-          },
-          "Tarde": {
-            "meanPatientsMultiplier": 1,
-            "stdDevPatientsMultiplier": 1,
-            "predictedPatientsMultiplier": 1,
-            "neededDoctorsMultiplier": 1
-          },
-          "Noite": {
-            "meanPatientsMultiplier": 1,
-            "stdDevPatientsMultiplier": 1,
-            "predictedPatientsMultiplier": 1,
-            "neededDoctorsMultiplier": 1
-          },
-          "Madrugada": {
-            "meanPatientsMultiplier": 1,
-            "stdDevPatientsMultiplier": 1,
-            "predictedPatientsMultiplier": 1,
-            "neededDoctorsMultiplier": 1
-          }
+          "manha": { "predictedPatientsMultiplier": 0.85 },
+          "tarde": { "predictedPatientsMultiplier": 1.10 },
+          "noite": { "predictedPatientsMultiplier": 1.25 },
+          "madrugada": { "predictedPatientsMultiplier": 1.40 }
+        }
+      },
+      {
+        "nome": "Carnaval",
+        "escopo": "nacional",
+        "datas": ["2024-02-12", "2024-02-13", "2025-03-03", "2025-03-04", "2026-02-16", "2026-02-17"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.15 },
+          "tarde": { "predictedPatientsMultiplier": 1.20 },
+          "noite": { "predictedPatientsMultiplier": 1.25 },
+          "madrugada": { "predictedPatientsMultiplier": 1.30 }
+        }
+      },
+      {
+        "nome": "Sexta-feira Santa",
+        "escopo": "nacional",
+        "datas": ["2024-03-29", "2025-04-18", "2026-04-03"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 0.90 },
+          "tarde": { "predictedPatientsMultiplier": 1.05 },
+          "noite": { "predictedPatientsMultiplier": 1.10 },
+          "madrugada": { "predictedPatientsMultiplier": 1.10 }
+        }
+      },
+      {
+        "nome": "Tiradentes",
+        "escopo": "nacional",
+        "datas": ["2024-04-21", "2025-04-21", "2026-04-21"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.12 },
+          "tarde": { "predictedPatientsMultiplier": 1.15 },
+          "noite": { "predictedPatientsMultiplier": 1.05 },
+          "madrugada": { "predictedPatientsMultiplier": 1.05 }
+        }
+      },
+      {
+        "nome": "Dia do Trabalho",
+        "escopo": "nacional",
+        "datas": ["2024-05-01", "2025-05-01", "2026-05-01"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.18 },
+          "tarde": { "predictedPatientsMultiplier": 1.22 },
+          "noite": { "predictedPatientsMultiplier": 1.10 },
+          "madrugada": { "predictedPatientsMultiplier": 1.05 }
+        }
+      },
+      {
+        "nome": "Corpus Christi",
+        "escopo": "nacional",
+        "datas": ["2024-05-30", "2025-06-19", "2026-06-04"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.10 },
+          "tarde": { "predictedPatientsMultiplier": 1.15 },
+          "noite": { "predictedPatientsMultiplier": 1.08 },
+          "madrugada": { "predictedPatientsMultiplier": 1.05 }
+        }
+      },
+      {
+        "nome": "Independência",
+        "escopo": "nacional",
+        "datas": ["2024-09-07", "2025-09-07", "2026-09-07"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.15 },
+          "tarde": { "predictedPatientsMultiplier": 1.18 },
+          "noite": { "predictedPatientsMultiplier": 1.12 },
+          "madrugada": { "predictedPatientsMultiplier": 1.10 }
+        }
+      },
+      {
+        "nome": "Nossa Sra Aparecida",
+        "escopo": "nacional",
+        "datas": ["2024-10-12", "2025-10-12", "2026-10-12"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.12 },
+          "tarde": { "predictedPatientsMultiplier": 1.20 },
+          "noite": { "predictedPatientsMultiplier": 1.10 },
+          "madrugada": { "predictedPatientsMultiplier": 1.05 }
+        }
+      },
+      {
+        "nome": "Finados",
+        "escopo": "nacional",
+        "datas": ["2024-11-02", "2025-11-02", "2026-11-02"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 0.95 },
+          "tarde": { "predictedPatientsMultiplier": 1.05 },
+          "noite": { "predictedPatientsMultiplier": 1.02 },
+          "madrugada": { "predictedPatientsMultiplier": 1.00 }
+        }
+      },
+      {
+        "nome": "República & Consciência Negra",
+        "escopo": "nacional",
+        "datas": ["2024-11-15", "2024-11-20", "2025-11-15", "2025-11-20", "2026-11-15", "2026-11-20"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 1.12 },
+          "tarde": { "predictedPatientsMultiplier": 1.15 },
+          "noite": { "predictedPatientsMultiplier": 1.08 },
+          "madrugada": { "predictedPatientsMultiplier": 1.05 }
+        }
+      },
+      {
+        "nome": "Natal",
+        "escopo": "nacional",
+        "datas": ["2024-12-25", "2025-12-25", "2026-12-25"],
+        "metricas": {
+          "manha": { "predictedPatientsMultiplier": 0.70 },
+          "tarde": { "predictedPatientsMultiplier": 0.85 },
+          "noite": { "predictedPatientsMultiplier": 1.15 },
+          "madrugada": { "predictedPatientsMultiplier": 1.25 }
         }
       }
     ]

@@ -10,11 +10,12 @@ Este documento rastreia o estado atual da arquitetura, integrações e próximos
 ## 2. Componentes do Sistema
 | Componente | Função |
 | :--- | :--- |
-| **`DataTransportService`** | ETL Incremental (Delta Sync) com janela deslizante de 365 dias. |
-| **`AnalyticalPredictionV2`** | Motor de Predição desacoplado que consome o buffer Postgres local. |
-| **`CalibrationService`** | IA de Auto-Ajuste que detecta tendências semanais e gera multiplicadores. |
-| **`CronService`** | Agendador central das tarefas de transporte e calibração automática. |
-| **`dbModel.js`** | Camada de persistência (Supabase) otimizada para o fluxo analítico. |
+| **`DataTransportService`** | ETL Incremental (Delta Sync) com janela de 365 dias (800 nos testes). |
+| **`PredictionEngine`** | Motor Analítico (MAD, Regressão, Sazonalidade) e Multiplicadores. |
+| **`CalibrationService`** | IA de Auto-Ajuste Semanal para detecção de novas tendências. |
+| **`CronService`** | Orquestrador de tarefas (06h/18h - Sync | Dom 01h - Calibração). |
+| **`dbModel.js`** | Camada de persistência otimizada (Supabase/Postgres). |
+| **`analise_feriados.json`** | Base de Sazonalidade Real populada para 2024, 2025 e 2026. |
 
 ## 3. Banco de Dados e Integração [Status: EM TESTE]
 - **Destino**: `historico_predicao` (Postgres local/Supabase).
@@ -25,6 +26,7 @@ Este documento rastreia o estado atual da arquitetura, integrações e próximos
 - [x] Implementação do `DataTransportService` e `CronService`.
 - [x] Refatoração do Preditor Analítico para consumir tabela `historico_predicao`.
 - [x] Implementação do `CalibrationService` (IA de Auto-Ajuste semanal).
+- [x] Povoamento de Sazonalidade Proativa (`analise_feriados.json` 2024-2026).
 - [ ] Migração de fonte de dados (Postgres Teste -> Oracle Produção).
 - [ ] Dashboard de Monitoramento de Performance do Preditor (Assertividade).
 
