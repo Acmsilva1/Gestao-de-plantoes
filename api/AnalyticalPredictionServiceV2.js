@@ -27,19 +27,26 @@ const inferConfidenceFromDemand = (demand) => {
     return 'Baixa';
 };
 
-const buildSummary = (rows = []) => {
-    const totalDemand = rows.reduce((sum, row) => sum + (Number(row.demandaEstimada ?? row.demanda_estimada) || 0), 0);
+const buildSummary = (enrichedRows = []) => {
+    const totalDemand = enrichedRows.reduce((sum, row) => sum + (Number(row.demandaEstimada) || 0), 0);
     const byDate = new Map();
     const byUnit = new Map();
     const confidenceCounts = { Alta: 0, Média: 0, Baixa: 0 };
 
-    for (const row of rows) {
-        const demand = Number(row.demandaEstimada ?? row.demanda_estimada) || 0;
-        const dateKey = row.dataPrevista || row.data_prevista;
-        const confidence = row.confianca ? normalizeConfidence(String(row.confianca).toLowerCase()) : 'Baixa';
+    for (const row of enrichedRows) {
+        const demand = Number(row.demandaEstimada) || 0;
+        const dateKey = row.dataPrevista;
+        const confidence = row.confianca || 'Baixa';
+        
         byDate.set(dateKey, (byDate.get(dateKey) || 0) + demand);
         byUnit.set(row.unidade, (byUnit.get(row.unidade) || 0) + demand);
-        confidenceCounts[confidence] += 1;
+        
+        if (confidenceCounts[confidence] !== undefined) {
+            confidenceCounts[confidence] += 1;
+        } else {
+            // Fallback para evitar erro se a normalização retornar algo inesperado
+            confidenceCounts['Baixa'] += 1;
+        }
     }
 
     const peakDay = Array.from(byDate.entries()).sort((a, b) => b[1] - a[1])[0] || null;
@@ -47,20 +54,20 @@ const buildSummary = (rows = []) => {
 
     return {
         totalDemand,
-        totalRows: rows.length,
-        totalDays: new Set(rows.map((row) => row.dataPrevista || row.data_prevista)).size,
-        averageDemandPerRow: rows.length ? Number((totalDemand / rows.length).toFixed(2)) : 0,
+        totalRows: enrichedRows.length,
+        totalDays: new Set(enrichedRows.map((row) => row.dataPrevista)).size,
+        averageDemandPerRow: enrichedRows.length ? Number((totalDemand / enrichedRows.length).toFixed(2)) : 0,
         peakDay: peakDay ? { date: peakDay[0], label: formatPredictionDateLabel(peakDay[0]), demand: peakDay[1] } : null,
         topUnit: topUnit ? { unidade: topUnit[0], demand: topUnit[1] } : null,
         confidenceCounts,
         diagnostics: {
-            lowSampleRows: rows.filter((row) => Number(row.amostraHistorica || 0) < 8).length,
-            highVolatilityRows: rows.filter((row) => Number(row.volatilidadeRelativa || 0) > 0.35).length,
-            avgConfidenceScore: rows.length
+            lowSampleRows: enrichedRows.filter((row) => Number(row.amostraHistorica || 0) < 8).length,
+            highVolatilityRows: enrichedRows.filter((row) => Number(row.volatilidadeRelativa || 0) > 0.35).length,
+            avgConfidenceScore: enrichedRows.length
                 ? Number(
                       (
-                          rows.reduce((sum, row) => sum + (Number(row.scoreConfianca) || 0), 0) /
-                          rows.length
+                          enrichedRows.reduce((sum, row) => sum + (Number(row.scoreConfianca) || 0), 0) /
+                          enrichedRows.length
                       ).toFixed(1)
                   )
                 : 0

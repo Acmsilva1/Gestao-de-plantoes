@@ -50,10 +50,11 @@ export default function ManagerDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState(() => String(now.getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState(() => String(now.getFullYear()));
     const [selectedUnit, setSelectedUnit] = useState('all');
+    const [comparisonUnits, setComparisonUnits] = useState([]); // IDs das unidades extras para comparar
     const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [data, setData] = useState({
+    const [rawData, setRawData] = useState({ // Dados brutos vindos da API
         acceptedByQuinzena: { q1: [], q2: [] },
         occupancyBreakdown: [],
         topDoctorsByUnit: []
@@ -67,23 +68,59 @@ export default function ManagerDashboardPage() {
         return options;
     }, [now]);
 
+    // Filtramos os dados baseado na seleção (Single, All ou Comparison)
+    const filteredData = useMemo(() => {
+        if (!rawData.acceptedByQuinzena) return rawData;
+
+        const isComparison = selectedUnit !== 'all';
+        const targetIds = isComparison ? [selectedUnit, ...comparisonUnits] : null;
+
+        const filterQuinzena = (list) => {
+            if (!targetIds) return list;
+            return list.filter(row => targetIds.includes(String(row.unidadeId)));
+        };
+
+        const q1 = filterQuinzena(rawData.acceptedByQuinzena.q1 || []);
+        const q2 = filterQuinzena(rawData.acceptedByQuinzena.q2 || []);
+
+        // Recalcular breakdown de ocupação para as unidades selecionadas
+        const totalOcupadas = q1.reduce((s, r) => s + r.totalOcupadas, 0) + q2.reduce((s, r) => s + r.totalOcupadas, 0);
+        const totalVazias = q1.reduce((s, r) => s + r.totalVazias, 0) + q2.reduce((s, r) => s + r.totalVazias, 0);
+        const totalTotal = totalOcupadas + totalVazias;
+
+        const occupancyBreakdown = [
+            { categoria: 'Ocupadas', total: totalOcupadas, percentual: totalTotal > 0 ? Number(((totalOcupadas / totalTotal) * 100).toFixed(1)) : 0 },
+            { categoria: 'Vazias', total: totalVazias, percentual: totalTotal > 0 ? Number(((totalVazias / totalTotal) * 100).toFixed(1)) : 0 }
+        ];
+
+        const topDoctorsByUnit = !targetIds 
+            ? rawData.topDoctorsByUnit 
+            : (rawData.topDoctorsByUnit || []).filter(u => targetIds.includes(String(u.unidadeId)));
+
+        return {
+            acceptedByQuinzena: { q1, q2 },
+            occupancyBreakdown,
+            topDoctorsByUnit
+        };
+    }, [rawData, selectedUnit, comparisonUnits]);
+
     const totalAlocados = useMemo(
-        () => (data.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0) +
-            (data.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
-        [data.acceptedByQuinzena?.q1, data.acceptedByQuinzena?.q2]
+        () => (filteredData.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0) +
+            (filteredData.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
+        [filteredData.acceptedByQuinzena]
     );
     const totalVazias = useMemo(
-        () => (data.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalVazias || 0), 0) +
-            (data.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalVazias || 0), 0),
-        [data.acceptedByQuinzena?.q1, data.acceptedByQuinzena?.q2]
+        () => (filteredData.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalVazias || 0), 0) +
+            (filteredData.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalVazias || 0), 0),
+        [filteredData.acceptedByQuinzena]
     );
     const totalAceitasQ1 = useMemo(
-        () => (data.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
-        [data.acceptedByQuinzena?.q1]
+        () => (filteredData.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
+        [filteredData.acceptedByQuinzena]
     );
     const totalAceitasQ2 = useMemo(
-        () => (data.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
-        [data.acceptedByQuinzena?.q2]
+        () => (filteredData.acceptedByQuinzena?.q2 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0),
+        [filteredData.acceptedByQuinzena]
     );
 
     useEffect(() => {
@@ -95,11 +132,15 @@ export default function ManagerDashboardPage() {
             setLoading(true);
             setError('');
             try {
-                const unitQuery = selectedUnit !== 'all' ? `&unidadeId=${encodeURIComponent(selectedUnit)}` : '';
+                // Se estiver comparando, SEMPRE pega 'all' para filtrar no front. 
+                // Se for single e sem comparação, pega apenas a unidade.
+                const needsAllData = selectedUnit === 'all' || comparisonUnits.length > 0;
+                const unitQuery = !needsAllData ? `&unidadeId=${encodeURIComponent(selectedUnit)}` : '';
+                
                 const response = await fetch(`/api/manager/dashboard-summary?month=${encodeURIComponent(month)}&gestorId=${encodeURIComponent(gestorId)}${unitQuery}`);
                 const payload = await readApiResponse(response);
                 if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar dashboard.');
-                if (!cancelled) setData(payload);
+                if (!cancelled) setRawData(payload);
             } catch (err) {
                 if (!cancelled) setError(err.message);
             } finally {
@@ -110,7 +151,7 @@ export default function ManagerDashboardPage() {
         return () => {
             cancelled = true;
         };
-    }, [month, selectedUnit, session?.id]);
+    }, [month, selectedUnit, comparisonUnits.length > 0, session?.id]); // Recarrega se entrar no modo comparação
 
     useEffect(() => {
         const gestorId = session?.id;
@@ -177,7 +218,10 @@ export default function ManagerDashboardPage() {
                             <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Unidade</label>
                             <select
                                 value={selectedUnit}
-                                onChange={(e) => setSelectedUnit(e.target.value)}
+                                onChange={(e) => {
+                                    setSelectedUnit(e.target.value);
+                                    if (e.target.value === 'all') setComparisonUnits([]);
+                                }}
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
                             >
                                 <option value="all">Todas as unidades</option>
@@ -209,6 +253,53 @@ export default function ManagerDashboardPage() {
                         <p className="mt-1 text-2xl font-black text-amber-300">{totalVazias}</p>
                     </div>
                 </div>
+
+                {/* Submenu de Comparação BI */}
+                {selectedUnit !== 'all' && (
+                    <div className="mt-8 animate-in slide-in-from-top-4 duration-500">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-1 w-8 bg-sky-500 rounded-full" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Comparação BI Interativa</p>
+                            <span className="rounded-full bg-sky-500/10 px-3 py-0.5 text-[9px] font-black text-sky-400 border border-sky-500/20 uppercase tracking-widest">Selecione para comparar</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {units
+                                .filter(u => u.id !== selectedUnit)
+                                .map(unit => {
+                                    const isSelected = comparisonUnits.includes(unit.id);
+                                    return (
+                                        <button
+                                            key={unit.id}
+                                            onClick={() => {
+                                                setComparisonUnits(prev => 
+                                                    isSelected ? prev.filter(id => id !== unit.id) : [...prev, unit.id]
+                                                );
+                                            }}
+                                            className={`group relative flex items-center gap-3 rounded-xl border px-4 py-2.5 transition-all duration-300 ${
+                                                isSelected 
+                                                    ? 'border-sky-500/50 bg-sky-500/20 text-white shadow-[0_0_15px_-5px_rgba(14,165,233,0.4)]' 
+                                                    : 'border-slate-700 bg-slate-900/40 text-slate-400 hover:border-slate-600 hover:bg-slate-800/60'
+                                            }`}
+                                        >
+                                            <div className={`flex h-4 w-4 items-center justify-center rounded-md border transition-all ${
+                                                isSelected ? 'bg-sky-500 border-sky-400' : 'border-slate-600'
+                                            }`}>
+                                                {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white animate-in zoom-in-50 duration-200" />}
+                                            </div>
+                                            <span className="text-[11px] font-bold uppercase tracking-tight">{unit.nome}</span>
+                                            {isSelected && (
+                                                <div className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500"></span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })
+                            }
+                        </div>
+                    </div>
+                )}
             </div>
 
             {error ? <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
@@ -227,7 +318,7 @@ export default function ManagerDashboardPage() {
                             </div>
                             <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.acceptedByQuinzena?.q1 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
+                                    <BarChart data={filteredData.acceptedByQuinzena?.q1 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                         <XAxis
                                             dataKey="unidade"
@@ -260,7 +351,7 @@ export default function ManagerDashboardPage() {
                             </div>
                             <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data.acceptedByQuinzena?.q2 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
+                                    <BarChart data={filteredData.acceptedByQuinzena?.q2 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                         <XAxis
                                             dataKey="unidade"
@@ -296,7 +387,7 @@ export default function ManagerDashboardPage() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={data.occupancyBreakdown || []}
+                                        data={filteredData.occupancyBreakdown || []}
                                         dataKey="total"
                                         nameKey="categoria"
                                         cx="50%"
@@ -304,7 +395,7 @@ export default function ManagerDashboardPage() {
                                         outerRadius={120}
                                         label={({ categoria, percentual }) => `${categoria}: ${percentual}%`}
                                     >
-                                        {(data.occupancyBreakdown || []).map((entry, index) => (
+                                        {(filteredData.occupancyBreakdown || []).map((entry, index) => (
                                             <Cell key={`${entry.categoria}-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                         ))}
                                     </Pie>
@@ -321,7 +412,7 @@ export default function ManagerDashboardPage() {
                             <h3 className="text-lg font-black">Médicos com Mais Plantões por Unidade</h3>
                         </div>
                         <div className="space-y-6">
-                            {(data.topDoctorsByUnit || []).map((unit) => (
+                            {(filteredData.topDoctorsByUnit || []).map((unit) => (
                                 <div key={unit.unidadeId} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
                                     <div className="border-b border-slate-800 bg-slate-900/70 px-4 py-3 text-sm font-black text-sky-300">{unit.unidade}</div>
                                     <div className="overflow-x-auto">
@@ -346,7 +437,7 @@ export default function ManagerDashboardPage() {
                                     </div>
                                 </div>
                             ))}
-                            {(data.topDoctorsByUnit || []).length === 0 ? (
+                            {(filteredData.topDoctorsByUnit || []).length === 0 ? (
                                 <p className="rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-slate-500">
                                     Sem dados de alocação para o mês selecionado.
                                 </p>

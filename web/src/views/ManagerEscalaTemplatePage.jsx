@@ -48,12 +48,16 @@ export default function ManagerEscalaTemplatePage() {
     useEffect(() => {
         if (!gestorId) return;
         setDoctorsLoading(true);
-        fetch(`/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`)
+        const url = unitId 
+            ? `/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}&unidadeId=${encodeURIComponent(unitId)}`
+            : `/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`;
+
+        fetch(url)
             .then(readApiResponse)
             .then(data => setDoctors(Array.isArray(data) ? data : []))
             .catch(() => setDoctors([]))
             .finally(() => setDoctorsLoading(false));
-    }, [gestorId]);
+    }, [gestorId, unitId]);
 
     const loadTemplates = useCallback(async () => {
         if (!unitId) {

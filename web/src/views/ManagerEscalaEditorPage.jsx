@@ -101,14 +101,17 @@ export default function ManagerEscalaEditorPage() {
         (async () => {
             setDoctorsLoading(true);
             try {
-                const r = await fetch(`/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`);
+                const url = unitId 
+                    ? `/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}&unidadeId=${encodeURIComponent(unitId)}`
+                    : `/api/manager/medicos?gestorId=${encodeURIComponent(gestorId)}`;
+                const r = await fetch(url);
                 const data = await readApiResponse(r);
                 if (!cancelled) {
                     if (r.ok && Array.isArray(data)) setDoctors(data);
                     else setDoctors([]);
                 }
             } catch {
-                if (!cancelled) setDoctors([]);
+                if (!cancelled) setDoctorsLoading(false);
             } finally {
                 if (!cancelled) setDoctorsLoading(false);
             }
@@ -116,7 +119,7 @@ export default function ManagerEscalaEditorPage() {
         return () => {
             cancelled = true;
         };
-    }, [gestorId]);
+    }, [gestorId, unitId]);
 
     const loadEditor = useCallback(
         async (options = {}) => {

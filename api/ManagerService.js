@@ -241,25 +241,21 @@ export const getDashboardSummary = async (req, res) => {
         const occupiedQ2ByUnit = new Map();
         const doctorByUnit = new Map();
 
-        const getQuinzenaMap = (day, firstHalfMap, secondHalfMap) => (day <= 15 ? firstHalfMap : secondHalfMap);
-
         for (const row of disponibilidadeRows || []) {
             const unitId = row.unidade_id;
             const unitName = unitNameById.get(unitId) || row.unidades?.nome || 'Unidade';
             unitNameById.set(unitId, unitName);
             const day = Number(String(row.data_plantao).slice(8, 10));
-            const targetMap = getQuinzenaMap(day, availableQ1ByUnit, availableQ2ByUnit);
-            if (!targetMap.has(unitId)) targetMap.set(unitId, new Set());
-            targetMap.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+            const targetMap = day <= 15 ? availableQ1ByUnit : availableQ2ByUnit;
+            targetMap.set(unitId, (targetMap.get(unitId) || 0) + (row.vagas_totais || 0));
         }
 
         for (const row of escalaRows || []) {
             const unitId = row.unidade_id;
             const unitName = unitNameById.get(unitId) || 'Unidade';
             const day = Number(String(row.data_plantao).slice(8, 10));
-            const targetMap = getQuinzenaMap(day, occupiedQ1ByUnit, occupiedQ2ByUnit);
-            if (!targetMap.has(unitId)) targetMap.set(unitId, new Set());
-            targetMap.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+            const targetMap = day <= 15 ? occupiedQ1ByUnit : occupiedQ2ByUnit;
+            targetMap.set(unitId, (targetMap.get(unitId) || 0) + 1); // Cada linha de escala = 1 médico ocupado
 
             const doctorKey = `${unitId}|${row.medico_id}`;
             const current = doctorByUnit.get(doctorKey) || {
@@ -278,8 +274,11 @@ export const getDashboardSummary = async (req, res) => {
             const unitIds = new Set([...availableMap.keys(), ...occupiedMap.keys()]);
             return Array.from(unitIds)
                 .map((unitId) => {
-                    const totalSlots = (availableMap.get(unitId) || new Set()).size;
-                    const totalOcupadas = (occupiedMap.get(unitId) || new Set()).size;
+                    const totalOcupadas = occupiedMap.get(unitId) || 0;
+                    // O total de vagas deve ser no mínimo o total de ocupadas para evitar 0% injusto
+                    let totalSlots = availableMap.get(unitId) || 0;
+                    if (totalSlots < totalOcupadas) totalSlots = totalOcupadas;
+
                     const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
                     return {
                         unidadeId: unitId,
@@ -370,9 +369,20 @@ export const getDoctorAccesses = async (req, res) => {
         const manager = await getScopedManager(req, res);
         if (!manager) return;
 
-        const list = isMasterManager(manager)
-            ? await dbModel.getDoctorsAccessList()
-            : await dbModel.getDoctorsAccessListByUnit(manager.unidade_id);
+        const { unidadeId } = req.query;
+
+        // Se for Master, pode filtrar por qualquer unidade ou ver tudo.
+        // Se for Gestor comum, sempre filtra pela sua própria unidade.
+        let targetUnitId = unidadeId;
+        if (!isMasterManager(manager)) {
+            targetUnitId = manager.unidade_id;
+        }
+
+        const list = targetUnitId
+            ? await dbModel.getDoctorsAccessListByUnit(targetUnitId)
+            : (isMasterManager(manager) 
+                ? await dbModel.getDoctorsAccessList() 
+                : await dbModel.getDoctorsAccessListByUnit(manager.unidade_id));
         
         // Formatar para algo amigável ao frontend
         const mappedList = list.map(doc => ({
@@ -1139,20 +1149,24 @@ export const getReportsData = async (req, res) => {
 
         disponibilidadeRows.forEach(row => {
             const unitId = row.unidade_id;
-            if (!availableByUnit.has(unitId)) availableByUnit.set(unitId, new Set());
-            availableByUnit.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+            const current = availableByUnit.get(unitId) || 0;
+            availableByUnit.set(unitId, current + (row.vagas_totais || 0));
         });
 
         escalaRows.forEach(row => {
             const unitId = row.unidade_id;
-            if (!occupiedByUnit.has(unitId)) occupiedByUnit.set(unitId, new Set());
-            occupiedByUnit.get(unitId).add(`${row.data_plantao}|${row.turno}`);
+            const current = occupiedByUnit.get(unitId) || 0;
+            occupiedByUnit.set(unitId, current + 1);
         });
 
         const unitIds = new Set([...availableByUnit.keys(), ...occupiedByUnit.keys()]);
         const occupancyByUnit = Array.from(unitIds).map(unitId => {
-            const totalSlots = (availableByUnit.get(unitId) || new Set()).size;
-            const totalOcupadas = (occupiedByUnit.get(unitId) || new Set()).size;
+            const totalOcupadas = occupiedByUnit.get(unitId) || 0;
+            let totalSlots = availableByUnit.get(unitId) || 0;
+            
+            // Fallback: Se não há predição/disponibilidade mas há médicos, assumimos que o total é ao menos o ocupado
+            if (totalSlots < totalOcupadas) totalSlots = totalOcupadas;
+
             const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
             return {
                 unidade: unitNameById.get(unitId) || 'Unidade',

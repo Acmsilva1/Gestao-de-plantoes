@@ -1,5 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BrainCircuit, CalendarDays, Download, Filter, MapPinned, RefreshCcw, TrendingUp } from 'lucide-react';
+import { 
+    AlertCircle, 
+    BrainCircuit, 
+    CalendarDays, 
+    Download, 
+    Filter, 
+    MapPinned, 
+    RefreshCcw, 
+    TrendingUp, 
+    X,
+    Zap
+} from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
@@ -43,6 +54,7 @@ export default function ManagerPredicaoPage() {
     const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
     const [loading, setLoading] = useState(true);
     const [recalculating, setRecalculating] = useState(false);
+    const [isStabilityModalOpen, setIsStabilityModalOpen] = useState(false);
     const [error, setError] = useState('');
     const [filters, setFilters] = useState({
         unidade: '',
@@ -97,9 +109,10 @@ export default function ManagerPredicaoPage() {
             current.faixaMin += Number(row.faixaMin) || 0;
             current.faixaMax += Number(row.faixaMax) || 0;
 
-            if (row.confianca === 'Baixa') {
+            const rowConf = String(row.confianca || '').toLowerCase();
+            if (rowConf === 'baixa' || rowConf === 'b') {
                 current.confianca = 'Baixa';
-            } else if (row.confianca === 'Média' && current.confianca !== 'Baixa') {
+            } else if ((rowConf === 'media' || rowConf === 'média' || rowConf.startsWith('m')) && current.confianca !== 'Baixa') {
                 current.confianca = 'Média';
             }
 
@@ -411,12 +424,19 @@ export default function ManagerPredicaoPage() {
                     <p className="mt-1 text-lg font-black text-white">{data.summary.peakDay?.label || '-'}</p>
                     <p className="text-xs text-slate-400">{data.summary.peakDay ? `${data.summary.peakDay.demand} atendimentos` : 'Sem dados'}</p>
                 </div>
-                <div className={metricClass}>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Confiança</p>
+                <div 
+                    onClick={() => setIsStabilityModalOpen(true)}
+                    className={`${metricClass} cursor-pointer group transition-all duration-300 hover:scale-[1.02] hover:border-sky-500/50 hover:shadow-[0_0_20px_-10px_rgba(14,165,233,0.3)]`}
+                >
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400">Confiança</p>
+                        <AlertCircle size={12} className="text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                     <p className="mt-1 text-sm font-black text-white">
-                        A {data.summary.confidenceCounts?.Alta || 0} | M {data.summary.confidenceCounts?.Média || 0} | B {data.summary.confidenceCounts?.Baixa || 0}
+                        A {data.summary.confidenceCounts?.Alta || 0} | M {data.summary.confidenceCounts?.Média || 0} | <span className="text-rose-400">B {data.summary.confidenceCounts?.Baixa || 0}</span>
                     </p>
                     <p className="text-xs text-slate-400">distribuição simples da estabilidade</p>
+                    <p className="mt-1 text-[9px] font-black uppercase text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">Ver diagnóstico 🔍</p>
                 </div>
                 <div className={metricClass}>
                     <p className="text-[10px] uppercase tracking-widest text-slate-400">Amostra baixa</p>
@@ -663,6 +683,98 @@ export default function ManagerPredicaoPage() {
                     </div>
                 )}
             </section>
+
+            {/* Modal de Diagnóstico de Estabilidade (Baixa Confiança - B) */}
+            {isStabilityModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 transition-all animate-in fade-in duration-300">
+                    <div 
+                        className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" 
+                        onClick={() => setIsStabilityModalOpen(false)} 
+                    />
+                    <div className={cardClass + " relative w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl border-slate-700 ring-1 ring-sky-500/20"}>
+                        <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-5">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-400">
+                                    <AlertCircle size={28} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Diagnóstico de Estabilidade</h3>
+                                    <p className="text-xs text-slate-400 uppercase font-bold tracking-widest">Detalhamento dos pontos de atenção (Baixa Confiança)</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setIsStabilityModalOpen(false)}
+                                className="h-10 w-10 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-6">
+                            <div className="grid gap-4">
+                                {displayedRows.filter(r => {
+                                    const c = String(r.confianca || '').trim().toLowerCase();
+                                    return !['alta', 'media', 'média'].includes(c);
+                                }).length === 0 ? (
+                                    <div className="text-center py-12 bg-slate-900/40 rounded-[2rem] border border-slate-800 text-slate-500 font-bold">
+                                        Nenhum alerta de instabilidade detectado na visão atual.
+                                    </div>
+                                ) : (
+                                    <div className="overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-950/20">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-900/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800">
+                                                <tr>
+                                                    <th className="px-6 py-4">Data / Local</th>
+                                                    <th className="px-6 py-4">Localização/Turno</th>
+                                                    <th className="px-6 py-4">Diagnóstico do Robo</th>
+                                                    <th className="px-6 py-4 text-right">Certeza</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/40">
+                                                {displayedRows.filter(r => {
+                                                    const c = String(r.confianca || '').trim().toLowerCase();
+                                                    return !['alta', 'media', 'média'].includes(c);
+                                                }).map((row, idx) => (
+                                                    <tr key={idx} className="hover:bg-rose-500/5 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="font-black text-white uppercase tracking-tight">{row.dataLabel}</div>
+                                                            <div className="text-[10px] text-slate-500">{row.dataPrevista}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="font-bold text-slate-300 uppercase text-xs">{row.unidade || 'Rede'}</div>
+                                                            <div className="text-[10px] text-slate-500 uppercase tracking-widest">{row.turno || 'TOTAL'}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="text-rose-200/80 text-xs leading-relaxed italic border-l-2 border-rose-500/30 pl-3">
+                                                                "{row.motivoConfianca || 'Sazonalidade extrema ou variabilidade histórica detectada.'}"
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="text-lg font-black text-rose-400 tracking-tighter">{row.scoreConfianca || (row.confianca === 'Baixa' ? 40 : 65)}%</div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-rose-500/5 rounded-2xl p-4 border border-rose-500/10 flex items-start gap-4">
+                            <div className="h-8 w-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-500 flex-shrink-0 animate-pulse">
+                                <Zap size={16} />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-black text-rose-200 uppercase tracking-widest mb-1">Ação Sugerida</h4>
+                                <p className="text-xs text-rose-200/60 leading-relaxed">
+                                    Para estes dias marcados com <span className="font-black text-rose-400">estabilidade baixa</span>, o robô sugere manter uma margem de segurança de profissionais de sobreaviso, pois houve comportamento atípico no histórico.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
