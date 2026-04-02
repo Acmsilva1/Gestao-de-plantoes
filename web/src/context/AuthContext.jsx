@@ -20,8 +20,8 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = (data, isManager = false) => {
-        const newSession = { ...data, isManager };
+    const login = (data, perfil = 'medico') => {
+        const newSession = { ...data, perfil };
         window.localStorage.setItem('maestro-session', JSON.stringify(newSession));
         setSession(newSession);
     };

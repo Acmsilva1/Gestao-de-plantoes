@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FALLBACK_MEDICO_PROFILES, GESTOR_PROFILES } from '../devTestProfiles.js';
+import { FALLBACK_MEDICO_PROFILES, GESTOR_PROFILES, ADMIN_PROFILES } from '../devTestProfiles.js';
 
 const parseJson = async (response) => {
     const raw = await response.text();
@@ -37,6 +37,7 @@ export default function LoginView() {
     const [medicoId, setMedicoId] = useState(FALLBACK_MEDICO_PROFILES[0]?.id ?? '');
     const [managerList, setManagerList] = useState(GESTOR_PROFILES);
     const [gestorId, setGestorId] = useState(GESTOR_PROFILES[0]?.id ?? '');
+    const [adminId, setAdminId] = useState(ADMIN_PROFILES[0]?.id ?? '');
 
     const [loadingMedicos, setLoadingMedicos] = useState(true);
     const [loadingManagers, setLoadingManagers] = useState(true);
@@ -126,7 +127,7 @@ export default function LoginView() {
             setError('Nenhum perfil de médico disponível.');
             return;
         }
-        login({ ...profile, crm: profile.crm }, false);
+        login({ ...profile, crm: profile.crm }, 'medico');
         navigate('/medico');
     };
 
@@ -136,8 +137,18 @@ export default function LoginView() {
             setError('Nenhum perfil de gestor configurado em devTestProfiles.js (GESTOR_PROFILES).');
             return;
         }
-        login({ ...profile }, true);
+        login({ ...profile }, 'gestor');
         navigate('/gestor');
+    };
+
+    const enterAdmin = () => {
+        const profile = ADMIN_PROFILES.find((p) => p.id === adminId) ?? ADMIN_PROFILES[0];
+        if (!profile) {
+            setError('Nenhum perfil administrativo disponível.');
+            return;
+        }
+        login({ ...profile }, 'admin');
+        navigate('/admin');
     };
 
     return (
@@ -171,6 +182,17 @@ export default function LoginView() {
                         }`}
                     >
                         Gestor
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('admin')}
+                        className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${
+                            activeTab === 'admin'
+                                ? 'border border-purple-500/30 bg-purple-500/10 text-purple-400'
+                                : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                    >
+                        ADM
                     </button>
                 </div>
 
@@ -236,9 +258,33 @@ export default function LoginView() {
                         >
                             Acessar Painel Gerencial
                         </button>
-                        <p className="text-center text-xs text-slate-500">
-                            Edite gestores em <code className="text-slate-400">GESTOR_PROFILES</code> em <code className="text-slate-400">devTestProfiles.js</code>.
-                        </p>
+                    </div>
+                )}
+
+                {activeTab === 'admin' && (
+                    <div className="grid gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div>
+                            <label className="mb-2 block text-sm font-semibold text-slate-200">Acesso Administrativo</label>
+                            <select
+                                value={adminId}
+                                onChange={(e) => setAdminId(e.target.value)}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-purple-500"
+                            >
+                                {ADMIN_PROFILES.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.nome} ({p.usuario})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-3 text-sm text-slate-400">Extração de relatórios para faturamento, produtividade e auditoria.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={enterAdmin}
+                            className="rounded-2xl bg-purple-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-purple-500/20 transition hover:bg-purple-400"
+                        >
+                            Acessar Área Administrativa
+                        </button>
                     </div>
                 )}
             </div>

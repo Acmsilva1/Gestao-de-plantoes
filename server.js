@@ -60,6 +60,14 @@ import {
     getCancelamentosPendentesGestor,
     postDecidirCancelamentoGestor
 } from './api/ManagerService.js';
+import {
+    getAdminProductivityReport,
+    getAdminExchangesReport,
+    getAdminCancellationsReport,
+    getAdminUnits,
+    getAdminDoctors,
+    updateAdminProfile
+} from './api/AdminController.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,6 +149,14 @@ app.put('/api/manager/templates/:id', updateManagerTemplate);
 app.delete('/api/manager/templates/:id', deleteManagerTemplate);
 app.post('/api/manager/escala/importar-template', postApplyTemplateToMonth);
 app.post('/api/manager/escala/limpar-mes', postClearMonthScale);
+
+// --- Rotas Administrativas (Relatórios de Faturamento) ---
+app.get('/api/admin/reports/productivity', getAdminProductivityReport);
+app.get('/api/admin/reports/exchanges', getAdminExchangesReport);
+app.get('/api/admin/reports/cancellations', getAdminCancellationsReport);
+app.get('/api/admin/units', getAdminUnits);
+app.get('/api/admin/doctors', getAdminDoctors);
+app.post('/api/admin/perfil/:id', updateAdminProfile);
 
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));

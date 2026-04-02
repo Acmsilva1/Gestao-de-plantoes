@@ -200,6 +200,27 @@ export const GESTOR_PROFILES = [
     }
 ];
 
+export const ADMIN_PROFILES = [
+    {
+        id: 'a0000000-0000-4000-8000-000000000000',
+        nome: 'Administrador de demonstração',
+        usuario: 'admin.demo',
+        perfil: 'ADMINISTRATIVO'
+    },
+    {
+        id: 'a0000001-0000-4000-8000-000000000001',
+        nome: 'Faturamento Hospitalar 01',
+        usuario: 'admin.faturamento',
+        perfil: 'ADMINISTRATIVO'
+    },
+    {
+        id: 'a0000002-0000-4000-8000-000000000002',
+        nome: 'Auditoria e Controle',
+        usuario: 'admin.auditoria',
+        perfil: 'ADMINISTRATIVO'
+    }
+];
+
 /** @deprecated use FALLBACK_MEDICO_PROFILES */
 export const DEV_MEDICO_PROFILES = FALLBACK_MEDICO_PROFILES;
 /** @deprecated use GESTOR_PROFILES */

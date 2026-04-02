@@ -13,6 +13,7 @@ Este documento rastreia o estado atual da arquitetura, integrações e próximos
 | **`DataTransportService`** | ETL Incremental (Delta Sync) com janela de 365 dias (800 nos testes). |
 | **`PredictionEngine`** | Motor Analítico (MAD, Regressão, Sazonalidade) e Multiplicadores. |
 | **`CalibrationService`** | IA de Auto-Ajuste Semanal para detecção de novas tendências. |
+| **`AdminService`** | Relatórios operacionais (Produtividade/Horas, Trocas e Cancelamentos). |
 | **`CronService`** | Orquestrador de tarefas (06h/18h - Sync | Dom 01h - Calibração). |
 | **`dbModel.js`** | Camada de persistência otimizada (Supabase/Postgres). |
 | **`analise_feriados.json`** | Base de Sazonalidade Real populada para 2024, 2025 e 2026. |
@@ -27,6 +28,7 @@ Este documento rastreia o estado atual da arquitetura, integrações e próximos
 - [x] Refatoração do Preditor Analítico para consumir tabela `historico_predicao`.
 - [x] Implementação do `CalibrationService` (IA de Auto-Ajuste semanal).
 - [x] Povoamento de Sazonalidade Proativa (`analise_feriados.json` 2024-2026).
+- [x] Módulo Administrativo (Relatórios de Faturamento em CSV/HTML/JSON).
 - [ ] Migração de fonte de dados (Postgres Teste -> Oracle Produção).
 - [ ] Dashboard de Monitoramento de Performance do Preditor (Assertividade).
 

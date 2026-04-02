@@ -1577,5 +1577,82 @@ export const dbModel = {
             .upsert(rows, { onConflict: 'unidade,turno,dia_semana' })
             .select('*');
         return unwrap(response, 'Falha ao salvar multiplicadores de ML');
+    },
+
+    // --- MÉTODOS ADMINISTRATIVOS (RELATÓRIOS) ---
+
+    async getAdminProductivityReport({ startDate, endDate, medicoId, unidadeId }) {
+        let query = supabase
+            .from('escala')
+            .select(`
+                id,
+                data_plantao,
+                turno,
+                medicos (id, nome, especialidade, crm),
+                unidades (id, nome)
+            `)
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate);
+
+        if (medicoId) query = query.eq('medico_id', medicoId);
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('data_plantao', { ascending: true });
+        return unwrap(response, 'Falha ao gerar relatório de produtividade');
+    },
+
+    async getAdminExchangesReport({ startDate, endDate, medicoId, unidadeId }) {
+        let query = supabase
+            .from('pedidos_troca_escala')
+            .select(`
+                id,
+                data_plantao,
+                turno,
+                status,
+                created_at,
+                medico_solicitante:medicos!medico_solicitante_id (nome),
+                medico_alvo:medicos!medico_alvo_id (nome),
+                unidades (nome)
+            `)
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate);
+
+        if (medicoId) {
+            query = query.or(`medico_solicitante_id.eq.${medicoId},medico_alvo_id.eq.${medicoId}`);
+        }
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('data_plantao', { ascending: true });
+        return unwrap(response, 'Falha ao gerar relatório de trocas');
+    },
+
+    async getAdminCancellationsReport({ startDate, endDate, medicoId, unidadeId }) {
+        // Assumindo estrutura similar à escala/trocas
+        let query = supabase
+            .from('pedidos_cancelamento_escala')
+            .select(`
+                *,
+                medicos (nome),
+                unidades (nome)
+            `)
+            .gte('created_at', `${startDate}T00:00:00Z`)
+            .lte('created_at', `${endDate}T23:59:59Z`);
+
+        if (medicoId) query = query.eq('medico_id', medicoId);
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('created_at', { ascending: false });
+        return unwrap(response, 'Falha ao gerar relatório de cancelamentos');
+    },
+
+    async updateAdminProfile(adminId, data) {
+        const response = await supabase
+            .from('admins')
+            .update(data)
+            .eq('id', adminId)
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar perfil de administrador');
     }
 };
