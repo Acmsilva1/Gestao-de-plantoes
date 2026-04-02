@@ -62,6 +62,7 @@ import {
 } from './api/ManagerService.js';
 import {
     getAdminProductivityReport,
+    getAdminProductivitySummary,
     getAdminExchangesReport,
     getAdminCancellationsReport,
     getAdminUnits,
@@ -152,6 +153,7 @@ app.post('/api/manager/escala/limpar-mes', postClearMonthScale);
 
 // --- Rotas Administrativas (Relatórios de Faturamento) ---
 app.get('/api/admin/reports/productivity', getAdminProductivityReport);
+app.get('/api/admin/reports/productivity/summary', getAdminProductivitySummary);
 app.get('/api/admin/reports/exchanges', getAdminExchangesReport);
 app.get('/api/admin/reports/cancellations', getAdminCancellationsReport);
 app.get('/api/admin/units', getAdminUnits);

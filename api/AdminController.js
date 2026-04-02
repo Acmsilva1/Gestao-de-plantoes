@@ -18,6 +18,8 @@ export const getAdminProductivityReport = async (req, res) => {
 
         if (format === 'html') {
             const html = adminService.formatHTMLTable(data);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename=relatorio_produtividade.html');
             return res.send(html);
         }
 
@@ -27,6 +29,21 @@ export const getAdminProductivityReport = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const getAdminProductivitySummary = async (req, res) => {
+    try {
+        const { startDate, endDate, medicoId, unidadeId } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Data de início e fim são obrigatórias.' });
+        }
+        const summary = await adminService.getProductivitySummary({ startDate, endDate, medicoId, unidadeId });
+        res.json(summary);
+    } catch (error) {
+        console.error('[AdminController] Summary Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 
 export const getAdminExchangesReport = async (req, res) => {
     try {
@@ -38,6 +55,13 @@ export const getAdminExchangesReport = async (req, res) => {
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', 'attachment; filename=relatorio_trocas.csv');
             return res.send(csv);
+        }
+
+        if (format === 'html') {
+            const html = adminService.formatHTMLTable(data);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename=relatorio_trocas.html');
+            return res.send(html);
         }
 
         res.json(data);
@@ -56,6 +80,13 @@ export const getAdminCancellationsReport = async (req, res) => {
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', 'attachment; filename=relatorio_cancelamentos.csv');
             return res.send(csv);
+        }
+
+        if (format === 'html') {
+            const html = adminService.formatHTMLTable(data);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename=relatorio_cancelamentos.html');
+            return res.send(html);
         }
 
         res.json(data);
