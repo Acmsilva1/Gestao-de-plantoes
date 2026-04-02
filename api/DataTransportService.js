@@ -20,6 +20,8 @@ export class DataTransportService {
         console.log("[ETL] Verificando novos dados no DB principal...");
         
         try {
+            await dbModel.updatePipelineStatus({ status: 'RUNNING', last_run: new Date().toISOString() });
+
             // 0. Carregar unidades atuais para mapeamento de nome
             const actualUnits = await dbModel.getUnits();
             const unitNameToActual = new Map();
@@ -33,23 +35,18 @@ export class DataTransportService {
             console.log(`[ETL] Checkpoint local: ${lastDate}`);
 
             // 2. EXTRAÇÃO INCREMENTAL
-            // Aqui simularíamos a busca do Oracle. Por hora, buscamos do 'historico_tasy' ou similar
-            // que atua como nosso "Source de Teste".
             const sourceRows = await dbModel.getHistoricalSourceRows(lastDate);
 
             if (!sourceRows || sourceRows.length === 0) {
-                console.log("[ETL] Nenhuma novidade encontrada. Voltando a dormir.");
+                console.log("[ETL] Nenhuma novidade encontrada.");
+                await dbModel.updatePipelineStatus({ status: 'SUCCESS', last_checkpoint: lastDate, rows_processed: 0 });
                 return;
             }
 
-            console.log(`[ETL] Encontradas ${sourceRows.length} novas entradas.`);
-
-            // 3. TRANSFORMAÇÃO (Sanitização e Normalização)
+            // 3. TRANSFORMAÇÃO
             const rowsToInsert = sourceRows.map(row => {
                 const isoDate = toPredictionIsoDate(row.dt_atendimento || row.data || row.data_atendimento);
                 const rawName = normalizePredictionText(row.nm_unidade || row.unidade);
-                
-                // Tentar casar com o nome real no sistema (ex: sem o _es)
                 const mappedName = unitNameToActual.get(rawName) || rawName;
 
                 return {
@@ -63,20 +60,32 @@ export class DataTransportService {
             }).filter(row => row.data && row.turno && row.data > lastDate);
 
             if (rowsToInsert.length === 0) {
-                console.log("[ETL] Dados já processados ou inválidos.");
+                await dbModel.updatePipelineStatus({ status: 'SUCCESS', last_checkpoint: lastDate, rows_processed: 0 });
                 return;
             }
 
-            // 4. CARGA (Upsert no Postgres Local)
+            // 4. CARGA
             await dbModel.upsertHistoricalPrediction(rowsToInsert);
 
-            // 5. FAXINA (Manter apenas os últimos 365 dias para o Analista)
+            // 5. FAXINA
             const deletedCount = await dbModel.pruneOldHistoricalPrediction(LOOKBACK_DAYS);
             
-            console.log(`[ETL] Sucesso: ${rowsToInsert.length} linhas importadas. ${deletedCount} linhas antigas removidas.`);
+            await dbModel.updatePipelineStatus({ 
+                status: 'SUCCESS', 
+                last_checkpoint: rowsToInsert[rowsToInsert.length - 1].data, 
+                rows_processed: rowsToInsert.length,
+                error_message: null
+            });
+
+            console.log(`[ETL] Sucesso: ${rowsToInsert.length} linhas importadas.`);
 
         } catch (err) {
-            console.error("[ETL] Erro crítico no transporte de dados:", err);
+            console.error("[ETL] Erro crítico:", err);
+            await dbModel.updatePipelineStatus({ 
+                status: 'ERROR', 
+                error_message: err.message,
+                last_run: new Date().toISOString() 
+            });
         }
     }
 }

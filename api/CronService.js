@@ -18,10 +18,10 @@ class CronService {
         console.log("[Cron] Orquestrador de tarefas iniciado.");
 
         // 1. Sincronização de Dados (Transporte Incremental)
-        // Agendamento: 06:00 e 18:00 (0 6,18 * * *)
-        const syncJob = cron.schedule('0 6,18 * * *', async () => {
+        // Agendamento: De hora em hora (0 * * * *)
+        const syncJob = cron.schedule('0 * * * *', async () => {
             const agora = new Date().toLocaleTimeString('pt-BR');
-            console.log(`[Cron] Executando transporte de dados às ${agora}...`);
+            console.log(`[Cron] Executando transporte de dados horário às ${agora}...`);
             
             await dataTransport.syncSlidingWindow();
             

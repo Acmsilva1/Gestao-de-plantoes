@@ -1654,5 +1654,25 @@ export const dbModel = {
             .single();
 
         return unwrap(response, 'Falha ao atualizar perfil de administrador');
+    },
+
+    async updatePipelineStatus(data) {
+        const response = await supabase
+            .from('pipeline_status')
+            .upsert({ id: 'main_etl', ...data, updated_at: new Date().toISOString() })
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar status da pipeline');
+    },
+
+    async getPipelineStatus() {
+        const response = await supabase
+            .from('pipeline_status')
+            .select('*')
+            .eq('id', 'main_etl')
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao buscar status da pipeline');
     }
 };
