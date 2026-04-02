@@ -1,19 +1,19 @@
-# Status do Projeto: [Nome do Módulo]
-**Última Atualização:** 2026-04-01 18:10
-**Hash do Último Commit:** `a1b2c3d`
+# Status do Projeto: Alinhamento Arquitetural
+**Última Atualização:** 2026-04-02 00:30
 
 ## 1. Contexto Atual
-- **Objetivo:** Migração da persistência para Docker.
-- **Etapa:** Configuração do volume de dados.
+- **Objetivo:** Adequação à Nova Diretiva de Engenharia (Vertical Slicing).
+- **Etapa:** Sprint 1# Checkpoint - Gestão de Plantões
 
-## 2. O que já foi feito (DONE)
-- [x] Criação do Dockerfile.
-- [x] Definição da imagem base.
+## Sprint 1: Alinhamento Arquitetural (Concluída)
+- [x] Estrutura de pastas `src/modules` criada (Modular Vertical Slicing).
+- [x] Documentação base (`README.md` raiz e por módulo) atualizada com diagramas Mermaid.
+- [x] Consolidação de Banco de Dados: Criado `model/master.sql` (Skeleton) como bússola para migração corporativa.
+- [x] Limpeza de arquivos SQL redundantes no diretório `model/`.
 
-## 3. Onde parou (Ponto de Interrupção)
-- Erro de permissão ao montar o volume no diretório `/data`. O servidor caiu durante o log de erro.
-
-## 4. Próximos Passos (TODO)
-- [ ] Ajustar o `chown` no entrypoint.
-- [ ] Validar a conexão com o Postgres.
-- 
+## Próximos Passos (Sprint 2):
+1.  **Migração de Lógica**: Mover funções de `api/` para os domínios em `src/modules/`.
+2.  **Repositórios**: Implementar `infrastructure` em cada módulo usando `dbModel.js` como base.
+3.  **Testes**: Iniciar cobertura de testes unitários nas fatias verticais.
+- [ ] Mover lógica de cálculo de demanda para `src/modules/predicao/domain`.
+- [ ] Iniciar testes unitários na nova estrutura de domínio.
