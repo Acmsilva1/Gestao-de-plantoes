@@ -1,6 +1,6 @@
 import { dbModel } from '../model/dbModel.js';
 import { cacheModel } from '../model/CacheModel.js';
-import { buildMonthShiftPlan, calculateDemandProfile, getDemandForDateAndPeriod, getForecastMonthReferences, getHistoryWindowStartDate } from './PredictionService.js';
+import { buildMonthShiftPlan, calculateDemandProfile, getDemandForDateAndPeriod, getForecastMonthReferences, getHistoryWindowStartDate } from './PredictionEngine.js';
 
 const PUBLIC_SHIFTS_CACHE_KEY = 'public-shifts';
 const buildAvailabilityKey = (row) => `${row.unidade_id}|${row.data_plantao}|${row.turno}`;

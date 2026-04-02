@@ -7,7 +7,7 @@ import {
     getPredictionHorizonDates,
     getPredictionLookbackStartDate,
     normalizeHistoricalPredictionRow
-} from '../predicao (novo)/pipeline.js';
+} from './PredictionEngine.js';
 
 const buildFilters = (rows = []) => ({
     unidades: Array.from(new Set(rows.map((row) => row.unidade).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
