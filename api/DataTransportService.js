@@ -1,5 +1,6 @@
 import { dbModel } from '../model/dbModel.js';
 import {
+    LOOKBACK_DAYS,
     normalizePredictionText,
     normalizePredictionTurno,
     toPredictionIsoDate
@@ -17,8 +18,14 @@ export class DataTransportService {
      */
     async syncSlidingWindow() {
         console.log("[ETL] Verificando novos dados no DB principal...");
-
+        
         try {
+            // 0. Carregar unidades atuais para mapeamento de nome
+            const actualUnits = await dbModel.getUnits();
+            const unitNameToActual = new Map();
+            actualUnits.forEach(u => {
+                unitNameToActual.set(normalizePredictionText(u.nome), u.nome);
+            });
             // 1. Identificar o "Checkpoint" (Última data no banco de destino)
             const localStats = await dbModel.getHistoricalPredictionStats();
             const lastDate = localStats?.maxDate || '2024-01-01';
@@ -40,11 +47,16 @@ export class DataTransportService {
             // 3. TRANSFORMAÇÃO (Sanitização e Normalização)
             const rowsToInsert = sourceRows.map(row => {
                 const isoDate = toPredictionIsoDate(row.dt_atendimento || row.data || row.data_atendimento);
+                const rawName = normalizePredictionText(row.nm_unidade || row.unidade);
+                
+                // Tentar casar com o nome real no sistema (ex: sem o _es)
+                const mappedName = unitNameToActual.get(rawName) || rawName;
+
                 return {
                     data: isoDate,
                     turno: normalizePredictionTurno(row.cd_turno || row.turno || row.periodo),
                     demanda: Number(row.nr_atendimentos || row.demanda || row.total_atendimentos || row.atendimento_count || 0),
-                    unidade: normalizePredictionText(row.nm_unidade || row.unidade),
+                    unidade: mappedName,
                     regional: normalizePredictionText(row.nm_regional || row.regional || 'Geral'),
                     weekday: new Date(`${isoDate}T12:00:00Z`).getUTCDay()
                 };
@@ -59,7 +71,7 @@ export class DataTransportService {
             await dbModel.upsertHistoricalPrediction(rowsToInsert);
 
             // 5. FAXINA (Manter apenas os últimos 365 dias para o Analista)
-            const deletedCount = await dbModel.pruneOldHistoricalPrediction(365);
+            const deletedCount = await dbModel.pruneOldHistoricalPrediction(LOOKBACK_DAYS);
             
             console.log(`[ETL] Sucesso: ${rowsToInsert.length} linhas importadas. ${deletedCount} linhas antigas removidas.`);
 

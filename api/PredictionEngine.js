@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const FORECAST_DAYS = 30;
-export const LOOKBACK_DAYS = 365;
+export const LOOKBACK_DAYS = 800; // Aumentado para capturar dados de 2024 nos testes
 export const TURNOS_ANALITICOS = ['manha', 'tarde', 'noite', 'madrugada'];
 export const DEFAULT_CALENDAR_MULTIPLIERS = {
     default_weekend: 1.08,
@@ -16,7 +16,9 @@ const HOLIDAY_CONFIG_PATH = path.resolve(__dirname, '..', 'model', 'analise_feri
 export const normalizePredictionText = (value = '') =>
     String(value || '')
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/_(es|rj|sp|mg|df|pr|sc|rs|ba|pe|ce|go|mt|ms|am|pa|al|se|pb|rn|pi|ma|to|ro|ac|rr|ap)$/i, '') // Remove sufixos de UF
+        .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();
 
@@ -173,7 +175,7 @@ const getHolidayMultiplier = (holidayMultiplierMap, isoDate, turno) =>
 export const normalizeHistoricalPredictionRow = (row = {}) => {
     const data = toPredictionIsoDate(row.data || row.data_atendimento || row.data_prevista || row.dt_atendimento);
     const turno = normalizePredictionTurno(row.turno || row.periodo || row.shift || row.faixa);
-    const demanda = Number(row.total_atendimentos ?? row.atendimento_count ?? row.demanda_estimada ?? row.quantidade ?? row.volume ?? row.total ?? 0);
+    const demanda = Number(row.demanda ?? row.total_atendimentos ?? row.atendimento_count ?? row.demanda_estimada ?? row.quantidade ?? row.volume ?? row.total ?? 0);
     const unidade = String(row.unidade || row.unidade_nome || row.nome_unidade || row.hospital || row.unidade_id || 'Rede').trim();
     const regional = String(row.regional || row.regiao || row.região || row.cidade || row.uf || 'Geral').trim();
 

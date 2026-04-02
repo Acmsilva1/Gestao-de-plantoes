@@ -184,6 +184,7 @@ export const dbModel = {
             demanda_estimada: row.demanda_estimada,
             unidade: row.unidade,
             regional: row.regional,
+            confianca: row.confianca,
             executado_em: row.executado_em
         }));
 
@@ -1567,5 +1568,14 @@ export const dbModel = {
         }
         const response = await query.order('data', { ascending: true });
         return unwrap(response, 'Falha ao carregar histórico de predição');
+    },
+
+    async upsertHistoricalTasyMl(rows) {
+        if (!rows || rows.length === 0) return [];
+        const response = await supabase
+            .from('historico_tasy_ml')
+            .upsert(rows, { onConflict: 'unidade,turno,dia_semana' })
+            .select('*');
+        return unwrap(response, 'Falha ao salvar multiplicadores de ML');
     }
 };

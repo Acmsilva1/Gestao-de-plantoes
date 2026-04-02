@@ -9,8 +9,9 @@ O projeto utiliza uma arquitetura baseada em **Serviços Modulares**, onde cada 
 ### Módulos Principais
 - **`DataTransportService`**: Camada de ETL (Extração, Transformação e Carga) com importação incremental (Delta Sync).
 - **`PredictionEngine`**: O "Cérebro" do sistema. Motor puramente analítico de predição de demanda.
+- **`CalibrationService`**: IA de Auto-Ajuste que detecta tendências semanais e gera multiplicadores.
 - **`SchedulerService`**: Orquestrador de tarefas periódicas e geração automática de escalas.
-- **`CronService`**: Gerenciador de tarefas em segundo plano (Sincronização agendada 06h/18h).
+- **`CronService`**: Gerenciador de tarefas em segundo plano (Sincronização agendada e Calibração IA).
 - **`ManagerService` & `DirecionadorService`**: Interfaces de negócio para Gestores e Médicos.
 
 ---
@@ -35,14 +36,35 @@ Utiliza a técnica de **Median Absolute Deviation (MAD)** para identificar e ign
 
 ### 2. Composição da Demanda Base
 A predição final é uma média ponderada de três modelos:
-- **Mediana Sazonal (50%)**: Mediana histórica do mesmo dia da semana nos últimos 12 meses.
-- **Média Recente (30%)**: Média simples dos últimos 10 dias úteis.
-- **Tendência Linear (20%)**: Regressão linear baseada na inclinação da demanda dos últimos 8 dias.
+- **Mediana Sazonal (50%)**: Mediana histórica do mesmo dia da semana nos últimos 12 meses (Captura feriados recorrentes e hábitos de escala).
+- **Média Recente (30%)**: Média simples das últimas 10 ocorrências (Captura surtos ou mudanças graduais).
+- **Tendência Linear (20%)**: Regressão linear baseada na inclinação da demanda dos últimos 8 dias (Captura o crescimento ou queda imediata).
 
-### 3. Fatores de Ajuste (Multiplicadores)
-- **Calendário**: Multiplicadores automáticos para fins de semana (1.08x) e "correria de segunda-feira" (1.12x).
+### 3. Fatores de Ajuste e Camada de IA (ML)
+- **Calendário**: Multiplicadores automáticos para fins de semana (1.08x) e segundas-feiras (1.12x).
 - **Feriados e Sazonalidade**: Integração com `analise_feriados.json` para prever impactos de datas comemorativas nacionais e regionais.
-- **Confiança**: Atribui um score (Alta, Média, Baixa) baseado no tamanho da amostra histórica e na volatilidade do contexto.
+- **Camada de Inteligência (ML)**: O motor busca pela tabela `historico_tasy_ml` multiplicadores específicos para contextos de alta volatilidade.
+- **Confiança**: Score (Alta, Média, Baixa) baseado no tamanho da amostra histórica (mínimo 10 dias) e na volatilidade (dispersão).
+
+---
+
+## 🔁 Auto-Calibração (Feedback Loop)
+
+O sistema possui um ciclo de aprendizado autônomo através do **`CalibrationService`**:
+
+- **Análise Semanal**: Todo Domingo às 01:00 AM, o sistema compara a **Previsão Realizada** contra o **Afastamento Real**.
+- **Detecção de Tendência**: Se o desvio for consistentemente superior a 5%, ele gera um novo multiplicador na tabela de ML.
+- **Auto-Ajuste**: Isso garante que o preditor "aprenda" novas tendências (ex: crescimento populacional ou novos serviços na unidade) sem intervenção humana.
+
+---
+
+## ⏰ Agendamento de Tarefas (Crontab)
+
+| Tarefa | Agendamento | Função |
+| :--- | :--- | :--- |
+| **Sincronização Incremental** | 06:00 e 18:00 | Atualizar banco local com dados do Oracle. |
+| **Auto-Calibração IA** | Domingo, 01:00 | Ajustar multiplicadores baseados na demanda real. |
+| **Recalcular Predição** | Logo após Calibração | Atualizar projeções de 30 dias com os novos pesos. |
 
 ---
 
