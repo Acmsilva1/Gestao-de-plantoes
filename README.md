@@ -68,6 +68,15 @@ O sistema possui um ciclo de aprendizado autônomo através do **`CalibrationSer
 
 ---
 
+## 💼 Módulo Administrativo & Faturamento
+
+O sistema conta com um painel administrativo voltado para auditoria e prestação de contas, construído sob a arquitetura de alta performance **Summary-First**:
+- **Visão Consolidada na Interface**: O painel exibe um agregado de produtividade de forma instantânea (total de horas e plantões agrupados por profissional), processado diretamente no servidor. Isso evita o tráfego abusivo de registros individuais para o navegador (evitando travamentos em consultas longas).
+- **Exportações para Auditoria**: As planilhas geradas (CSV) e os laudos em HTML para conferência financeira recebem, automaticamente, o bloco de dados consolidados como cabeçalho principal, sendo seguido pelas linhas em formato transacional.
+- **Relatórios Operacionais**: Rastreabilidade completa de todas as permutas bilaterais e cancelamentos efetuados pelos médicos.
+
+---
+
 ## 🔮 Roadmap & Integrações Futuras
 
 O sistema está em constante evolução para reduzir o atrito na comunicação entre gestão e corpo clínico.
