@@ -68,6 +68,21 @@ O sistema possui um ciclo de aprendizado autônomo através do **`CalibrationSer
 
 ---
 
+## 🔮 Roadmap & Integrações Futuras
+
+O sistema está em constante evolução para reduzir o atrito na comunicação entre gestão e corpo clínico.
+
+### 📱 Integração WhatsApp Business (Meta)
+Em desenvolvimento para transformar o engajamento:
+- **Alertas de Plantão "Quente"**: Notificação instantânea para vagas de última hora.
+- **Orquestração via Chat**: Aceite de plantões e aprovação de permutas diretamente pelo WhatsApp.
+- **PDF Automático**: Envio individual das escalas mensais assim que liberadas.
+- **Lembrete de Jornada**: Mensagens automáticas pré-plantão para redução de faltas.
+
+Veja o detalhamento completo em **[WHATSAPP.md](./WHATSAPP.md)**.
+
+---
+
 ## 🚀 Como Executar
 
 ### Instalação
@@ -84,4 +99,4 @@ npm run dev:full
 ```
 
 ---
-*Este projeto segue RIGOROSAMENTE a Diretiva de Engenharia 001/2026.*
+*Este projeto segue RIGOROSAMENTE a Diretiva de Engenharia 001/2026. Sincronia entre predição e operação via automação de mensageria é prioridade Nível 1.*
