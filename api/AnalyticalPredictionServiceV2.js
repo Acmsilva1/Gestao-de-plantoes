@@ -97,7 +97,7 @@ const formatPredictionRow = (row, diagnostics = null) => {
 
 export const recalculateAnalyticalPredictionV2 = async () => {
     const startDate = getPredictionLookbackStartDate();
-    const [historyRows, mlRows] = await Promise.all([dbModel.getHistoricalTasy(startDate), dbModel.getHistoricalTasyMl()]);
+    const [historyRows, mlRows] = await Promise.all([dbModel.getHistoricalPredictionData(startDate), dbModel.getHistoricalTasyMl()]);
 
     if (!historyRows?.length) {
         return { summary: buildSummary([]), filters: buildFilters([]), rows: [], generatedAt: null };
@@ -118,7 +118,7 @@ export const getAnalyticalPredictionSnapshotV2 = async (filters = {}) => {
     const [allRows, historyRows] = await Promise.all([dbModel.getPredictionData({
         startDate: horizonDates[0] || null,
         endDate: horizonDates[horizonDates.length - 1] || null
-    }), dbModel.getHistoricalTasy(getPredictionLookbackStartDate())]);
+    }), dbModel.getHistoricalPredictionData(getPredictionLookbackStartDate())]);
 
     const contextIndex = buildContextHistoryIndex((historyRows || []).map(normalizeHistoricalPredictionRow).filter(Boolean));
 

@@ -1503,5 +1503,69 @@ export const dbModel = {
             const shiftDate = new Date(`${r.data_plantao}T${time}-03:00`);
             return shiftDate.getTime() > now.getTime();
         });
+    },
+
+    // --- MÉTODOS PARA O DATA TRANSPORT (ETL) ---
+
+    async getHistoricalPredictionStats() {
+        const response = await supabase
+            .from('historico_predicao')
+            .select('data', { count: 'exact' })
+            .order('data', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        
+        const data = unwrap(response, 'Falha ao buscar estatísticas do histórico');
+        return {
+            maxDate: data?.data || null
+        };
+    },
+
+    async getHistoricalSourceRows(afterDate) {
+        // Simulando a busca do DB Principal (Oracle/Source). 
+        // No momento, buscamos de uma tabela que atua como nosso buffer de teste.
+        let query = supabase.from('historico_tasy').select('*');
+        
+        if (afterDate) {
+            query = query.gt('data', afterDate); // dt_atendimento no Oracle
+        }
+
+        const response = await query.order('data', { ascending: true });
+        return unwrap(response, 'Falha ao buscar dados da fonte');
+    },
+
+    async upsertHistoricalPrediction(rows) {
+        if (!rows?.length) return [];
+        
+        const response = await supabase
+            .from('historico_predicao')
+            .upsert(rows, { onConflict: 'data,turno,unidade' })
+            .select('data');
+            
+        return unwrap(response, 'Falha ao carregar novos dados de predição');
+    },
+
+    async pruneOldHistoricalPrediction(days = 365) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        const isoCutoff = cutoffDate.toISOString().split('T')[0];
+
+        const response = await supabase
+            .from('historico_predicao')
+            .delete()
+            .lt('data', isoCutoff)
+            .select('data');
+            
+        const rows = unwrap(response, 'Falha na limpeza do histórico');
+        return rows?.length || 0;
+    },
+
+    async getHistoricalPredictionData(startDate = null) {
+        let query = supabase.from('historico_predicao').select('*');
+        if (startDate) {
+            query = query.gte('data', startDate);
+        }
+        const response = await query.order('data', { ascending: true });
+        return unwrap(response, 'Falha ao carregar histórico de predição');
     }
 };

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { env, getMissingEnvVars, hasDatabaseEnv } from './config/env.js';
 import { startPredictionScheduler, triggerPredictionCycle } from './api/SchedulerService.js';
+import { cronService } from './api/CronService.js';
 import {
     getDoctorCalendar,
     getDoctorAgenda,
@@ -152,6 +153,7 @@ const server = app.listen(env.port, () => {
     console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
     if (hasDatabaseEnv() && !env.disablePredictorScheduler) {
         startPredictionScheduler();
+        cronService.start(); // Inicia o transporte de dados (6h e 18h)
     } else if (hasDatabaseEnv() && env.disablePredictorScheduler) {
         console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) — módulo médico / sem predição');
     }
