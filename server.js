@@ -45,6 +45,7 @@ import {
     postDecidirAssumirGestor,
     getEscalaEditor,
     postEscalaLinha,
+    patchMoverEscalaLinha,
     deleteEscalaLinha,
     putEscalaMesVisibilidade,
     postImportarMesAnteriorEscala,
@@ -136,6 +137,7 @@ app.get('/api/manager/cancelamentos-pendentes', getCancelamentosPendentesGestor)
 app.post('/api/manager/cancelamentos/:pedidoId/decidir', postDecidirCancelamentoGestor);
 app.get('/api/manager/escala-editor', getEscalaEditor);
 app.post('/api/manager/escala/linha', postEscalaLinha);
+app.patch('/api/manager/escala/linha/:id/mover', patchMoverEscalaLinha);
 app.delete('/api/manager/escala/linha/:id', deleteEscalaLinha);
 app.put('/api/manager/escala/mes-visibilidade', putEscalaMesVisibilidade);
 app.post('/api/manager/escala/importar-mes-anterior', postImportarMesAnteriorEscala);

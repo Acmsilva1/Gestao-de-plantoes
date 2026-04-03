@@ -14,10 +14,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
+    "amqplib": "^1.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "redis": "^5.11.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

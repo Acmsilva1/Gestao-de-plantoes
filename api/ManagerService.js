@@ -1,6 +1,9 @@
 import { dbModel } from '../model/dbModel.js';
 import { TURNOS_ESCALA } from './DirecionadorService.js';
 import { getAnalyticalPredictionSnapshotV2, recalculateAnalyticalPredictionV2 } from './AnalyticalPredictionServiceV2.js';
+import { cacheService, escalaEditorCacheKey, escalaEditorCachePattern } from './CacheService.js';
+import { queueService } from './QueueService.js';
+import { env } from '../config/env.js';
 
 const getMonthDates = (monthStr) => {
     // monthStr format "YYYY-MM"
@@ -880,6 +883,68 @@ const monthBounds = (mes) => {
     return { start: `${mes}-01`, end: `${mes}-${String(lastDay).padStart(2, '0')}` };
 };
 
+const buildEscalaEditorResponse = (unidadeId, year, linhas, publicacoes) => {
+    const pubByMes = new Map((publicacoes || []).map((p) => [p.mes, p]));
+    const months = [];
+
+    for (let m = 1; m <= 12; m += 1) {
+        const mes = `${year}-${String(m).padStart(2, '0')}`;
+        const { start, end } = monthBounds(mes);
+        const mesLinhas = (linhas || []).filter((r) => r.data_plantao >= start && r.data_plantao <= end);
+        const pub = pubByMes.get(mes);
+        months.push({
+            mes,
+            publicacao: pub ? { status: pub.status, updated_at: pub.updated_at } : null,
+            linhas: mesLinhas
+        });
+    }
+
+    return { year, unidadeId, months };
+};
+
+const loadEscalaEditorFresh = async (unidadeId, year) => {
+    const [linhas, publicacoes] = await Promise.all([
+        dbModel.getEscalaByUnitAndYear(unidadeId, year),
+        dbModel.listEscalaMesPublicacaoForUnitYear(unidadeId, year)
+    ]);
+    return buildEscalaEditorResponse(unidadeId, year, linhas, publicacoes);
+};
+
+const refreshEscalaEditorCache = async (unidadeId, year) => {
+    try {
+        if (!unidadeId || !Number.isFinite(year)) return;
+        const payload = await loadEscalaEditorFresh(unidadeId, year);
+        await cacheService.setJSON(escalaEditorCacheKey(unidadeId, year), payload, env.escalaEditorCacheTtlSec);
+    } catch (err) {
+        console.error('[cache] falha ao fazer write-through do editor:', err.message);
+    }
+};
+
+const invalidateEscalaEditorCache = async (unidadeId, year) => {
+    try {
+        if (!unidadeId) return;
+        if (year != null) {
+            await cacheService.del(escalaEditorCacheKey(unidadeId, year));
+            return;
+        }
+        await cacheService.delByPattern(escalaEditorCachePattern(unidadeId));
+    } catch (err) {
+        console.error('[cache] falha ao invalidar cache do editor:', err.message);
+    }
+};
+
+const publishEscalaEvent = async (eventType, payload) => {
+    try {
+        await queueService.publish(`manager.escala.${eventType}`, {
+            eventType,
+            at: new Date().toISOString(),
+            ...payload
+        });
+    } catch (err) {
+        console.error('[queue] falha ao publicar evento de escala:', err.message);
+    }
+};
+
 export const getEscalaEditor = async (req, res) => {
     const { unidadeId, year: yearStr } = req.query;
 
@@ -897,27 +962,15 @@ export const getEscalaEditor = async (req, res) => {
         if (!manager) return;
         if (!assertUnitScope(res, manager, unidadeId)) return;
 
-        const [linhas, publicacoes] = await Promise.all([
-            dbModel.getEscalaByUnitAndYear(unidadeId, year),
-            dbModel.listEscalaMesPublicacaoForUnitYear(unidadeId, year)
-        ]);
-
-        const pubByMes = new Map((publicacoes || []).map((p) => [p.mes, p]));
-        const months = [];
-
-        for (let m = 1; m <= 12; m += 1) {
-            const mes = `${year}-${String(m).padStart(2, '0')}`;
-            const { start, end } = monthBounds(mes);
-            const mesLinhas = (linhas || []).filter((r) => r.data_plantao >= start && r.data_plantao <= end);
-            const pub = pubByMes.get(mes);
-            months.push({
-                mes,
-                publicacao: pub ? { status: pub.status, updated_at: pub.updated_at } : null,
-                linhas: mesLinhas
-            });
+        const cacheKey = escalaEditorCacheKey(unidadeId, year);
+        const cached = await cacheService.getJSON(cacheKey);
+        if (cached) {
+            return res.json(cached);
         }
 
-        res.json({ year, unidadeId, months });
+        const responsePayload = await loadEscalaEditorFresh(unidadeId, year);
+        await cacheService.setJSON(cacheKey, responsePayload, env.escalaEditorCacheTtlSec);
+        res.json(responsePayload);
     } catch (err) {
         res.status(500).json({ error: 'Erro ao carregar editor de escala.', details: err.message });
     }
@@ -940,12 +993,80 @@ export const postEscalaLinha = async (req, res) => {
         if (!assertUnitScope(res, manager, unidadeId)) return;
 
         const row = await dbModel.insertEscalaRow({ unidadeId, medicoId, data_plantao, turno });
+        const year = Number(String(data_plantao).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        await publishEscalaEvent('linha.criada', {
+            unidadeId,
+            escalaId: row.id,
+            medicoId,
+            data_plantao,
+            turno
+        });
         res.status(201).json({ id: row.id });
     } catch (err) {
         if (/duplicate|unique/i.test(err.message)) {
             return res.status(409).json({ error: 'Este medico ja esta locado neste turno.' });
         }
         res.status(500).json({ error: 'Erro ao inserir linha na escala.', details: err.message });
+    }
+};
+
+export const patchMoverEscalaLinha = async (req, res) => {
+    const { id } = req.params;
+    const { unidadeId, data_plantao_destino, turno_destino } = req.body ?? {};
+
+    if (!id || !unidadeId || !data_plantao_destino || !turno_destino) {
+        return res.status(400).json({
+            error: 'Campos obrigatorios: id, unidadeId, data_plantao_destino, turno_destino.'
+        });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data_plantao_destino)) {
+        return res.status(400).json({ error: 'data_plantao_destino deve estar no formato YYYY-MM-DD.' });
+    }
+
+    if (!TURNOS_ESCALA.has(turno_destino)) {
+        return res.status(400).json({ error: 'Turno invalido. Use: Manha, Tarde, Noite ou Madrugada.' });
+    }
+
+    try {
+        const manager = await getScopedManager(req, res);
+        if (!manager) return;
+        if (!assertUnitScope(res, manager, unidadeId)) return;
+
+        const existingRow = await dbModel.getEscalaById(id);
+        if (!existingRow || String(existingRow.unidade_id) !== String(unidadeId)) {
+            return res.status(404).json({ error: 'Linha da escala nao encontrada para esta unidade.' });
+        }
+
+        await dbModel.moveEscalaRowById({
+            escalaId: id,
+            unidadeId,
+            data_plantao: data_plantao_destino,
+            turno: turno_destino
+        });
+
+        const sourceYear = Number(String(existingRow.data_plantao).slice(0, 4));
+        const year = Number(String(data_plantao_destino).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        if (sourceYear !== year) {
+            await refreshEscalaEditorCache(unidadeId, sourceYear);
+        }
+        await publishEscalaEvent('linha.movida', {
+            unidadeId,
+            escalaId: id,
+            data_plantao_destino,
+            turno_destino
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        if (/linha nao encontrada|not found/i.test(err.message)) {
+            return res.status(404).json({ error: 'Linha da escala nao encontrada para esta unidade.' });
+        }
+        if (/duplicate|unique/i.test(err.message)) {
+            return res.status(409).json({ error: 'Este medico ja esta locado no destino selecionado.' });
+        }
+        res.status(500).json({ error: 'Erro ao mover linha na escala.', details: err.message });
     }
 };
 
@@ -962,7 +1083,18 @@ export const deleteEscalaLinha = async (req, res) => {
         if (!manager) return;
         if (!assertUnitScope(res, manager, unidadeId)) return;
 
+        const existingRow = await dbModel.getEscalaById(id);
         await dbModel.deleteEscalaRowById(id, unidadeId);
+        if (existingRow?.data_plantao) {
+            const year = Number(String(existingRow.data_plantao).slice(0, 4));
+            await refreshEscalaEditorCache(unidadeId, year);
+        } else {
+            await invalidateEscalaEditorCache(unidadeId, null);
+        }
+        await publishEscalaEvent('linha.removida', {
+            unidadeId,
+            escalaId: id
+        });
         res.json({ ok: true });
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -990,6 +1122,13 @@ export const putEscalaMesVisibilidade = async (req, res) => {
         if (!assertUnitScope(res, manager, unidadeId)) return;
 
         const row = await dbModel.upsertEscalaMesPublicacao({ unidadeId, mes, status });
+        const year = Number(String(mes).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        await publishEscalaEvent('mes.visibilidade_atualizada', {
+            unidadeId,
+            mes,
+            status
+        });
         res.json({ publicacao: { mes: row.mes, status: row.status, updated_at: row.updated_at } });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao gravar visibilidade do mes.', details: err.message });
@@ -1096,6 +1235,15 @@ export const postImportarMesAnteriorEscala = async (req, res) => {
             }
         }
 
+        const year = Number(String(mesDestino).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        await publishEscalaEvent('mes.importado_anterior', {
+            unidadeId,
+            mesDestino,
+            mesOrigem,
+            importadas,
+            ignoradas
+        });
         res.json({
             mesOrigem,
             mesDestino,
@@ -1463,6 +1611,15 @@ export const postApplyTemplateToMonth = async (req, res) => {
                 pular++;
             }
         }
+        const year = Number(String(mesDestino).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        await publishEscalaEvent('template.aplicado', {
+            unidadeId,
+            mesDestino,
+            templateId,
+            inseridas: sucesso,
+            ignoradas: pular
+        });
         res.json({ sucesso, pular, total: novasLinhas.length });
     } catch (err) {
         res.status(500).json({ error: 'Falha ao aplicar template', details: err.message });
@@ -1477,6 +1634,12 @@ export const postClearMonthScale = async (req, res) => {
         if (!unidadeId || !mesDestino) return res.status(400).json({ error: 'Parâmetros insuficientes.' });
         if (!assertUnitScope(res, manager, unidadeId)) return;
         await dbModel.clearMonthScale(unidadeId, mesDestino);
+        const year = Number(String(mesDestino).slice(0, 4));
+        await refreshEscalaEditorCache(unidadeId, year);
+        await publishEscalaEvent('mes.limpo', {
+            unidadeId,
+            mesDestino
+        });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Falha ao limpar mês', details: err.message });

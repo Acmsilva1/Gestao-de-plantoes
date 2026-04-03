@@ -86,6 +86,10 @@ export default function ManagerEscalaEditorPage() {
     const [templates, setTemplates] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [applyTemplateModal, setApplyTemplateModal] = useState(null); // { mesDestino, tpl, selectedPeriods: number[] }
+    const [draggingRow, setDraggingRow] = useState(null);
+    const [dragOverSlotKey, setDragOverSlotKey] = useState('');
+    const [moveModal, setMoveModal] = useState(null);
+    const [moveTurnoDestino, setMoveTurnoDestino] = useState('');
 
     useEffect(() => {
         if (!gestorId) return;
@@ -249,6 +253,109 @@ export default function ManagerEscalaEditorPage() {
         setModalError('');
         setModalMedicoId('');
         setAddSlotModal({ date, turno });
+    };
+
+    const startDragRow = (event, row, originDate, originTurno) => {
+        if (busyKey) {
+            event.preventDefault();
+            return;
+        }
+        const payload = {
+            rowId: row.id,
+            medicoNome: row.medicos?.nome ?? 'Medico',
+            originDate,
+            originTurno
+        };
+        setDraggingRow(payload);
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(row.id));
+        event.dataTransfer.setData('application/x-escala-row', JSON.stringify(payload));
+    };
+
+    const endDragRow = () => {
+        setDragOverSlotKey('');
+        setDraggingRow(null);
+    };
+
+    const getDragPayloadFromEvent = (event) => {
+        const jsonPayload = event.dataTransfer.getData('application/x-escala-row');
+        if (jsonPayload) {
+            try {
+                return JSON.parse(jsonPayload);
+            } catch {
+                return null;
+            }
+        }
+        return draggingRow;
+    };
+
+    const onSlotDragOver = (event, date, turno) => {
+        if (busyKey) return;
+        const payload = getDragPayloadFromEvent(event);
+        if (!payload?.rowId) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDragOverSlotKey(`${date}|${turno}`);
+    };
+
+    const onSlotDragLeave = () => {
+        setDragOverSlotKey('');
+    };
+
+    const onSlotDrop = (event, date, turno) => {
+        event.preventDefault();
+        if (busyKey) return;
+        const payload = getDragPayloadFromEvent(event);
+        setDragOverSlotKey('');
+        if (!payload?.rowId) return;
+
+        setError('');
+        setMoveTurnoDestino(turno);
+        setMoveModal({
+            rowId: payload.rowId,
+            medicoNome: payload.medicoNome ?? 'Medico',
+            originDate: payload.originDate,
+            originTurno: payload.originTurno,
+            destinationDate: date,
+            destinationTurno: turno
+        });
+    };
+
+    const confirmMoveFromModal = async () => {
+        if (!moveModal || !unitId || !moveTurnoDestino) return;
+        setBusyKey(`move-${moveModal.rowId}`);
+        setError('');
+        try {
+            const r = await fetch(`/api/manager/escala/linha/${encodeURIComponent(moveModal.rowId)}/mover`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    unidadeId: String(unitId),
+                    data_plantao_destino: moveModal.destinationDate,
+                    turno_destino: moveTurnoDestino,
+                    gestorId
+                })
+            });
+            const data = await readApiResponse(r);
+            if (!r.ok) {
+                const msg = data.error || data.details || 'Falha ao mover plantonista.';
+                throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+            }
+            const destinoTurno = moveTurnoDestino;
+            const destinoDate = moveModal.destinationDate;
+            setMoveModal(null);
+            setMoveTurnoDestino('');
+            await loadEditor({ preserveUi: true });
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    document.getElementById(slotScrollId(destinoDate, destinoTurno))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            });
+        } catch (e) {
+            setError(e.message || 'Erro ao mover plantonista.');
+        } finally {
+            setBusyKey(null);
+        }
     };
 
     const removeLinha = async (rowId) => {
@@ -745,10 +852,25 @@ export default function ManagerEscalaEditorPage() {
                                                                     <div
                                                                         key={`${entry.date}-${turno}`}
                                                                         id={slotScrollId(entry.date, turno)}
-                                                                        className="scroll-mt-28 rounded-xl border border-slate-700/80 bg-slate-900/60 p-1.5 md:scroll-mt-24"
+                                                                        onDragOver={(e) => onSlotDragOver(e, entry.date, turno)}
+                                                                        onDragLeave={onSlotDragLeave}
+                                                                        onDrop={(e) => onSlotDrop(e, entry.date, turno)}
+                                                                        className={`scroll-mt-28 rounded-xl border bg-slate-900/60 p-1.5 transition md:scroll-mt-24 ${
+                                                                            dragOverSlotKey === `${entry.date}|${turno}`
+                                                                                ? 'border-sky-400 ring-1 ring-sky-400/60'
+                                                                                : 'border-slate-700/80'
+                                                                        }`}
                                                                     >
                                                                         <div className="mb-1 flex items-center justify-between gap-1">
-                                                                            <span className="text-[10px] font-black uppercase text-slate-400">{turno}</span>
+                                                                            <span
+                                                                                className={`rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase ${
+                                                                                    slot?.linhas?.length
+                                                                                        ? 'text-slate-400'
+                                                                                        : 'border border-emerald-400/45 bg-emerald-500/20 text-emerald-300'
+                                                                                }`}
+                                                                            >
+                                                                                {turno}
+                                                                            </span>
                                                                             <button
                                                                                 type="button"
                                                                                 disabled={Boolean(busyKey)}
@@ -763,7 +885,12 @@ export default function ManagerEscalaEditorPage() {
                                                                                 slot.linhas.map((row) => (
                                                                                     <div
                                                                                         key={row.id}
-                                                                                        className="flex items-center justify-between gap-1 rounded-lg bg-slate-800/50 px-2 py-1"
+                                                                                        draggable={!Boolean(busyKey)}
+                                                                                        onDragStart={(e) => startDragRow(e, row, entry.date, turno)}
+                                                                                        onDragEnd={endDragRow}
+                                                                                        className={`flex items-center justify-between gap-1 rounded-lg bg-slate-800/50 px-2 py-1 ${
+                                                                                            draggingRow?.rowId === row.id ? 'opacity-60' : ''
+                                                                                        }`}
                                                                                     >
                                                                                         <span className="break-words text-[10px] font-semibold leading-tight text-slate-200">
                                                                                             {row.medicos?.nome ?? 'Médico'}
@@ -798,6 +925,87 @@ export default function ManagerEscalaEditorPage() {
                         </div>
                     ) : null}
             </div>
+
+            {moveModal ? (
+                <div
+                    className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/85 px-4 py-8 backdrop-blur-md"
+                    onClick={() => !busyKey && setMoveModal(null)}
+                    role="presentation"
+                >
+                    <div
+                        className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-labelledby="move-medico-title"
+                        aria-modal="true"
+                    >
+                        <div className="mb-4 flex items-start justify-between gap-3">
+                            <div>
+                                <h3 id="move-medico-title" className="text-lg font-black text-white">
+                                    Mover plantonista
+                                </h3>
+                                <p className="mt-1 text-xs text-slate-400">
+                                    Arraste low-code com confirmacao antes de gravar
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                disabled={Boolean(busyKey)}
+                                onClick={() => setMoveModal(null)}
+                                className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-800 hover:text-white disabled:opacity-40"
+                                aria-label="Fechar"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="mb-4 rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-200">
+                            <p>
+                                <span className="font-black text-white">{moveModal.medicoNome}</span>
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                                Origem: {formatDatePt(moveModal.originDate)} · {moveModal.originTurno}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                                Destino: {formatDatePt(moveModal.destinationDate)}
+                            </p>
+                        </div>
+
+                        <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-500">Turno de destino</label>
+                        <select
+                            value={moveTurnoDestino}
+                            onChange={(e) => setMoveTurnoDestino(e.target.value)}
+                            disabled={Boolean(busyKey)}
+                            className="mb-5 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-sky-400 disabled:opacity-50"
+                        >
+                            {UNIT_SHIFT_ORDER.map((turno) => (
+                                <option key={turno} value={turno}>
+                                    {turno}
+                                </option>
+                            ))}
+                        </select>
+
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                disabled={Boolean(busyKey)}
+                                onClick={() => setMoveModal(null)}
+                                className="flex-1 rounded-2xl border border-slate-600 bg-slate-800/80 py-3 text-sm font-bold text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={Boolean(busyKey) || !moveTurnoDestino}
+                                onClick={confirmMoveFromModal}
+                                className="flex-1 rounded-2xl bg-sky-500 py-3 text-sm font-black text-slate-950 hover:bg-sky-400 disabled:opacity-50"
+                            >
+                                {busyKey ? 'A gravar…' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {addSlotModal ? (
                 <div

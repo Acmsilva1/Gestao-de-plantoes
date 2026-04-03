@@ -446,6 +446,24 @@ export const dbModel = {
         }
         return row;
     },
+    async moveEscalaRowById({ escalaId, unidadeId, data_plantao, turno }) {
+        const response = await supabase
+            .from('escala')
+            .update({
+                data_plantao,
+                turno
+            })
+            .eq('id', escalaId)
+            .eq('unidade_id', unidadeId)
+            .select('id, unidade_id, medico_id, data_plantao, turno')
+            .maybeSingle();
+
+        const row = unwrap(response, 'Falha ao mover linha da escala');
+        if (!row) {
+            throw new Error('Linha nao encontrada ou unidade diferente.');
+        }
+        return row;
+    },
     async getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId) {
         const response = await supabase
             .from('escala')

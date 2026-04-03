@@ -109,3 +109,21 @@ npm run dev:full
 
 ---
 *Este projeto segue RIGOROSAMENTE a Diretiva de Engenharia 001/2026. Sincronia entre prediÃ§Ã£o e operaÃ§Ã£o via automaÃ§Ã£o de mensageria Ã© prioridade NÃ­vel 1.*
+
+### Infra Opcional (Produção antecipada)
+Variáveis para ativar cache temporário e mensageria sem quebrar o fluxo atual (fallback automático se indisponível):
+
+```bash
+# Redis (cache de baixa latência)
+ENABLE_REDIS=1
+REDIS_URL=redis://localhost:6379
+REDIS_PREFIX=gdp
+ESCALA_EDITOR_CACHE_TTL_SEC=45
+
+# RabbitMQ (eventos assíncronos)
+ENABLE_QUEUE=1
+RABBITMQ_URL=amqp://localhost:5672
+RABBITMQ_EXCHANGE=gestao.events
+```
+
+Com `ENABLE_REDIS`/`ENABLE_QUEUE` desligados, o sistema continua operando normalmente usando apenas banco.
