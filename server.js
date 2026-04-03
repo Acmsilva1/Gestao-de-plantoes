@@ -162,6 +162,20 @@ app.get('/api/admin/units', getAdminUnits);
 app.get('/api/admin/doctors', getAdminDoctors);
 app.post('/api/admin/perfil/:id', updateAdminProfile);
 
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'Rota da API não encontrada.' });
+});
+
+app.use((err, req, res, next) => {
+    console.error('[API ERROR]', err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    return res.status(err.status || 500).json({
+        error: err.message || 'Erro interno do servidor.'
+    });
+});
+
 if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -175,7 +189,7 @@ const server = app.listen(env.port, () => {
         startPredictionScheduler();
         cronService.start(); // Inicia o transporte de dados (6h e 18h)
     } else if (hasDatabaseEnv() && env.disablePredictorScheduler) {
-        console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) — módulo médico / sem predição');
+        console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) - módulo médico / sem predição');
     }
 });
 
@@ -193,3 +207,4 @@ server.on('error', (err) => {
 });
 
 export default app;
+

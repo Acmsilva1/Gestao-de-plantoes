@@ -309,7 +309,9 @@ export const dbModel = {
             .lte('data_plantao', endDate)
             .order('data_plantao', { ascending: true });
 
-        if (unidadeId) {
+        if (Array.isArray(unidadeId) && unidadeId.length) {
+            query = query.in('unidade_id', unidadeId);
+        } else if (unidadeId) {
             query = query.eq('unidade_id', unidadeId);
         }
 
@@ -324,7 +326,9 @@ export const dbModel = {
             .lte('data_plantao', endDate)
             .order('data_plantao', { ascending: true });
 
-        if (unidadeId) {
+        if (Array.isArray(unidadeId) && unidadeId.length) {
+            query = query.in('unidade_id', unidadeId);
+        } else if (unidadeId) {
             query = query.eq('unidade_id', unidadeId);
         }
 
@@ -792,7 +796,9 @@ export const dbModel = {
             .lte('data_plantao', endDate)
             .order('data_plantao', { ascending: true });
 
-        if (unidadeId) {
+        if (Array.isArray(unidadeId) && unidadeId.length) {
+            query = query.in('unidade_id', unidadeId);
+        } else if (unidadeId) {
             query = query.eq('unidade_id', unidadeId);
         }
 
@@ -1344,7 +1350,7 @@ export const dbModel = {
         let suffix = 2;
         while (true) {
             const existsResp = await supabase.from('medicos').select('id').eq('usuario', usernameAttempt).maybeSingle();
-            const exists = unwrap(existsResp, 'Falha ao validar usuÃ¡rio de mÃ©dico');
+            const exists = unwrap(existsResp, 'Falha ao validar usuário de médico');
             if (!exists) break;
             usernameAttempt = `${nextUsername}.${suffix}`;
             suffix += 1;
@@ -1386,7 +1392,9 @@ export const dbModel = {
             .gte('data_plantao', startDate)
             .lte('data_plantao', endDate);
 
-        if (unidadeId) {
+        if (Array.isArray(unidadeId) && unidadeId.length) {
+            query = query.in('unidade_id', unidadeId);
+        } else if (unidadeId) {
             query = query.eq('unidade_id', unidadeId);
         }
 
@@ -1694,3 +1702,5 @@ export const dbModel = {
         return unwrap(response, 'Falha ao buscar status da pipeline');
     }
 };
+
+

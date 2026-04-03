@@ -21,6 +21,12 @@ const parseGestorId = (req) => {
     return qId || bId || hId || '';
 };
 
+const parseCsvIds = (value) =>
+    String(value || '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+
 const isMasterManager = (manager) => manager?.perfis?.nome === 'GESTOR_MASTER';
 
 const getScopedManager = async (req, res, options = {}) => {
@@ -165,7 +171,7 @@ export const getDashboardMetrics = async (req, res) => {
             }
         }
 
-        // Aggregation of vacancies AND demand (both from disponibilidade — contains predictor forecast)
+        // Aggregation of vacancies AND demand (both from disponibilidade - contains predictor forecast)
         (vacancies || []).forEach(v => {
             const dayNum = Number(v.data_plantao.slice(-2));
             const available = Math.max(v.vagas_totais - v.vagas_ocupadas, 0);
@@ -221,16 +227,30 @@ export const getDashboardSummary = async (req, res) => {
         const manager = await getScopedManager(req, res);
         if (!manager) return;
 
-        const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const { startMonthDate, endMonthDate, year, month: monthNumber } = getMonthDates(month);
         const scopedUnitId = unidadeId || (isMasterManager(manager) ? null : manager.unidade_id);
         if (scopedUnitId && !assertUnitScope(res, manager, scopedUnitId)) return;
 
-        const [escalaRows, disponibilidadeRows] = await Promise.all([
+        const [escalaRows, disponibilidadeRows, unitsCatalogRaw] = await Promise.all([
             dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId)
+            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId),
+            dbModel.getUnits()
         ]);
 
+        const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+        const q1Days = Math.min(15, daysInMonth);
+        const q2Days = Math.max(daysInMonth - 15, 0);
+        const mandatorySlotsQ1PerUnit = q1Days * TURNOS_ESCALA.size;
+        const mandatorySlotsQ2PerUnit = q2Days * TURNOS_ESCALA.size;
+        const unitsCatalog = scopedUnitId
+            ? (unitsCatalogRaw || []).filter((u) => String(u.id) === String(scopedUnitId))
+            : unitsCatalogRaw || [];
+        const unitNameCatalog = new Map((unitsCatalog || []).map((u) => [u.id, u.nome]));
+
         const unitNameById = new Map();
+        for (const u of unitsCatalog) {
+            if (u?.id && u?.nome) unitNameById.set(u.id, u.nome);
+        }
         for (const r of disponibilidadeRows || []) {
             if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
         }
@@ -238,20 +258,9 @@ export const getDashboardSummary = async (req, res) => {
             if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
         }
 
-        const availableQ1ByUnit = new Map();
-        const availableQ2ByUnit = new Map();
         const occupiedQ1ByUnit = new Map();
         const occupiedQ2ByUnit = new Map();
         const doctorByUnit = new Map();
-
-        for (const row of disponibilidadeRows || []) {
-            const unitId = row.unidade_id;
-            const unitName = unitNameById.get(unitId) || row.unidades?.nome || 'Unidade';
-            unitNameById.set(unitId, unitName);
-            const day = Number(String(row.data_plantao).slice(8, 10));
-            const targetMap = day <= 15 ? availableQ1ByUnit : availableQ2ByUnit;
-            targetMap.set(unitId, (targetMap.get(unitId) || 0) + (row.vagas_totais || 0));
-        }
 
         for (const row of escalaRows || []) {
             const unitId = row.unidade_id;
@@ -273,19 +282,18 @@ export const getDashboardSummary = async (req, res) => {
             doctorByUnit.set(doctorKey, current);
         }
 
-        const toOverviewArray = (availableMap, occupiedMap) => {
-            const unitIds = new Set([...availableMap.keys(), ...occupiedMap.keys()]);
+        const toOverviewArray = (mandatorySlotsPerUnit, occupiedMap) => {
+            const unitIds = new Set([...unitsCatalog.map((u) => u.id), ...occupiedMap.keys()]);
             return Array.from(unitIds)
                 .map((unitId) => {
                     const totalOcupadas = occupiedMap.get(unitId) || 0;
-                    // O total de vagas deve ser no mínimo o total de ocupadas para evitar 0% injusto
-                    let totalSlots = availableMap.get(unitId) || 0;
+                    let totalSlots = mandatorySlotsPerUnit;
                     if (totalSlots < totalOcupadas) totalSlots = totalOcupadas;
 
                     const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
                     return {
                         unidadeId: unitId,
-                        unidade: unitNameById.get(unitId) || 'Unidade',
+                        unidade: unitNameById.get(unitId) || unitNameCatalog.get(unitId) || 'Unidade',
                         totalSlots,
                         totalOcupadas,
                         totalVazias,
@@ -296,8 +304,8 @@ export const getDashboardSummary = async (req, res) => {
         };
 
         const acceptedByQuinzena = {
-            q1: toOverviewArray(availableQ1ByUnit, occupiedQ1ByUnit),
-            q2: toOverviewArray(availableQ2ByUnit, occupiedQ2ByUnit)
+            q1: toOverviewArray(mandatorySlotsQ1PerUnit, occupiedQ1ByUnit),
+            q2: toOverviewArray(mandatorySlotsQ2PerUnit, occupiedQ2ByUnit)
         };
 
         const q1Totals = acceptedByQuinzena.q1.reduce(
@@ -496,7 +504,16 @@ export const getAnalyticalPredictionData = async (req, res) => {
             return res.status(403).json({ error: 'Funcao disponivel apenas para gestor master.' });
         }
 
+        const unidadeIds = parseCsvIds(req.query?.unidadeIds);
+        let unidades = [];
+        if (unidadeIds.length) {
+            const units = await dbModel.getUnits();
+            const unitNameById = new Map((units || []).map((u) => [String(u.id), u.nome]));
+            unidades = unidadeIds.map((id) => unitNameById.get(String(id))).filter(Boolean);
+        }
+
         const payload = await getAnalyticalPredictionSnapshotV2({
+            unidades,
             unidade: typeof req.query?.unidade === 'string' ? req.query.unidade.trim() : '',
             regional: typeof req.query?.regional === 'string' ? req.query.regional.trim() : '',
             turno: typeof req.query?.turno === 'string' ? req.query.turno.trim() : ''
@@ -1268,38 +1285,44 @@ export const getReportsData = async (req, res) => {
         if (!manager) return;
 
         const isMaster = isMasterManager(manager);
-        let scopedUnitId = unidadeId;
+        const unidadeIdsFromQuery = parseCsvIds(req.query?.unidadeIds);
+        let scopedUnitIds = null;
 
-        // If not Master, force the unit to be the manager's assigned unit
         if (!isMaster) {
-            scopedUnitId = manager.unidade_id;
-        } else {
-            // Master can see 'all' or a specific unit
-            scopedUnitId = unidadeId !== 'all' ? unidadeId : null;
+            scopedUnitIds = [String(manager.unidade_id)];
+        } else if (unidadeIdsFromQuery.length) {
+            scopedUnitIds = unidadeIdsFromQuery;
+        } else if (unidadeId && unidadeId !== 'all') {
+            scopedUnitIds = [String(unidadeId)];
         }
 
         const { startMonthDate, endMonthDate } = getMonthDates(month);
 
-        const [escalaRows, disponibilidadeRows, swapRequests, cancelamentoRows] = await Promise.all([
-            dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getCancelamentosByRange(startMonthDate, endMonthDate, scopedUnitId)
+        const [escalaRows, disponibilidadeRows, swapRequests, cancelamentoRows, unitsCatalogRaw] = await Promise.all([
+            dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitIds),
+            dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitIds),
+            dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitIds),
+            dbModel.getCancelamentosByRange(startMonthDate, endMonthDate, scopedUnitIds),
+            dbModel.getUnits()
         ]);
 
-        // 1. Occupancy Data (Reuse logic from getDashboardSummary)
+        // 1. Occupancy Data (4 turnos obrigatorios por dia em cada unidade)
+        const [reportYear, reportMonth] = month.split('-').map(Number);
+        const daysInMonth = new Date(Date.UTC(reportYear, reportMonth, 0)).getUTCDate();
+        const mandatorySlotsPerUnit = daysInMonth * TURNOS_ESCALA.size;
+        const unitsCatalog = scopedUnitIds?.length
+            ? (unitsCatalogRaw || []).filter((u) => scopedUnitIds.includes(String(u.id)))
+            : unitsCatalogRaw || [];
+        const unitNameCatalog = new Map((unitsCatalog || []).map((u) => [u.id, u.nome]));
+
         const unitNameById = new Map();
+        unitsCatalog.forEach((u) => {
+            if (u?.id && u?.nome) unitNameById.set(u.id, u.nome);
+        });
         disponibilidadeRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
         escalaRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
 
-        const availableByUnit = new Map();
         const occupiedByUnit = new Map();
-
-        disponibilidadeRows.forEach(row => {
-            const unitId = row.unidade_id;
-            const current = availableByUnit.get(unitId) || 0;
-            availableByUnit.set(unitId, current + (row.vagas_totais || 0));
-        });
 
         escalaRows.forEach(row => {
             const unitId = row.unidade_id;
@@ -1307,17 +1330,17 @@ export const getReportsData = async (req, res) => {
             occupiedByUnit.set(unitId, current + 1);
         });
 
-        const unitIds = new Set([...availableByUnit.keys(), ...occupiedByUnit.keys()]);
+        const unitIds = new Set([...unitsCatalog.map((u) => u.id), ...occupiedByUnit.keys()]);
         const occupancyByUnit = Array.from(unitIds).map(unitId => {
             const totalOcupadas = occupiedByUnit.get(unitId) || 0;
-            let totalSlots = availableByUnit.get(unitId) || 0;
+            let totalSlots = mandatorySlotsPerUnit;
             
             // Fallback: Se não há predição/disponibilidade mas há médicos, assumimos que o total é ao menos o ocupado
             if (totalSlots < totalOcupadas) totalSlots = totalOcupadas;
 
             const totalVazias = Math.max(totalSlots - totalOcupadas, 0);
             return {
-                unidade: unitNameById.get(unitId) || 'Unidade',
+                unidade: unitNameById.get(unitId) || unitNameCatalog.get(unitId) || 'Unidade',
                 totalSlots,
                 totalOcupadas,
                 totalVazias,
@@ -1645,3 +1668,5 @@ export const postClearMonthScale = async (req, res) => {
         res.status(500).json({ error: 'Falha ao limpar mês', details: err.message });
     }
 };
+
+

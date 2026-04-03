@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { 
     AlertCircle, 
     BrainCircuit, 
@@ -52,6 +52,10 @@ const formatDateTime = (value) => {
 export default function ManagerPredicaoPage() {
     const { session } = useAuth();
     const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
+    const [units, setUnits] = useState([]);
+    const [selectedUnitIds, setSelectedUnitIds] = useState([]);
+    const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+    const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
     const [loading, setLoading] = useState(true);
     const [recalculating, setRecalculating] = useState(false);
     const [isStabilityModalOpen, setIsStabilityModalOpen] = useState(false);
@@ -69,7 +73,7 @@ export default function ManagerPredicaoPage() {
             averageDemandPerRow: 0,
             peakDay: null,
             topUnit: null,
-            confidenceCounts: { Alta: 0, Média: 0, Baixa: 0 },
+            confidenceCounts: { Alta: 0, Media: 0, Baixa: 0 },
             diagnostics: { lowSampleRows: 0, highVolatilityRows: 0, avgConfidenceScore: 0 }
         },
         filters: {
@@ -80,15 +84,38 @@ export default function ManagerPredicaoPage() {
         rows: [],
         generatedAt: null
     });
+    const monthOptions = useMemo(
+        () => [
+            { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' },
+            { value: '03', label: 'Março' }, { value: '04', label: 'Abril' },
+            { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
+            { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' },
+            { value: '09', label: 'Setembro' }, { value: '10', label: 'Outubro' },
+            { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' }
+        ],
+        []
+    );
+    const yearOptions = useMemo(() => {
+        const current = new Date().getFullYear();
+        const arr = [];
+        for (let y = current - 2; y <= current + 2; y += 1) arr.push(String(y));
+        return arr;
+    }, []);
 
     const queryString = useMemo(() => {
         const params = new URLSearchParams();
         params.set('gestorId', session?.id || '');
-        if (filters.unidade) params.set('unidade', filters.unidade);
+        if (selectedUnitIds.length > 0) params.set('unidadeIds', selectedUnitIds.join(','));
+        else if (filters.unidade) params.set('unidade', filters.unidade);
         if (filters.regional) params.set('regional', filters.regional);
         if (filters.turno && filters.turno !== 'TOTAL') params.set('turno', filters.turno.toLowerCase());
         return params.toString();
-    }, [filters.regional, filters.turno, filters.unidade, session?.id]);
+    }, [filters.regional, filters.turno, filters.unidade, selectedUnitIds, session?.id]);
+
+    const selectedUnitNames = useMemo(
+        () => units.filter((u) => selectedUnitIds.includes(String(u.id))).map((u) => u.nome),
+        [units, selectedUnitIds]
+    );
 
     const displayedRows = useMemo(() => {
         if (filters.turno !== 'TOTAL') {
@@ -112,8 +139,8 @@ export default function ManagerPredicaoPage() {
             const rowConf = String(row.confianca || '').toLowerCase();
             if (rowConf === 'baixa' || rowConf === 'b') {
                 current.confianca = 'Baixa';
-            } else if ((rowConf === 'media' || rowConf === 'média' || rowConf.startsWith('m')) && current.confianca !== 'Baixa') {
-                current.confianca = 'Média';
+            } else if ((rowConf === 'media' || rowConf === 'Media' || rowConf.startsWith('m')) && current.confianca !== 'Baixa') {
+                current.confianca = 'Media';
             }
 
             accumulator.set(row.dataPrevista, current);
@@ -123,8 +150,18 @@ export default function ManagerPredicaoPage() {
         return Array.from(grouped.values()).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
     }, [data.rows, filters.turno]);
 
+    const scopedRows = useMemo(
+        () =>
+            displayedRows.filter((row) => {
+                const rowMonth = row.dataPrevista?.slice(5, 7);
+                const rowYear = row.dataPrevista?.slice(0, 4);
+                return rowMonth === selectedMonth && rowYear === selectedYear;
+            }),
+        [displayedRows, selectedMonth, selectedYear]
+    );
+
     const chartDataByQuinzena = useMemo(() => {
-        const baseRows = displayedRows.map((row) => {
+        const baseRows = scopedRows.map((row) => {
             const date = new Date(`${row.dataPrevista}T12:00:00-03:00`);
             const day = Number(row.dataPrevista.slice(8, 10));
             return {
@@ -138,7 +175,7 @@ export default function ManagerPredicaoPage() {
             q1: baseRows.filter((row) => row.day >= 1 && row.day <= 15),
             q2: baseRows.filter((row) => row.day >= 16)
         };
-    }, [displayedRows]);
+    }, [scopedRows]);
 
     const fetchPrediction = async () => {
         const response = await fetch(`/api/manager/predicao-analitica?${queryString}`);
@@ -148,13 +185,13 @@ export default function ManagerPredicaoPage() {
     };
 
     const handleDownloadHtmlReport = () => {
-        if (!displayedRows.length) return;
+        if (!scopedRows.length) return;
 
         const generatedLabel = formatDateTime(data.generatedAt);
         const turnoLabel = filters.turno || 'TOTAL';
-        const unidadeLabel = filters.unidade || 'Todas as unidades';
+        const unidadeLabel = selectedUnitNames.length ? selectedUnitNames.join(' | ') : (filters.unidade || 'Todas as unidades');
         const regionalLabel = filters.regional || 'Todas as regionais';
-        const rowsHtml = displayedRows
+        const rowsHtml = scopedRows
             .map(
                 (row) => `
                     <tr class="border-b border-slate-100">
@@ -173,7 +210,7 @@ export default function ManagerPredicaoPage() {
                             <span class="inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${
                                 row.confianca === 'Alta'
                                     ? 'bg-emerald-100 text-emerald-700'
-                                    : row.confianca === 'MÃ©dia'
+                                    : row.confianca === 'Media'
                                     ? 'bg-amber-100 text-amber-700'
                                     : 'bg-rose-100 text-rose-700'
                             }">
@@ -230,7 +267,7 @@ export default function ManagerPredicaoPage() {
             </div>
             <div class="rounded-[1.5rem] bg-white p-6 shadow-lg">
                 <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Linhas exibidas</div>
-                <div class="mt-3 text-4xl font-black text-emerald-700">${escapeHtml(displayedRows.length)}</div>
+                <div class="mt-3 text-4xl font-black text-emerald-700">${escapeHtml(scopedRows.length)}</div>
             </div>
             <div class="rounded-[1.5rem] bg-white p-6 shadow-lg">
                 <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Dias projetados</div>
@@ -308,6 +345,37 @@ export default function ManagerPredicaoPage() {
         URL.revokeObjectURL(url);
     };
 
+    const toggleSelectedUnit = (unitId) => {
+        setSelectedUnitIds((current) =>
+            current.includes(String(unitId)) ? current.filter((id) => id !== String(unitId)) : [...current, String(unitId)]
+        );
+    };
+
+    useEffect(() => {
+        if (!session?.id || !isMaster) return;
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const response = await fetch(`/api/manager/unidades?gestorId=${encodeURIComponent(session.id)}`);
+                const payload = await readApiResponse(response);
+                if (!cancelled && response.ok) {
+                    const list = Array.isArray(payload) ? payload : [];
+                    setUnits(list);
+                    if (selectedUnitIds.length === 0) {
+                        setSelectedUnitIds(list.map((u) => String(u.id)));
+                    }
+                }
+            } catch {
+                if (!cancelled) setUnits([]);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.id, isMaster]);
+
     useEffect(() => {
         if (!session?.id || !isMaster) return;
 
@@ -365,13 +433,13 @@ export default function ManagerPredicaoPage() {
                 <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                     <div className="max-w-3xl">
-                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-sky-300/80">Gestor Master</p>
+                        <p className="text-[11px] font-black uppercase tracking-[0.35em] text-sky-300/80">Monitoramento</p>
                         <h2 className="mt-2 flex items-center gap-3 text-3xl font-black text-white md:text-4xl">
                             <BrainCircuit className="text-sky-300" size={34} />
-                            Predição Analítica
+                            Análise Preditiva
                         </h2>
                         <p className="mt-3 text-sm text-slate-300">
-                            Projeção consolidada dos próximos 30 dias com leitura do histórico Tasy, sazonalidade de feriados e ajustes para dias atípicos.
+                            Utilização padrão do painel com foco em projeção de demanda e estabilidade por período.
                         </p>
                     </div>
 
@@ -383,7 +451,7 @@ export default function ManagerPredicaoPage() {
                         <button
                             type="button"
                             onClick={handleDownloadHtmlReport}
-                            disabled={!displayedRows.length || loading}
+                            disabled={!scopedRows.length || loading}
                             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-sm font-black text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Download size={16} />
@@ -398,6 +466,39 @@ export default function ManagerPredicaoPage() {
                             <RefreshCcw size={16} className={recalculating ? 'animate-spin' : ''} />
                             {recalculating ? 'Recalculando...' : 'Recalcular'}
                         </button>
+                    </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Mês</label>
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                        >
+                            {monthOptions.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Ano</label>
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                        >
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Unidade</label>
+                        <div className="rounded-2xl border border-sky-500/40 bg-sky-500/10 py-3 px-4 text-sm font-black text-sky-200">
+                            Multiunidades ({selectedUnitIds.length || units.length})
+                        </div>
                     </div>
                 </div>
             </section>
@@ -433,10 +534,10 @@ export default function ManagerPredicaoPage() {
                         <AlertCircle size={12} className="text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <p className="mt-1 text-sm font-black text-white">
-                        A {data.summary.confidenceCounts?.Alta || 0} | M {data.summary.confidenceCounts?.Média || 0} | <span className="text-rose-400">B {data.summary.confidenceCounts?.Baixa || 0}</span>
+                        A {data.summary.confidenceCounts?.Alta || 0} | M {data.summary.confidenceCounts?.Media || 0} | <span className="text-rose-400">B {data.summary.confidenceCounts?.Baixa || 0}</span>
                     </p>
                     <p className="text-xs text-slate-400">distribuição simples da estabilidade</p>
-                    <p className="mt-1 text-[9px] font-black uppercase text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">Ver diagnóstico 🔍</p>
+                    <p className="mt-1 text-[9px] font-black uppercase text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">Ver diagnóstico </p>
                 </div>
                 <div className={metricClass}>
                     <p className="text-[10px] uppercase tracking-widest text-slate-400">Amostra baixa</p>
@@ -466,25 +567,38 @@ export default function ManagerPredicaoPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
-                    <div>
-                        <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <div className="mb-4 rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
                             <MapPinned size={12} className="text-sky-400" />
-                            Unidade
+                            Comparação por unidades
                         </label>
-                        <select
-                            value={filters.unidade}
-                            onChange={(event) => setFilters((current) => ({ ...current, unidade: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
-                        >
-                            <option value="">Todas as unidades</option>
-                            {data.filters.unidades.map((option) => (
-                                <option key={option} value={option}>
-                                    {option}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-sky-300">
+                            {selectedUnitIds.length || units.length} selecionada(s)
+                        </div>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        {units.map((u) => {
+                            const active = selectedUnitIds.includes(String(u.id));
+                            return (
+                                <button
+                                    key={u.id}
+                                    type="button"
+                                    onClick={() => toggleSelectedUnit(u.id)}
+                                    className={`rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-tight transition ${
+                                        active
+                                            ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200'
+                                            : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                                    }`}
+                                >
+                                    {u.nome}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
                     <div>
                         <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
                             <TrendingUp size={12} className="text-emerald-400" />
@@ -607,14 +721,14 @@ export default function ManagerPredicaoPage() {
                                 : 'Detalhamento do turno selecionado com dados persistidos em `dados_predicao`.'}
                         </p>
                     </div>
-                    <div className="text-sm text-slate-400">{displayedRows.length} linhas exibidas</div>
+                    <div className="text-sm text-slate-400">{scopedRows.length} linhas exibidas</div>
                 </div>
 
                 {loading ? (
                     <div className="flex h-64 items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/40">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
                     </div>
-                ) : displayedRows.length === 0 ? (
+                ) : scopedRows.length === 0 ? (
                     <div className="rounded-3xl border border-slate-800 bg-slate-950/30 px-4 py-12 text-center text-slate-500">
                         Nenhum dado de predição disponível para os filtros selecionados.
                     </div>
@@ -636,7 +750,7 @@ export default function ManagerPredicaoPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/40">
-                                {displayedRows.map((row) => (
+                                {scopedRows.map((row) => (
                                     <tr key={`${row.dataPrevista}-${row.unidade || 'total'}-${row.turno || 'TOTAL'}`} className="hover:bg-slate-800/20 transition-colors">
                                         <td className="px-5 py-4">
                                             <div className="font-black text-white">{row.dataLabel}</div>
@@ -660,7 +774,7 @@ export default function ManagerPredicaoPage() {
                                                 className={`inline-flex rounded-xl border px-3 py-1 text-xs font-black ${
                                                     row.confianca === 'Alta'
                                                         ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                                                        : row.confianca === 'Média'
+                                                        : row.confianca === 'Media'
                                                         ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
                                                         : 'border-rose-500/20 bg-rose-500/10 text-rose-300'
                                                 }`}
@@ -712,9 +826,9 @@ export default function ManagerPredicaoPage() {
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-6">
                             <div className="grid gap-4">
-                                {displayedRows.filter(r => {
+                                {scopedRows.filter(r => {
                                     const c = String(r.confianca || '').trim().toLowerCase();
-                                    return !['alta', 'media', 'média'].includes(c);
+                                    return !['alta', 'media', 'Media'].includes(c);
                                 }).length === 0 ? (
                                     <div className="text-center py-12 bg-slate-900/40 rounded-[2rem] border border-slate-800 text-slate-500 font-bold">
                                         Nenhum alerta de instabilidade detectado na visão atual.
@@ -731,9 +845,9 @@ export default function ManagerPredicaoPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-800/40">
-                                                {displayedRows.filter(r => {
+                                                {scopedRows.filter(r => {
                                                     const c = String(r.confianca || '').trim().toLowerCase();
-                                                    return !['alta', 'media', 'média'].includes(c);
+                                                    return !['alta', 'media', 'Media'].includes(c);
                                                 }).map((row, idx) => (
                                                     <tr key={idx} className="hover:bg-rose-500/5 transition-colors">
                                                         <td className="px-6 py-4">
@@ -778,3 +892,7 @@ export default function ManagerPredicaoPage() {
         </div>
     );
 }
+
+
+
+

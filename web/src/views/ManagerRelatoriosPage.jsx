@@ -44,10 +44,18 @@ export default function ManagerRelatoriosPage() {
     const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
     const [selectedUnit, setSelectedUnit] = useState(session.isMaster ? 'all' : session.unidade_id);
+    const [selectedUnitIds, setSelectedUnitIds] = useState([]);
     const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [reportData, setReportData] = useState(null);
+    const resumoTopo = useMemo(() => {
+        const rows = reportData?.occupancyByUnit || [];
+        const totalSlots = rows.reduce((sum, r) => sum + (Number(r.totalSlots) || 0), 0);
+        const totalOcupadas = rows.reduce((sum, r) => sum + (Number(r.totalOcupadas) || 0), 0);
+        const totalVazias = rows.reduce((sum, r) => sum + (Number(r.totalVazias) || 0), 0);
+        return { totalSlots, totalOcupadas, totalVazias };
+    }, [reportData]);
 
     const yearOptions = useMemo(() => {
         const current = new Date().getFullYear();
@@ -60,7 +68,11 @@ export default function ManagerRelatoriosPage() {
         try {
             const resp = await fetch(`/api/manager/unidades?gestorId=${session.id}`);
             const data = await readApiResponse(resp);
-            setUnits(Array.isArray(data) ? data : []);
+            const unitList = Array.isArray(data) ? data : [];
+            setUnits(unitList);
+            if (session.isMaster && selectedUnitIds.length === 0) {
+                setSelectedUnitIds(unitList.map((u) => String(u.id)));
+            }
         } catch (err) {
             console.error('Erro ao buscar unidades:', err);
         }
@@ -71,7 +83,16 @@ export default function ManagerRelatoriosPage() {
         setError('');
         try {
             const monthStr = `${selectedYear}-${selectedMonth}`;
-            const url = `/api/manager/reports?month=${monthStr}&unidadeId=${selectedUnit}&gestorId=${session.id}`;
+            const params = new URLSearchParams();
+            params.set('month', monthStr);
+            params.set('gestorId', session.id);
+            if (session.isMaster) {
+                if (selectedUnitIds.length > 0) params.set('unidadeIds', selectedUnitIds.join(','));
+                else params.set('unidadeId', 'all');
+            } else {
+                params.set('unidadeId', selectedUnit);
+            }
+            const url = `/api/manager/reports?${params.toString()}`;
             const resp = await fetch(url);
             const data = await readApiResponse(resp);
             if (!resp.ok) throw new Error(data.error || 'Falha ao buscar relatório');
@@ -84,12 +105,24 @@ export default function ManagerRelatoriosPage() {
     };
 
     useEffect(() => { fetchUnits(); }, []);
-    useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit]);
+    useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit, selectedUnitIds]);
+
+    const toggleSelectedUnit = (unitId) => {
+        setSelectedUnitIds((current) =>
+            current.includes(String(unitId)) ? current.filter((id) => id !== String(unitId)) : [...current, String(unitId)]
+        );
+    };
 
     const handleGenerateProfessionalReport = () => {
         if (!reportData) return;
 
-        const unitLabel = selectedUnit === 'all' ? 'CONSOLIDADO REDE' : units.find(u => u.id === selectedUnit)?.nome?.toUpperCase();
+        const selectedNames = units
+            .filter((u) => selectedUnitIds.includes(String(u.id)))
+            .map((u) => String(u.nome || '').toUpperCase())
+            .filter(Boolean);
+        const unitLabel = session.isMaster
+            ? (selectedNames.length ? selectedNames.join(' | ') : 'CONSOLIDADO REDE')
+            : (selectedUnit === 'all' ? 'CONSOLIDADO REDE' : units.find(u => String(u.id) === String(selectedUnit))?.nome?.toUpperCase());
         const monthLabel = MONTHS.find(m => m.value === selectedMonth)?.label?.toUpperCase();
         
         const occupancyRows = reportData.occupancyByUnit.map((u, idx) => `
@@ -290,10 +323,12 @@ export default function ManagerRelatoriosPage() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
             {/* Control Panel */}
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/60 bg-slate-900/40 p-8 shadow-2xl backdrop-blur-md">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/60 bg-[radial-gradient(circle_at_0%_0%,rgba(14,165,233,0.24),transparent_45%),radial-gradient(circle_at_100%_100%,rgba(34,197,94,0.18),transparent_35%),linear-gradient(160deg,#020617_0%,#0f172a_55%,#111827_100%)] p-8 shadow-2xl backdrop-blur-md">
                 <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.35em] text-sky-300/80">Monitoramento</p>
                         <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">Relatórios de Gestão</h1>
+                        <p className="mt-2 text-sm text-slate-300">Utilização padrão do painel com finalidades diferentes por módulo.</p>
                         
                         {/* Tabs Navigation */}
                         <div className="mt-8 flex gap-2 rounded-2xl bg-slate-950/40 p-1.5 w-fit border border-slate-800">
@@ -357,18 +392,18 @@ export default function ManagerRelatoriosPage() {
                             </div>
                         </div>
 
-                        <div className="w-full space-y-2 lg:w-64">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Unidade Foco</label>
-                            <select 
-                                value={selectedUnit}
-                                onChange={(e) => setSelectedUnit(e.target.value)}
-                                disabled={!session.isMaster}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-5 py-3.5 text-sm font-bold text-white outline-none focus:border-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {session.isMaster && <option value="all">Todas as Unidades</option>}
-                                {units.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                            </select>
-                        </div>
+                        {!session.isMaster ? (
+                            <div className="w-full space-y-2 lg:w-64">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Unidade Foco</label>
+                                <select
+                                    value={selectedUnit}
+                                    onChange={(e) => setSelectedUnit(e.target.value)}
+                                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-5 py-3.5 text-sm font-bold text-white outline-none focus:border-blue-500 transition"
+                                >
+                                    {units.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                                </select>
+                            </div>
+                        ) : null}
                         
                         <div className="flex gap-2 lg:mb-0.5">
                             <button 
@@ -381,6 +416,36 @@ export default function ManagerRelatoriosPage() {
                         </div>
                     </div>
                 </div>
+
+                {session.isMaster ? (
+                    <div className="mt-6 rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Comparação multiunidade</div>
+                            <div className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-sky-300">
+                                {selectedUnitIds.length || units.length} selecionada(s)
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {units.map((u) => {
+                                const active = selectedUnitIds.includes(String(u.id));
+                                return (
+                                    <button
+                                        key={u.id}
+                                        type="button"
+                                        onClick={() => toggleSelectedUnit(u.id)}
+                                        className={`rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-tight transition ${
+                                            active
+                                                ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200'
+                                                : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                                        }`}
+                                    >
+                                        {u.nome}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {loading && (
@@ -639,3 +704,6 @@ export default function ManagerRelatoriosPage() {
         </div>
     );
 }
+
+
+

@@ -130,6 +130,7 @@ export const getAnalyticalPredictionSnapshotV2 = async (filters = {}) => {
     const contextIndex = buildContextHistoryIndex((historyRows || []).map(normalizeHistoricalPredictionRow).filter(Boolean));
 
     const filteredRows = (allRows || []).filter((row) => {
+        if (Array.isArray(filters.unidades) && filters.unidades.length && !filters.unidades.includes(row.unidade)) return false;
         if (filters.unidade && row.unidade !== filters.unidade) return false;
         if (filters.regional && row.regional !== filters.regional) return false;
         if (filters.turno && row.turno !== filters.turno) return false;

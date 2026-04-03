@@ -111,13 +111,13 @@ const loadBookingConfigs = (doctorId) => {
 const buildBookingConfigLabel = (config) => {
     if (!config) return '';
     if (config.bookingType === 'PARCIAL') {
-        return `Parcial • ${config.startTime} às ${config.endTime}`;
+        return `Parcial â€¢ ${config.startTime} às ${config.endTime}`;
     }
     if (config.bookingType === 'FIXO') {
         if (config.fixedMode === 'PARCIAL') {
-            return `Fixo parcial • até ${formatDisplayDate(config.fixedEndDate)} • ${config.startTime} às ${config.endTime}`;
+            return `Fixo parcial â€¢ até ${formatDisplayDate(config.fixedEndDate)} â€¢ ${config.startTime} às ${config.endTime}`;
         }
-        return `Fixo completo • até ${formatDisplayDate(config.fixedEndDate)}`;
+        return `Fixo completo â€¢ até ${formatDisplayDate(config.fixedEndDate)}`;
     }
     return 'Completo';
 };
@@ -125,7 +125,7 @@ const buildBookingConfigLabel = (config) => {
 const buildEscalaBookingLabel = (escalaItem, fallbackConfig) => {
     if (escalaItem?.tipoPlantao === 'PARCIAL') {
         return escalaItem.horaInicio && escalaItem.horaFim
-            ? `Parcial • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`
+            ? `Parcial â€¢ ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`
             : 'Parcial';
     }
 
@@ -138,10 +138,10 @@ const buildEscalaBookingLabel = (escalaItem, fallbackConfig) => {
                   : 'Sequência fixa';
 
         if (escalaItem.horaInicio && escalaItem.horaFim) {
-            return `Fixo parcial • ${rangeLabel} • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`;
+            return `Fixo parcial â€¢ ${rangeLabel} â€¢ ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`;
         }
 
-        return `Fixo completo • ${rangeLabel}`;
+        return `Fixo completo â€¢ ${rangeLabel}`;
     }
 
     return buildBookingConfigLabel(fallbackConfig) || 'Completo';
@@ -171,13 +171,13 @@ const trocaStatusLabel = (status, souSolicitante) => {
         case 'AGUARDANDO_GESTOR':
             return 'Em processamento';
         case 'APROVADO':
-            return 'Aprovado — escala atualizada';
+            return 'Aprovado - escala atualizada';
         case 'RECUSADO_COLEGA':
             return 'Recusado pelo colega';
         case 'RECUSADO_GESTOR':
             return 'Recusado';
         default:
-            return status || '—';
+            return status || '-';
     }
 };
 
@@ -260,7 +260,7 @@ const ProfileModal = ({ doctor, pedidosTroca, onRefreshTrocas, onClose, onUpdate
                             {pedidosTroca.map((p) => {
                                 const souSolicitante = p.medico_solicitante_id === doctor.id;
                                 const souAlvo = p.medico_alvo_id === doctor.id;
-                                const unidadeNome = p.unidades?.nome || p.unidade_nome || '—';
+                                const unidadeNome = p.unidades?.nome || p.unidade_nome || '-';
                                 const outroNome = souSolicitante ? p.alvo?.nome || 'Colega' : p.solicitante?.nome || 'Colega';
                                 const podeResponder = souAlvo && p.status === 'AGUARDANDO_COLEGA';
                                 const busy = respostaBusyId === p.id;
@@ -655,11 +655,11 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                         </h3>
                         <p className="mt-1 text-lg font-bold text-slate-200">{turno}</p>
                         <p className="mt-2 text-sm text-slate-400">
-                            Unidade: <span className="font-semibold text-slate-200">{shift?.local || unitNome || '—'}</span>
+                            Unidade: <span className="font-semibold text-slate-200">{shift?.local || unitNome || '-'}</span>
                         </p>
                         {shift ? (
                             <p className="mt-1 text-xs text-slate-500">
-                                Estado: <span className="text-slate-400">{shift.status || '—'}</span>
+                                Estado: <span className="text-slate-400">{shift.status || '-'}</span>
                                 {typeof shift.vagas === 'number' ? (
                                     <>
                                         {' '}
@@ -928,7 +928,7 @@ export default function DoctorView() {
                     </span>
                 </td>
                 <td class="py-4 px-6 text-xs text-slate-500 font-bold uppercase tracking-widest">${label}</td>
-                <td class="py-4 px-6 text-xs text-slate-400 font-bold">${item.especialidade || '—'}</td>
+                <td class="py-4 px-6 text-xs text-slate-400 font-bold">${item.especialidade || '-'}</td>
             </tr>
             `;
         }).join('');
@@ -1431,3 +1431,4 @@ export default function DoctorView() {
         </div>
     );
 }
+
