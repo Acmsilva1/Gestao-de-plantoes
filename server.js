@@ -40,7 +40,6 @@ import {
     createDoctor,
     deleteDoctor,
     getTrocasPendentesGestor,
-    postDecidirTrocaGestor,
     getAssumirPendentesGestor,
     postDecidirAssumirGestor,
     getEscalaEditor,
@@ -130,7 +129,9 @@ app.post('/api/manager/perfil/:id', updateManagerProfile);
 app.post('/api/manager/medicos', createDoctor);
 app.delete('/api/manager/medicos/:id', deleteDoctor);
 app.get('/api/manager/trocas-pendentes', getTrocasPendentesGestor);
-app.post('/api/manager/trocas/:pedidoId/decidir', postDecidirTrocaGestor);
+app.post('/api/manager/trocas/:pedidoId/decidir', (_req, res) =>
+    res.status(410).json({ error: 'Fluxo desabilitado: trocas entre medicos nao exigem mais aprovacao do gestor.' })
+);
 app.get('/api/manager/assumir-pendentes', getAssumirPendentesGestor);
 app.post('/api/manager/assumir/:pedidoId/decidir', postDecidirAssumirGestor);
 app.get('/api/manager/cancelamentos-pendentes', getCancelamentosPendentesGestor);

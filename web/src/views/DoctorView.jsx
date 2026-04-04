@@ -169,7 +169,7 @@ const trocaStatusLabel = (status, souSolicitante) => {
         case 'AGUARDANDO_COLEGA':
             return souSolicitante ? 'Aguardando confirmação do colega' : 'Aguardando a sua resposta';
         case 'AGUARDANDO_GESTOR':
-            return 'Em processamento';
+            return 'Em processamento automatico';
         case 'APROVADO':
             return 'Aprovado - escala atualizada';
         case 'RECUSADO_COLEGA':
@@ -584,7 +584,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 Confirmar troca de plantão
                             </h4>
                             <p id="confirm-troca-desc" className="mt-3 text-sm leading-relaxed text-slate-300">
-                                O pedido será enviado ao colega selecionado. Se aceite, a troca será <span className="font-semibold text-amber-200">processada automaticamente</span> caso esteja dentro das regras (mesma especialidade e antecedência mínima de 12h).
+                                O pedido será enviado ao colega selecionado. Se ele aceitar, a troca será <span className="font-semibold text-amber-200">processada automaticamente</span>.
                             </p>
                             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
                                 <button
@@ -688,7 +688,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                                 <>
                                     <p className="text-base font-bold text-emerald-100">Pedido enviado ao colega!</p>
                                     <p className="mt-2 text-sm text-slate-400">
-                                        Se o colega aceitar e as regras forem atendidas (mesma especialidade, antecedência &gt; 12h), a troca será efetivada automaticamente na escala.
+                                        Se o colega aceitar, a troca será efetivada automaticamente na escala.
                                     </p>
                                 </>
                             ) : pedidoSucessoTipo === 'cancelamento' ? (

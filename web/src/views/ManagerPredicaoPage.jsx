@@ -49,6 +49,15 @@ const formatDateTime = (value) => {
     return new Date(value).toLocaleString('pt-BR');
 };
 
+const normalizeText = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+const areSameIds = (left = [], right = []) =>
+    left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
+
 export default function ManagerPredicaoPage() {
     const { session } = useAuth();
     const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
@@ -116,6 +125,43 @@ export default function ManagerPredicaoPage() {
         () => units.filter((u) => selectedUnitIds.includes(String(u.id))).map((u) => u.nome),
         [units, selectedUnitIds]
     );
+
+    const visibleUnits = useMemo(() => {
+        const selectedRegional = String(filters.regional || '').trim();
+        if (!selectedRegional) return units;
+
+        const unidadesPorRegional = data?.filters?.unidadesPorRegional || {};
+        const regionalKey = Object.keys(unidadesPorRegional).find((key) => normalizeText(key) === normalizeText(selectedRegional));
+        const allowedUnitNames = new Set((unidadesPorRegional[regionalKey] || []).map((name) => normalizeText(name)));
+        if (!allowedUnitNames.size) return [];
+
+        return (units || []).filter((u) => allowedUnitNames.has(normalizeText(u.nome)));
+    }, [units, filters.regional, data?.filters?.unidadesPorRegional]);
+
+    useEffect(() => {
+        const visibleIds = new Set((visibleUnits || []).map((u) => String(u.id)));
+        setSelectedUnitIds((current) => {
+            if (filters.unidade) {
+                const next = visibleIds.has(String(filters.unidade)) ? [String(filters.unidade)] : [];
+                return areSameIds(current, next) ? current : next;
+            }
+            if (!filters.regional) {
+                const allIds = (units || []).map((u) => String(u.id));
+                return areSameIds(current, allIds) ? current : allIds;
+            }
+            const kept = current.filter((id) => visibleIds.has(String(id)));
+            const next = kept.length > 0 ? kept : (visibleUnits || []).map((u) => String(u.id));
+            return areSameIds(current, next) ? current : next;
+        });
+    }, [visibleUnits, filters.regional, filters.unidade, units]);
+
+    useEffect(() => {
+        if (!filters.unidade) return;
+        const existsInVisible = (visibleUnits || []).some((u) => String(u.id) === String(filters.unidade));
+        if (!existsInVisible) {
+            setFilters((current) => ({ ...current, unidade: '' }));
+        }
+    }, [filters.unidade, visibleUnits]);
 
     const displayedRows = useMemo(() => {
         if (filters.turno !== 'TOTAL') {
@@ -346,6 +392,7 @@ export default function ManagerPredicaoPage() {
     };
 
     const toggleSelectedUnit = (unitId) => {
+        setFilters((current) => (current.unidade ? { ...current, unidade: '' } : current));
         setSelectedUnitIds((current) =>
             current.includes(String(unitId)) ? current.filter((id) => id !== String(unitId)) : [...current, String(unitId)]
         );
@@ -574,11 +621,11 @@ export default function ManagerPredicaoPage() {
                             Comparação por unidades
                         </label>
                         <div className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-sky-300">
-                            {selectedUnitIds.length || units.length} selecionada(s)
+                            {selectedUnitIds.length || visibleUnits.length} selecionada(s)
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {units.map((u) => {
+                        {visibleUnits.map((u) => {
                             const active = selectedUnitIds.includes(String(u.id));
                             return (
                                 <button
@@ -598,7 +645,7 @@ export default function ManagerPredicaoPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
                     <div>
                         <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
                             <TrendingUp size={12} className="text-emerald-400" />
@@ -613,6 +660,28 @@ export default function ManagerPredicaoPage() {
                             {data.filters.regionais.map((option) => (
                                 <option key={option} value={option}>
                                     {option}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            <MapPinned size={12} className="text-sky-400" />
+                            Unidade
+                        </label>
+                        <select
+                            value={filters.unidade}
+                            onChange={(event) => {
+                                const nextUnitId = event.target.value;
+                                setFilters((current) => ({ ...current, unidade: nextUnitId }));
+                                if (nextUnitId) setSelectedUnitIds([String(nextUnitId)]);
+                            }}
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                        >
+                            <option value="">Todas as unidades</option>
+                            {visibleUnits.map((unit) => (
+                                <option key={unit.id} value={unit.id}>
+                                    {unit.nome}
                                 </option>
                             ))}
                         </select>

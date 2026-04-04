@@ -11,7 +11,8 @@ import {
     FileText,
     Zap,
     CalendarDays,
-    Ban
+    Ban,
+    Filter
 } from 'lucide-react';
 import { 
     BarChart, 
@@ -37,6 +38,14 @@ const MONTHS = [
 ];
 
 const cardClass = 'overflow-hidden rounded-[2rem] border border-slate-700/70 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm';
+const normalizeText = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+const areSameIds = (left = [], right = []) =>
+    left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
 
 export default function ManagerRelatoriosPage() {
     const { session } = useAuth();
@@ -45,6 +54,8 @@ export default function ManagerRelatoriosPage() {
     const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
     const [selectedUnit, setSelectedUnit] = useState(session.isMaster ? 'all' : session.unidade_id);
     const [selectedUnitIds, setSelectedUnitIds] = useState([]);
+    const [selectedRegional, setSelectedRegional] = useState('');
+    const [selectedTurno, setSelectedTurno] = useState('ALL');
     const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -56,6 +67,16 @@ export default function ManagerRelatoriosPage() {
         const totalVazias = rows.reduce((sum, r) => sum + (Number(r.totalVazias) || 0), 0);
         return { totalSlots, totalOcupadas, totalVazias };
     }, [reportData]);
+    const visibleUnits = useMemo(() => {
+        const selectedRegionalValue = String(selectedRegional || '').trim();
+        if (!selectedRegionalValue) return units;
+
+        const unidadesPorRegional = reportData?.filters?.unidadesPorRegional || {};
+        const regionalKey = Object.keys(unidadesPorRegional).find((key) => normalizeText(key) === normalizeText(selectedRegionalValue));
+        const allowedUnitNames = new Set((unidadesPorRegional[regionalKey] || []).map((name) => normalizeText(name)));
+        if (!allowedUnitNames.size) return [];
+        return (units || []).filter((u) => allowedUnitNames.has(normalizeText(u.nome)));
+    }, [units, selectedRegional, reportData?.filters?.unidadesPorRegional]);
 
     const yearOptions = useMemo(() => {
         const current = new Date().getFullYear();
@@ -92,6 +113,8 @@ export default function ManagerRelatoriosPage() {
             } else {
                 params.set('unidadeId', selectedUnit);
             }
+            if (selectedRegional) params.set('regional', selectedRegional);
+            if (selectedTurno && selectedTurno !== 'ALL') params.set('turno', selectedTurno);
             const url = `/api/manager/reports?${params.toString()}`;
             const resp = await fetch(url);
             const data = await readApiResponse(resp);
@@ -105,18 +128,33 @@ export default function ManagerRelatoriosPage() {
     };
 
     useEffect(() => { fetchUnits(); }, []);
-    useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit, selectedUnitIds]);
+    useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit, selectedUnitIds, selectedRegional, selectedTurno]);
 
     const toggleSelectedUnit = (unitId) => {
-        setSelectedUnitIds((current) =>
-            current.includes(String(unitId)) ? current.filter((id) => id !== String(unitId)) : [...current, String(unitId)]
-        );
+        setSelectedUnitIds((current) => {
+            const next = current.includes(String(unitId)) ? current.filter((id) => id !== String(unitId)) : [...current, String(unitId)];
+            return areSameIds(current, next) ? current : next;
+        });
     };
+
+    useEffect(() => {
+        if (!session.isMaster) return;
+        const allowedIds = new Set((visibleUnits || []).map((u) => String(u.id)));
+        setSelectedUnitIds((current) => {
+            if (!selectedRegional) {
+                const allIds = (units || []).map((u) => String(u.id));
+                return areSameIds(current, allIds) ? current : allIds;
+            }
+            const kept = current.filter((id) => allowedIds.has(String(id)));
+            const next = kept.length > 0 ? kept : (visibleUnits || []).map((u) => String(u.id));
+            return areSameIds(current, next) ? current : next;
+        });
+    }, [visibleUnits, session.isMaster, selectedRegional, units]);
 
     const handleGenerateProfessionalReport = () => {
         if (!reportData) return;
 
-        const selectedNames = units
+        const selectedNames = visibleUnits
             .filter((u) => selectedUnitIds.includes(String(u.id)))
             .map((u) => String(u.nome || '').toUpperCase())
             .filter(Boolean);
@@ -368,7 +406,7 @@ export default function ManagerRelatoriosPage() {
                         </div>
                     </div>
 
-                    <div className="grid gap-6 sm:grid-cols-2 lg:flex lg:items-end">
+                    <div className="flex flex-wrap items-end gap-4 lg:gap-6">
                         <div className="space-y-2">
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
                                 <CalendarDays size={12} className="text-blue-400" />
@@ -392,6 +430,44 @@ export default function ManagerRelatoriosPage() {
                             </div>
                         </div>
 
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
+                                <Filter size={12} className="text-sky-400" />
+                                Regional
+                            </label>
+                            <select
+                                value={selectedRegional}
+                                onChange={(e) => setSelectedRegional(e.target.value)}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm font-bold text-white outline-none focus:border-blue-500 transition sm:min-w-[220px]"
+                            >
+                                <option value="">Todas as regionais</option>
+                                {(reportData?.filters?.regionaisDisponiveis || []).map((regional) => (
+                                    <option key={regional} value={regional}>
+                                        {regional}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
+                                <CalendarDays size={12} className="text-amber-400" />
+                                Turno
+                            </label>
+                            <select
+                                value={selectedTurno}
+                                onChange={(e) => setSelectedTurno(e.target.value)}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm font-bold text-white outline-none focus:border-blue-500 transition sm:min-w-[220px]"
+                            >
+                                <option value="ALL">Todos os turnos</option>
+                                {(reportData?.filters?.turnosDisponiveis || []).map((turno) => (
+                                    <option key={turno} value={turno}>
+                                        {turno}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         {!session.isMaster ? (
                             <div className="w-full space-y-2 lg:w-64">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Unidade Foco</label>
@@ -405,10 +481,10 @@ export default function ManagerRelatoriosPage() {
                             </div>
                         ) : null}
                         
-                        <div className="flex gap-2 lg:mb-0.5">
+                        <div className="flex w-full gap-2 sm:ml-auto sm:w-auto lg:mb-0.5">
                             <button 
                                 onClick={handleGenerateProfessionalReport}
-                                className="group flex items-center justify-center gap-3 rounded-2xl bg-blue-600 px-8 py-4 text-white transition hover:bg-blue-500 shadow-xl shadow-blue-900/30 ring-2 ring-blue-500/20"
+                                className="group flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-white transition hover:bg-blue-500 shadow-xl shadow-blue-900/30 ring-2 ring-blue-500/20 sm:w-auto"
                             >
                                 <Zap size={18} className="text-orange-400" />
                                 <span className="text-sm font-black uppercase tracking-tighter">Gerar Relatório</span>
@@ -422,11 +498,11 @@ export default function ManagerRelatoriosPage() {
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <div className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Comparação multiunidade</div>
                             <div className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-sky-300">
-                                {selectedUnitIds.length || units.length} selecionada(s)
+                                {selectedUnitIds.length || visibleUnits.length} selecionada(s)
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {units.map((u) => {
+                            {visibleUnits.map((u) => {
                                 const active = selectedUnitIds.includes(String(u.id));
                                 return (
                                     <button

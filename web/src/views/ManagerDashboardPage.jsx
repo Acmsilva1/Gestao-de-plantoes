@@ -27,6 +27,16 @@ const cardClass =
 const metricClass =
     'rounded-2xl border border-slate-700/70 bg-slate-900/60 px-4 py-3 backdrop-blur-sm';
 
+const normalizeText = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+
+const areSameIds = (left = [], right = []) =>
+    left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
+
 const ChartTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     const title = label ?? payload?.[0]?.name ?? 'Detalhes';
@@ -49,6 +59,7 @@ export default function ManagerDashboardPage() {
     const now = useMemo(() => new Date(), []);
     const [selectedMonth, setSelectedMonth] = useState(() => String(now.getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState(() => String(now.getFullYear()));
+    const [selectedRegional, setSelectedRegional] = useState('');
     const [selectedUnit, setSelectedUnit] = useState('all');
     const [comparisonUnits, setComparisonUnits] = useState([]); // IDs das unidades extras para comparar
     const [units, setUnits] = useState([]);
@@ -57,7 +68,12 @@ export default function ManagerDashboardPage() {
     const [rawData, setRawData] = useState({ // Dados brutos vindos da API
         acceptedByQuinzena: { q1: [], q2: [] },
         occupancyBreakdown: [],
-        topDoctorsByUnit: []
+        topDoctorsByUnit: [],
+        filters: {
+            regionalSelecionada: '',
+            regionaisDisponiveis: [],
+            unidadesPorRegional: {}
+        }
     });
 
     const month = `${selectedYear}-${selectedMonth}`;
@@ -67,6 +83,16 @@ export default function ManagerDashboardPage() {
         for (let y = current - 3; y <= current + 3; y += 1) options.push(String(y));
         return options;
     }, [now]);
+
+    const visibleUnits = useMemo(() => {
+        const selectedRegionalValue = String(selectedRegional || '').trim();
+        if (!selectedRegionalValue) return units;
+
+        const unidadesPorRegional = rawData?.filters?.unidadesPorRegional || {};
+        const regionalKey = Object.keys(unidadesPorRegional).find((key) => normalizeText(key) === normalizeText(selectedRegionalValue));
+        const allowedUnitNames = new Set((unidadesPorRegional[regionalKey] || []).map((name) => normalizeText(name)));
+        return units.filter((unit) => allowedUnitNames.has(normalizeText(unit?.nome)));
+    }, [units, selectedRegional, rawData?.filters?.unidadesPorRegional]);
 
     // Filtramos os dados baseado na seleção (Single, All ou Comparison)
     const filteredData = useMemo(() => {
@@ -136,8 +162,9 @@ export default function ManagerDashboardPage() {
                 // Se for single e sem comparação, pega apenas a unidade.
                 const needsAllData = selectedUnit === 'all' || comparisonUnits.length > 0;
                 const unitQuery = !needsAllData ? `&unidadeId=${encodeURIComponent(selectedUnit)}` : '';
-                
-                const response = await fetch(`/api/manager/dashboard-summary?month=${encodeURIComponent(month)}&gestorId=${encodeURIComponent(gestorId)}${unitQuery}`);
+                const regionalQuery = selectedRegional ? `&regional=${encodeURIComponent(selectedRegional)}` : '';
+
+                const response = await fetch(`/api/manager/dashboard-summary?month=${encodeURIComponent(month)}&gestorId=${encodeURIComponent(gestorId)}${regionalQuery}${unitQuery}`);
                 const payload = await readApiResponse(response);
                 if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar dashboard.');
                 if (!cancelled) setRawData(payload);
@@ -151,7 +178,7 @@ export default function ManagerDashboardPage() {
         return () => {
             cancelled = true;
         };
-    }, [month, selectedUnit, comparisonUnits.length > 0, session?.id]); // Recarrega se entrar no modo comparação
+    }, [month, selectedRegional, selectedUnit, comparisonUnits.length > 0, session?.id]); // Recarrega se entrar no modo comparação
 
     useEffect(() => {
         const gestorId = session?.id;
@@ -172,6 +199,24 @@ export default function ManagerDashboardPage() {
         };
     }, [session?.id]);
 
+    useEffect(() => {
+        if (selectedUnit === 'all') return;
+        const existsInVisible = visibleUnits.some((unit) => String(unit.id) === String(selectedUnit));
+        if (!existsInVisible) {
+            setSelectedUnit('all');
+            setComparisonUnits([]);
+        }
+    }, [selectedUnit, visibleUnits]);
+
+    useEffect(() => {
+        setComparisonUnits((current) => {
+            if (!current.length) return current;
+            const allowedIds = new Set(visibleUnits.map((unit) => String(unit.id)));
+            const next = current.filter((id) => allowedIds.has(String(id)) && String(id) !== String(selectedUnit));
+            return areSameIds(current, next) ? current : next;
+        });
+    }, [visibleUnits, selectedUnit]);
+
     return (
         <div className="animate-in fade-in duration-500 space-y-6">
             <div className="relative overflow-hidden rounded-[2rem] border border-slate-700/70 bg-[radial-gradient(circle_at_0%_0%,rgba(14,165,233,0.24),transparent_45%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.18),transparent_35%),linear-gradient(160deg,#020617_0%,#0f172a_55%,#111827_100%)] p-6">
@@ -182,7 +227,7 @@ export default function ManagerDashboardPage() {
                         <h2 className="mt-2 text-3xl font-black text-white md:text-4xl">Dashboards de Escala</h2>
                         <p className="mt-2 text-sm text-slate-300">Visão mensal de alocação e cobertura das escalas por unidade.</p>
                     </div>
-                    <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+                    <div className="grid w-full max-w-5xl gap-3 sm:grid-cols-4">
                         <div>
                             <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Mês</label>
                             <div className="relative">
@@ -215,6 +260,21 @@ export default function ManagerDashboardPage() {
                             </select>
                         </div>
                         <div>
+                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Regional</label>
+                            <select
+                                value={selectedRegional}
+                                onChange={(e) => setSelectedRegional(e.target.value)}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
+                            >
+                                <option value="">Todas as regionais</option>
+                                {(rawData?.filters?.regionaisDisponiveis || []).map((regional) => (
+                                    <option key={regional} value={regional}>
+                                        {regional}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
                             <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Unidade</label>
                             <select
                                 value={selectedUnit}
@@ -225,7 +285,7 @@ export default function ManagerDashboardPage() {
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
                             >
                                 <option value="all">Todas as unidades</option>
-                                {units.map((unit) => (
+                                {visibleUnits.map((unit) => (
                                     <option key={unit.id} value={unit.id}>
                                         {unit.nome}
                                     </option>
@@ -263,7 +323,7 @@ export default function ManagerDashboardPage() {
                             <span className="rounded-full bg-sky-500/10 px-3 py-0.5 text-[9px] font-black text-sky-400 border border-sky-500/20 uppercase tracking-widest">Selecione para comparar</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {units
+                            {visibleUnits
                                 .filter(u => u.id !== selectedUnit)
                                 .map(unit => {
                                     const isSelected = comparisonUnits.includes(unit.id);

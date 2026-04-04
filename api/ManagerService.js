@@ -228,15 +228,39 @@ export const getDashboardSummary = async (req, res) => {
         if (!manager) return;
 
         const { startMonthDate, endMonthDate, year, month: monthNumber } = getMonthDates(month);
+        const regionalFiltro = typeof req.query?.regional === 'string' ? req.query.regional.trim() : '';
+        const normalizeText = (value) =>
+            String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toLowerCase();
         const scopedUnitId = unidadeId || (isMasterManager(manager) ? null : manager.unidade_id);
         if (scopedUnitId && !assertUnitScope(res, manager, scopedUnitId)) return;
 
-        const [escalaRows, disponibilidadeRows, unitsCatalogRaw] = await Promise.all([
+        const [escalaRows, disponibilidadeRows, unitsCatalogRaw, predictionRows] = await Promise.all([
             dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitId),
             dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitId),
-            dbModel.getUnits()
+            dbModel.getUnits(),
+            dbModel.getPredictionData({ startDate: startMonthDate, endDate: endMonthDate })
         ]);
 
+        const regionaisDisponiveis = Array.from(new Set((predictionRows || []).map((r) => r.regional).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b, 'pt-BR')
+        );
+        const unidadesPorRegional = (predictionRows || []).reduce((acc, row) => {
+            const regionalKey = String(row.regional || '').trim();
+            const unidadeValue = String(row.unidade || '').trim();
+            if (!regionalKey || !unidadeValue) return acc;
+            if (!acc[regionalKey]) acc[regionalKey] = new Set();
+            acc[regionalKey].add(unidadeValue);
+            return acc;
+        }, {});
+        const unidadesPorRegionalSerializado = Object.fromEntries(
+            Object.entries(unidadesPorRegional)
+                .map(([regional, set]) => [regional, Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))])
+                .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+        );
         const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
         const q1Days = Math.min(15, daysInMonth);
         const q2Days = Math.max(daysInMonth - 15, 0);
@@ -246,15 +270,38 @@ export const getDashboardSummary = async (req, res) => {
             ? (unitsCatalogRaw || []).filter((u) => String(u.id) === String(scopedUnitId))
             : unitsCatalogRaw || [];
         const unitNameCatalog = new Map((unitsCatalog || []).map((u) => [u.id, u.nome]));
+        const regionaisPorUnidade = (predictionRows || []).reduce((acc, row) => {
+            const unidadeKey = normalizeText(row.unidade);
+            const regionalValue = String(row.regional || '').trim();
+            if (!unidadeKey || !regionalValue) return acc;
+            if (!acc.has(unidadeKey)) acc.set(unidadeKey, new Set());
+            acc.get(unidadeKey).add(regionalValue);
+            return acc;
+        }, new Map());
+        const isRegionalMatch = (unidadeNome) => {
+            if (!regionalFiltro) return true;
+            const mapped = regionaisPorUnidade.get(normalizeText(unidadeNome));
+            if (!mapped?.size) return false;
+            return Array.from(mapped).some((r) => normalizeText(r) === normalizeText(regionalFiltro));
+        };
+        const unitsCatalogFiltrado = unitsCatalog.filter((u) => isRegionalMatch(u.nome));
+        const escalaRowsFiltradas = (escalaRows || []).filter((row) => {
+            const unidadeNome = row.unidades?.nome || unitNameCatalog.get(row.unidade_id) || '';
+            return isRegionalMatch(unidadeNome);
+        });
+        const disponibilidadeRowsFiltradas = (disponibilidadeRows || []).filter((row) => {
+            const unidadeNome = row.unidades?.nome || unitNameCatalog.get(row.unidade_id) || '';
+            return isRegionalMatch(unidadeNome);
+        });
 
         const unitNameById = new Map();
-        for (const u of unitsCatalog) {
+        for (const u of unitsCatalogFiltrado) {
             if (u?.id && u?.nome) unitNameById.set(u.id, u.nome);
         }
-        for (const r of disponibilidadeRows || []) {
+        for (const r of disponibilidadeRowsFiltradas) {
             if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
         }
-        for (const r of escalaRows || []) {
+        for (const r of escalaRowsFiltradas) {
             if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
         }
 
@@ -262,7 +309,7 @@ export const getDashboardSummary = async (req, res) => {
         const occupiedQ2ByUnit = new Map();
         const doctorByUnit = new Map();
 
-        for (const row of escalaRows || []) {
+        for (const row of escalaRowsFiltradas) {
             const unitId = row.unidade_id;
             const unitName = unitNameById.get(unitId) || 'Unidade';
             const day = Number(String(row.data_plantao).slice(8, 10));
@@ -283,7 +330,7 @@ export const getDashboardSummary = async (req, res) => {
         }
 
         const toOverviewArray = (mandatorySlotsPerUnit, occupiedMap) => {
-            const unitIds = new Set([...unitsCatalog.map((u) => u.id), ...occupiedMap.keys()]);
+            const unitIds = new Set([...unitsCatalogFiltrado.map((u) => u.id), ...occupiedMap.keys()]);
             return Array.from(unitIds)
                 .map((unitId) => {
                     const totalOcupadas = occupiedMap.get(unitId) || 0;
@@ -366,6 +413,11 @@ export const getDashboardSummary = async (req, res) => {
 
         res.json({
             month,
+            filters: {
+                regionalSelecionada: regionalFiltro || '',
+                regionaisDisponiveis,
+                unidadesPorRegional: unidadesPorRegionalSerializado
+            },
             acceptedByQuinzena,
             occupancyBreakdown,
             topDoctorsByUnit
@@ -739,10 +791,10 @@ export const getTrocasPendentesGestor = async (req, res) => {
         const scopedUnitId = unidadeId || manager.unidade_id;
         if (!assertUnitScope(res, manager, scopedUnitId)) return;
 
-        const pedidos = await dbModel.listPedidosTrocaParaGestor(scopedUnitId);
+        const pedidos = await dbModel.listEventosCienciaGestor(scopedUnitId);
         res.json({ pedidos });
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar pedidos de troca.', details: err.message });
+        res.status(500).json({ error: 'Erro ao carregar feed de trocas.', details: err.message });
     }
 };
 
@@ -1297,19 +1349,55 @@ export const getReportsData = async (req, res) => {
         }
 
         const { startMonthDate, endMonthDate } = getMonthDates(month);
+        const regionalFiltro = typeof req.query?.regional === 'string' ? req.query.regional.trim() : '';
+        const turnoFiltroRaw = typeof req.query?.turno === 'string' ? req.query.turno.trim() : '';
+        const turnoFiltro = turnoFiltroRaw && turnoFiltroRaw.toUpperCase() !== 'ALL' ? turnoFiltroRaw.toUpperCase() : '';
 
-        const [escalaRows, disponibilidadeRows, swapRequests, cancelamentoRows, unitsCatalogRaw] = await Promise.all([
+        const normalizeText = (value) =>
+            String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toLowerCase();
+        const normalizeTurno = (value) => normalizeText(value).toUpperCase();
+
+        const [escalaRows, disponibilidadeRows, swapRequests, cancelamentoRows, unitsCatalogRaw, predictionRows] = await Promise.all([
             dbModel.getEscalaByRange(startMonthDate, endMonthDate, scopedUnitIds),
             dbModel.getAvailabilityByRange(startMonthDate, endMonthDate, scopedUnitIds),
             dbModel.getSwapDemandsByRange(startMonthDate, endMonthDate, scopedUnitIds),
             dbModel.getCancelamentosByRange(startMonthDate, endMonthDate, scopedUnitIds),
-            dbModel.getUnits()
+            dbModel.getUnits(),
+            dbModel.getPredictionData({ startDate: startMonthDate, endDate: endMonthDate })
         ]);
+
+        const regionaisDisponiveis = Array.from(new Set((predictionRows || []).map((r) => r.regional).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        const turnosDisponiveis = Array.from(new Set((predictionRows || []).map((r) => normalizeTurno(r.turno)).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+        const regionaisPorUnidade = (predictionRows || []).reduce((acc, row) => {
+            const unidadeKey = normalizeText(row.unidade);
+            const regionalValue = String(row.regional || '').trim();
+            if (!unidadeKey || !regionalValue) return acc;
+            if (!acc.has(unidadeKey)) acc.set(unidadeKey, new Set());
+            acc.get(unidadeKey).add(regionalValue);
+            return acc;
+        }, new Map());
+        const unidadesPorRegional = (predictionRows || []).reduce((acc, row) => {
+            const regionalKey = String(row.regional || '').trim();
+            const unidadeValue = String(row.unidade || '').trim();
+            if (!regionalKey || !unidadeValue) return acc;
+            if (!acc[regionalKey]) acc[regionalKey] = new Set();
+            acc[regionalKey].add(unidadeValue);
+            return acc;
+        }, {});
+        const unidadesPorRegionalSerializado = Object.fromEntries(
+            Object.entries(unidadesPorRegional)
+                .map(([regional, set]) => [regional, Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))])
+                .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+        );
 
         // 1. Occupancy Data (4 turnos obrigatorios por dia em cada unidade)
         const [reportYear, reportMonth] = month.split('-').map(Number);
         const daysInMonth = new Date(Date.UTC(reportYear, reportMonth, 0)).getUTCDate();
-        const mandatorySlotsPerUnit = daysInMonth * TURNOS_ESCALA.size;
         const unitsCatalog = scopedUnitIds?.length
             ? (unitsCatalogRaw || []).filter((u) => scopedUnitIds.includes(String(u.id)))
             : unitsCatalogRaw || [];
@@ -1322,18 +1410,47 @@ export const getReportsData = async (req, res) => {
         disponibilidadeRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
         escalaRows.forEach(r => { if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
 
+        const isRegionalMatch = (unidadeNome) => {
+            if (!regionalFiltro) return true;
+            const mapped = regionaisPorUnidade.get(normalizeText(unidadeNome));
+            if (!mapped?.size) return false;
+            return Array.from(mapped).some((r) => normalizeText(r) === normalizeText(regionalFiltro));
+        };
+
+        const escalaRowsFiltradas = (escalaRows || []).filter((row) => {
+            const unidadeNome = row.unidades?.nome || unitNameCatalog.get(row.unidade_id) || '';
+            if (!isRegionalMatch(unidadeNome)) return false;
+            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            return true;
+        });
+
+        const swapRequestsFiltradas = (swapRequests || []).filter((row) => {
+            const unidadeNome = row.unidade?.nome || '';
+            if (!isRegionalMatch(unidadeNome)) return false;
+            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            return true;
+        });
+
+        const cancelamentoRowsFiltradas = (cancelamentoRows || []).filter((row) => {
+            const unidadeNome = row.unidades?.nome || '';
+            if (!isRegionalMatch(unidadeNome)) return false;
+            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            return true;
+        });
+
         const occupiedByUnit = new Map();
 
-        escalaRows.forEach(row => {
+        escalaRowsFiltradas.forEach(row => {
             const unitId = row.unidade_id;
             const current = occupiedByUnit.get(unitId) || 0;
             occupiedByUnit.set(unitId, current + 1);
         });
 
         const unitIds = new Set([...unitsCatalog.map((u) => u.id), ...occupiedByUnit.keys()]);
+        const slotsPorDia = turnoFiltro ? 1 : TURNOS_ESCALA.size;
         const occupancyByUnit = Array.from(unitIds).map(unitId => {
             const totalOcupadas = occupiedByUnit.get(unitId) || 0;
-            let totalSlots = mandatorySlotsPerUnit;
+            let totalSlots = daysInMonth * slotsPorDia;
             
             // Fallback: Se não há predição/disponibilidade mas há médicos, assumimos que o total é ao menos o ocupado
             if (totalSlots < totalOcupadas) totalSlots = totalOcupadas;
@@ -1346,11 +1463,11 @@ export const getReportsData = async (req, res) => {
                 totalVazias,
                 percentual: totalSlots > 0 ? Number(((totalOcupadas / totalSlots) * 100).toFixed(2)) : 0
             };
-        }).sort((a, b) => b.totalSlots - a.totalSlots);
+        }).filter((row) => isRegionalMatch(row.unidade)).sort((a, b) => b.totalSlots - a.totalSlots);
 
         // 2. Doctor Shifts Table
         const doctorByUnit = new Map();
-        escalaRows.forEach(row => {
+        escalaRowsFiltradas.forEach(row => {
             const key = `${row.unidade_id}|${row.medico_id}`;
             if (!doctorByUnit.has(key)) {
                 doctorByUnit.set(key, {
@@ -1365,7 +1482,7 @@ export const getReportsData = async (req, res) => {
         const doctorShifts = Array.from(doctorByUnit.values()).sort((a, b) => b.total - a.total);
 
         // 3. Swap Demands
-        const swapDemands = (swapRequests || []).map(r => ({
+        const swapDemands = swapRequestsFiltradas.map(r => ({
             id: r.id,
             unidade: r.unidade?.nome || 'Unidade',
             data: r.data_plantao,
@@ -1377,7 +1494,7 @@ export const getReportsData = async (req, res) => {
         }));
 
         // 4. Cancelamentos
-        const cancelamentos = (cancelamentoRows || []).map(r => ({
+        const cancelamentos = cancelamentoRowsFiltradas.map(r => ({
             id: r.id,
             unidade: r.unidades?.nome || 'Unidade',
             data: r.data_plantao,
@@ -1390,6 +1507,13 @@ export const getReportsData = async (req, res) => {
 
         res.json({
             month,
+            filters: {
+                regionalSelecionada: regionalFiltro || '',
+                turnoSelecionado: turnoFiltro || '',
+                regionaisDisponiveis,
+                turnosDisponiveis,
+                unidadesPorRegional: unidadesPorRegionalSerializado
+            },
             occupancyByUnit,
             doctorShifts,
             swapDemands,

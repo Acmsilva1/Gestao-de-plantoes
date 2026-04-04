@@ -643,6 +643,27 @@ export const dbModel = {
             throw new Error(response.error.message || 'Falha ao aprovar pedido de troca');
         }
     },
+    async aprovarPedidoTrocaPorAceiteColega(pedidoId) {
+        const pedido = await this.getPedidoTrocaById(pedidoId);
+        if (!pedido) {
+            throw new Error('Pedido nao encontrado.');
+        }
+        if (pedido.status !== 'AGUARDANDO_COLEGA') {
+            throw new Error('Este pedido nao esta aguardando resposta do colega.');
+        }
+
+        await supabase
+            .from('pedidos_troca_escala')
+            .update({
+                status: 'AGUARDANDO_GESTOR',
+                colega_respondeu_em: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId);
+
+        await this.aprovarPedidoTrocaGestorRpc(pedidoId);
+        return this.getPedidoTrocaById(pedidoId);
+    },
     async recusarPedidoTrocaGestor(pedidoId) {
         const response = await supabase
             .from('pedidos_troca_escala')
@@ -708,6 +729,56 @@ export const dbModel = {
         const response = await query;
         const rows = unwrap(response, 'Falha ao listar pedidos de assumir');
         return this._enrichPedidosAssumirComMedicos(rows || []);
+    },
+    async listEventosCienciaGestor(unidadeId) {
+        let trocaQuery = supabase
+            .from('pedidos_troca_escala')
+            .select('*, unidades(nome)')
+            .in('status', ['APROVADO', 'RECUSADO_COLEGA'])
+            .order('updated_at', { ascending: false })
+            .limit(200);
+
+        if (unidadeId) {
+            trocaQuery = trocaQuery.eq('unidade_id', unidadeId);
+        }
+
+        const trocaResponse = await trocaQuery;
+        const trocaRows = unwrap(trocaResponse, 'Falha ao listar trocas para ciencia');
+        const trocasEnriquecidas = await this._enrichPedidosTrocaComMedicos(trocaRows || []);
+        const eventosTroca = trocasEnriquecidas.map((r) => ({
+            ...r,
+            tipo_evento: 'TROCA',
+            data_evento: r.updated_at || r.created_at
+        }));
+
+        let assumirQuery = supabase
+            .from('pedidos_assumir_escala')
+            .select('*, unidades(nome)')
+            .eq('status', 'APROVADO')
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        if (unidadeId) {
+            assumirQuery = assumirQuery.eq('unidade_id', unidadeId);
+        }
+
+        const assumirResponse = await assumirQuery;
+        const assumirRows = unwrap(assumirResponse, 'Falha ao listar pedidos de assumir para ciencia');
+        const assumirEnriquecidos = await this._enrichPedidosAssumirComMedicos(assumirRows || []);
+        const eventosAssumir = assumirEnriquecidos.map((r) => ({
+            ...r,
+            tipo_evento: 'ASSUMIR_VAGO',
+            data_evento: r.gestor_respondeu_em || r.updated_at || r.created_at
+        }));
+
+        const eventos = [...eventosTroca, ...eventosAssumir];
+        eventos.sort((a, b) => {
+            const left = new Date(a.data_evento || a.created_at || 0).getTime();
+            const right = new Date(b.data_evento || b.created_at || 0).getTime();
+            return right - left;
+        });
+
+        return eventos;
     },
     async aprovarPedidoAssumirGestorRpc(pedidoId) {
         const response = await supabase.rpc('aprovar_pedido_assumir_gestor', { p_pedido_id: pedidoId });

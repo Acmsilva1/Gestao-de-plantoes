@@ -545,11 +545,21 @@ export const postResponderTrocaColega = async (req, res) => {
             return res.status(400).json({ error: 'Informe aceitar: true ou false.' });
         }
 
-        const pedido = await dbModel.responderColegaPedidoTroca(pedidoId, medicoId, aceitar);
+        const pedidoAtual = await dbModel.getPedidoTrocaById(pedidoId);
+        if (!pedidoAtual) {
+            return res.status(404).json({ error: 'Pedido nao encontrado.' });
+        }
+        if (pedidoAtual.medico_alvo_id !== medicoId) {
+            return res.status(403).json({ error: 'Apenas o colega indicado pode responder a este pedido.' });
+        }
+
+        const pedido = aceitar
+            ? await dbModel.aprovarPedidoTrocaPorAceiteColega(pedidoId)
+            : await dbModel.responderColegaPedidoTroca(pedidoId, medicoId, false);
 
         res.json({
             pedido,
-            message: aceitar ? 'Colega aceitou. Aguardando gestor.' : 'Pedido recusado pelo colega.'
+            message: aceitar ? 'Colega aceitou. Troca efetivada automaticamente.' : 'Pedido recusado pelo colega.'
         });
     } catch (err) {
         const status = /nao encontrado|nao esta|Apenas o colega/i.test(err.message) ? 403 : 400;

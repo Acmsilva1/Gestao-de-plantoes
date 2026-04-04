@@ -9,11 +9,33 @@ import {
     normalizeHistoricalPredictionRow
 } from './PredictionEngine.js';
 
-const buildFilters = (rows = []) => ({
-    unidades: Array.from(new Set(rows.map((row) => row.unidade).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    regionais: Array.from(new Set(rows.map((row) => row.regional).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    turnos: Array.from(new Set(rows.map((row) => row.turno).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-});
+const buildFilters = (rows = []) => {
+    const unidades = Array.from(new Set(rows.map((row) => row.unidade).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const regionais = Array.from(new Set(rows.map((row) => row.regional).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const turnos = Array.from(new Set(rows.map((row) => row.turno).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    const unidadesPorRegional = rows.reduce((acc, row) => {
+        const regional = String(row.regional || '').trim();
+        const unidade = String(row.unidade || '').trim();
+        if (!regional || !unidade) return acc;
+        if (!acc[regional]) acc[regional] = new Set();
+        acc[regional].add(unidade);
+        return acc;
+    }, {});
+
+    const unidadesPorRegionalSerializado = Object.fromEntries(
+        Object.entries(unidadesPorRegional)
+            .map(([regional, set]) => [regional, Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))])
+            .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    );
+
+    return {
+        unidades,
+        regionais,
+        turnos,
+        unidadesPorRegional: unidadesPorRegionalSerializado
+    };
+};
 
 const normalizeConfidence = (value) => {
     if (value === 'alta') return 'Alta';
