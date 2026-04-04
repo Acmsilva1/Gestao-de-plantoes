@@ -175,3 +175,44 @@ BEGIN
     -- Implementar conforme regras corporativas de auditoria.
 END;
 $$;
+
+-- -----------------------------------------------------------------------------
+-- 6. WORKFLOWS ADICIONAIS: ASSUMIR VAGO E CANCELAMENTOS
+-- -----------------------------------------------------------------------------
+
+-- Pedido de assumir turno vago
+CREATE TABLE IF NOT EXISTS pedidos_assumir_escala (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    unidade_id UUID NOT NULL REFERENCES unidades (id) ON DELETE CASCADE,
+    data_plantao DATE NOT NULL,
+    turno TEXT NOT NULL,
+    medico_solicitante_id UUID NOT NULL REFERENCES medicos (id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'AGUARDANDO_GESTOR', -- APROVADO, RECUSADO_GESTOR
+    gestor_respondeu_em TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Pedido de cancelamento de plantao
+CREATE TABLE IF NOT EXISTS pedidos_cancelamento_escala (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    unidade_id UUID NOT NULL REFERENCES unidades (id) ON DELETE CASCADE,
+    escala_id UUID REFERENCES escala (id) ON DELETE SET NULL,
+    medico_id UUID NOT NULL REFERENCES medicos (id) ON DELETE CASCADE,
+    data_plantao DATE NOT NULL,
+    turno TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDENTE', -- APROVADO, RECUSADO
+    gestor_respondeu_em TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Garante a FK correta para preservar historico de cancelamento quando a linha da escala for removida.
+ALTER TABLE pedidos_cancelamento_escala
+    DROP CONSTRAINT IF EXISTS pedidos_cancelamento_escala_escala_id_fkey;
+
+ALTER TABLE pedidos_cancelamento_escala
+    ADD CONSTRAINT pedidos_cancelamento_escala_escala_id_fkey
+    FOREIGN KEY (escala_id)
+    REFERENCES escala (id)
+    ON DELETE SET NULL;

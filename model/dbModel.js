@@ -835,10 +835,63 @@ export const dbModel = {
         return unwrap(response, 'Falha ao listar pedidos de cancelamento');
     },
     async aprovarPedidoCancelamentoGestorRpc(pedidoId) {
+        const snapshotResp = await supabase
+            .from('pedidos_cancelamento_escala')
+            .select('*')
+            .eq('id', pedidoId)
+            .maybeSingle();
+        const snapshot = unwrap(snapshotResp, 'Falha ao carregar pedido de cancelamento');
+        if (!snapshot) {
+            throw new Error('Pedido de cancelamento nao encontrado ou ja decidido.');
+        }
+
         const response = await supabase.rpc('aprovar_pedido_cancelamento_gestor', { p_pedido_id: pedidoId });
         if (response.error) {
-            throw new Error(response.error.message || 'Falha ao aprovar cancelamento de plantão');
+            throw new Error(response.error.message || 'Falha ao aprovar cancelamento de plantao');
         }
+
+        const nowIso = new Date().toISOString();
+        const updateResp = await supabase
+            .from('pedidos_cancelamento_escala')
+            .update({
+                status: 'APROVADO',
+                gestor_respondeu_em: nowIso,
+                updated_at: nowIso
+            })
+            .eq('id', pedidoId)
+            .select('*')
+            .maybeSingle();
+
+        const updated = unwrap(updateResp, 'Falha ao registar aprovacao do cancelamento');
+        if (updated) {
+            return updated;
+        }
+
+        const restorePayload = {
+            ...snapshot,
+            status: 'APROVADO',
+            escala_id: null,
+            gestor_respondeu_em: nowIso,
+            updated_at: nowIso
+        };
+
+        const restoreResp = await supabase
+            .from('pedidos_cancelamento_escala')
+            .upsert(restorePayload, { onConflict: 'id' })
+            .select('*')
+            .maybeSingle();
+
+        const restored = unwrap(restoreResp, 'Falha ao preservar historico do cancelamento aprovado');
+        if (!restored) {
+            return {
+                ...snapshot,
+                status: 'APROVADO',
+                escala_id: null,
+                gestor_respondeu_em: nowIso,
+                updated_at: nowIso
+            };
+        }
+        return restored;
     },
     async recusarPedidoCancelamentoGestor(pedidoId) {
         const response = await supabase

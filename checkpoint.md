@@ -1,40 +1,43 @@
-# Checkpoint: Gestão de Plantões
+﻿# Checkpoint: Gestao de Plantoes
 
-Este documento rastreia o estado atual da arquitetura, integrações e próximos passos do projeto.
+Este documento rastreia o estado atual da arquitetura, integracoes e proximos passos do projeto.
 
-## 1. Arquitetura e Estrutura [Status: CONCLUÍDO]
-- **Modularização**: Aplicação organizada em uma estrutura de serviços na pasta `api/`.
-- **Limpeza**: Código otimizado e focado em um motor de predição sólido.
-- **Relatórios Summary-First**: Arquitetura do módulo administrativo modernizada para não trafegar grandes volumes de linhas à interface gráfica, processando os totais diretamente no back-end.
+## 1. Arquitetura e Estrutura [Status: CONCLUIDO]
+- Modularizacao: aplicacao organizada em estrutura de servicos na pasta `api/`.
+- Limpeza: codigo otimizado e focado em um motor de predicao robusto.
+- Relatorios Summary-First: processamento de totais no backend para evitar carga excessiva na interface.
 
 ## 2. Componentes do Sistema
-| Componente | Função |
+| Componente | Funcao |
 | :--- | :--- |
-| **`DataTransportService`** | ETL Incremental (Delta Sync) com janela de atualização contínua. |
-| **`PredictionEngine`** | Motor Analítico (MAD, Regressão, Sazonalidade) e Multiplicadores IA. |
-| **`CalibrationService`** | Motor de Auto-Ajuste Semanal para detecção de tendências (Dom 01h). |
-| **`AdminService`** | Relatórios de auditoria financeira (Produtividade, Trocas, Cancelamentos) com geração estática (CSV/HTML). |
-| **`CronService`** | Orquestrador de jobs automáticos de retaguarda. |
-| **`dbModel.js`** | Camada de abstração do Banco de Dados (Supabase/Postgres). |
+| `DataTransportService` | ETL incremental (Delta Sync) com janela continua de atualizacao. |
+| `PredictionEngine` | Motor analitico (MAD, regressao, sazonalidade) e multiplicadores IA. |
+| `CalibrationService` | Auto-ajuste semanal para deteccao de tendencias (domingo 01h). |
+| `AdminService` | Relatorios de auditoria (produtividade, trocas, cancelamentos) com saida CSV/HTML. |
+| `CronService` | Orquestrador de jobs de retaguarda. |
+| `dbModel.js` | Camada de abstracao do banco (Supabase/Postgres). |
 
-## 3. Banco de Dados e Integração
-- **Destino**: `historico_predicao` (Postgres local/Supabase).
-- **Fonte**: Mapeado no buffer de teste (`historico_tasy`), arquitetura desenhada em "Bridge" para aceitar a view Oracle original.
-- **Sanitização**: Padrão rígido de anonimização no momento do tráfego do dado fonte.
+## 3. Banco de Dados e Integracao
+- Destino: `historico_predicao` (Postgres local/Supabase).
+- Fonte: buffer de teste (`historico_tasy`), com arquitetura pronta para fonte Oracle.
+- Sanitizacao: anonimização aplicada no trafego do dado de origem.
 
-## 4. Entregas Concluídas (Recentes)
-- [x] Otimização e sincronismo visual do Card de Confiança de Predição vs Modal Detalhado.
-- [x] Filtros Dinâmicos no Editor de Escalas: Busca inteligente e limitador de Médicos filtráveis pela Unidade ativa.
-- [x] **Módulo Administrativo (Summary-First)**: Tela blindada contra travamentos, exibindo métricas agregadas (Horas, Médicos Ativos).
-- [x] Downloads Ricos (CSV/HTML): O sistema acopla um formulário cabeçalho consolidado no topo de cada arquivo fornecido pelo backend, seguido dos dados das transações.
-- [x] Correção do pipeline de download HTML, bloqueando renderização pelo browser (forçando `blob`).
-- [x] Definição formal de Casos de Uso Meta / WhatsApp (`WHATSAPP.md`).
+## 4. Entregas Concluidas (Recentes)
+- [x] Trocas sem aprovacao do gestor: aceite entre medicos finaliza com status final.
+- [x] Gestor em modo ciencia no menu `Trocas` (feed unificado `TROCA | ASSUMIR_VAGO`, sem botoes de decisao).
+- [x] Predicao e Relatorios com filtros por Regional, Turno e Unidade.
+- [x] Comparacao multiunidade sincronizada com regional selecionada (predicao, relatorios e dashboard).
+- [x] Dashboard com filtro regional e unidades dinamicas por regional.
+- [x] Ajustes de layout no modulo de Relatorios (acao de gerar relatorio sem overflow/corte).
+- [x] Correcao de loops de carregamento ao trocar filtros de regional/unidade.
+- [x] Correcao de persistencia de cancelamentos aprovados para manter historico e alimentar relatorios.
+- [x] Criada migracao SQL: `model/migrations/2026-04-03_fix_fk_cancelamento_escala.sql`.
 
-## 5. Próximos Passos
-- [ ] **Faturamento e Custos**: Inserir a parametrização de "Valor da Hora" nas unidades para liberação de cálculo financeiro.
-- [ ] **Integração WhatsApp**: Prosseguir para o "Meta Developers" e tokenização.
-- [ ] **Agrupamento Regional**: Disponibilizar o macro filtro de regional no dashboard de predições.
-- [ ] Transição transparente do ETL para a fonte Oracle verdadeira.
+## 5. Proximos Passos
+- [ ] Faturamento e Custos: parametrizar valor/hora por unidade para calculo financeiro completo.
+- [ ] Integracao WhatsApp: avancar com Meta Developers e tokenizacao.
+- [ ] Executar em todos os ambientes a migracao `2026-04-03_fix_fk_cancelamento_escala.sql`.
+- [ ] Transicao transparente do ETL para a fonte Oracle oficial.
 
 ---
-*Última Atualização: 2026-04-02*
+*Ultima Atualizacao: 2026-04-03*

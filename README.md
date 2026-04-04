@@ -127,3 +127,24 @@ RABBITMQ_EXCHANGE=gestao.events
 ```
 
 Com `ENABLE_REDIS`/`ENABLE_QUEUE` desligados, o sistema continua operando normalmente usando apenas banco.
+
+---
+
+## Atualizacoes Recentes (2026-04-03)
+
+### Fluxos de troca, assumir e cancelamento
+- Troca entre medicos: nao exige mais aprovacao manual do gestor; com aceite do colega o pedido finaliza automaticamente.
+- Assumir dia vago: permanece com processamento automatico e evento para ciencia do gestor.
+- Gestor: menu `Trocas` virou feed de ciencia unificado (`TROCA` e `ASSUMIR_VAGO`), sem botoes de aprovar/recusar.
+- Cancelamentos: continuam exigindo autorizacao do gestor, com persistencia de historico apos aprovacao para exibicao em relatorios.
+
+### Filtros e UX (Gestor Master)
+- Predicao: filtros por Regional, Turno e Unidade (inclusive com comparacao multiunidade).
+- Relatorios: filtros por Regional e Turno, com comparacao multiunidade sincronizada por regional.
+- Dashboard: filtro por regional e lista de unidades/comparacao restritas a regional selecionada.
+- Correcao visual no bloco de relatorios para evitar overflow/corte no botao de gerar relatorio.
+
+### Banco de dados
+- Nova migracao: `model/migrations/2026-04-03_fix_fk_cancelamento_escala.sql`.
+- Ajuste recomendado em `pedidos_cancelamento_escala.escala_id` para `ON DELETE SET NULL`, preservando historico quando a linha da escala for removida durante aprovacao do cancelamento.
+- `model/master.sql` atualizado com a estrutura de pedidos de assumir/cancelamento e a FK correta para cancelamentos.
