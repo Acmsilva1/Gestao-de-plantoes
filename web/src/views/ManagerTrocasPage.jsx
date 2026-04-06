@@ -23,9 +23,9 @@ const formatDisplayDate = (dateString) =>
     fullDateFormatter.format(new Date(`${dateString}T12:00:00-03:00`)).replace(/\//g, '-');
 
 const formatDisplayDateTime = (timestamp) => {
-    if (!timestamp) return '—';
+    if (!timestamp) return '-';
     const parsed = new Date(timestamp);
-    if (Number.isNaN(parsed.getTime())) return '—';
+    if (Number.isNaN(parsed.getTime())) return '-';
     return dateTimeFormatter.format(parsed).replace(',', '');
 };
 
@@ -33,7 +33,7 @@ const statusLabel = (tipoEvento, status) => {
     if (tipoEvento === 'ASSUMIR_VAGO') return 'Assumiu turno vago';
     if (status === 'APROVADO') return 'Troca efetivada';
     if (status === 'RECUSADO_COLEGA') return 'Recusada pelo colega';
-    return status || '—';
+    return status || '-';
 };
 
 export default function ManagerTrocasPage() {
@@ -81,9 +81,9 @@ export default function ManagerTrocasPage() {
         <div className="animate-in fade-in zoom-in-95 duration-500">
             <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-3xl font-black text-white">Trocas e ciência</h2>
+                    <h2 className="text-3xl font-black text-white">Trocas e ciencia</h2>
                     <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                        Feed de ciência do gestor. As trocas entre médicos e os assumir de turno vago são processados automaticamente.
+                        Feed de ciencia do gestor. As trocas entre medicos e os assumir de turno vago sao processados automaticamente.
                     </p>
                 </div>
                 {units.length > 0 ? (
@@ -113,8 +113,8 @@ export default function ManagerTrocasPage() {
                 <p className="text-sm text-slate-500">A carregar...</p>
             ) : pedidos.length === 0 ? (
                 <div className="rounded-3xl border border-slate-800 bg-slate-950/40 px-6 py-16 text-center">
-                    <p className="text-lg font-bold text-slate-400">Nenhum evento para ciência</p>
-                    <p className="mt-2 text-sm text-slate-600">Quando houver trocas ou assumir de vago, os detalhes aparecerão aqui.</p>
+                    <p className="text-lg font-bold text-slate-400">Nenhum evento para ciencia</p>
+                    <p className="mt-2 text-sm text-slate-600">Quando houver trocas ou assumir de vago, os detalhes aparecerao aqui.</p>
                 </div>
             ) : (
                 <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/30">
@@ -132,7 +132,7 @@ export default function ManagerTrocasPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
                             {pedidos.map((p) => {
-                                const unidadeNome = p.unidades?.nome || '—';
+                                const unidadeNome = p.unidades?.nome || '-';
                                 const ehTroca = p.tipo_evento === 'TROCA';
                                 const badgeClass = ehTroca
                                     ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
@@ -145,14 +145,14 @@ export default function ManagerTrocasPage() {
                                             </span>
                                         </td>
                                         <td className="px-5 py-4 font-mono text-sm text-sky-300">{formatDisplayDate(p.data_plantao)}</td>
-                                        <td className="px-5 py-4 text-sm font-semibold text-slate-100">{p.turno || '—'}</td>
+                                        <td className="px-5 py-4 text-sm font-semibold text-slate-100">{p.turno || '-'}</td>
                                         <td className="px-5 py-4 text-sm text-slate-300">{unidadeNome}</td>
                                         <td className="px-5 py-4 text-sm text-slate-300">
                                             {ehTroca ? (
                                                 <>
                                                     <div>
-                                                        <span className="font-semibold text-white">{p.solicitante?.nome || '—'}</span> ?{' '}
-                                                        <span className="font-semibold text-white">{p.alvo?.nome || '—'}</span>
+                                                        <span className="font-semibold text-white">{p.solicitante?.nome || '-'}</span> {'->'}{' '}
+                                                        <span className="font-semibold text-white">{p.alvo?.nome || '-'}</span>
                                                     </div>
                                                     {p.data_plantao_oferecida ? (
                                                         <div className="mt-1 text-[10px] font-bold text-amber-300">
@@ -162,7 +162,7 @@ export default function ManagerTrocasPage() {
                                                 </>
                                             ) : (
                                                 <div>
-                                                    Médico: <span className="font-semibold text-white">{p.solicitante?.nome || '—'}</span>
+                                                    Medico: <span className="font-semibold text-white">{p.solicitante?.nome || '-'}</span>
                                                 </div>
                                             )}
                                         </td>

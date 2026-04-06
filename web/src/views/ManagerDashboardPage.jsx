@@ -54,8 +54,9 @@ const ChartTooltip = ({ active, payload, label }) => {
     );
 };
 
-export default function ManagerDashboardPage() {
+export default function ManagerDashboardPage({ embedded = false, sharedFilters = null }) {
     const { session } = useAuth();
+    const useSharedFilters = Boolean(embedded && sharedFilters);
     const now = useMemo(() => new Date(), []);
     const [selectedMonth, setSelectedMonth] = useState(() => String(now.getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState(() => String(now.getFullYear()));
@@ -76,7 +77,14 @@ export default function ManagerDashboardPage() {
         }
     });
 
-    const month = `${selectedYear}-${selectedMonth}`;
+    const effectiveMonth = useSharedFilters ? (sharedFilters?.month || selectedMonth) : selectedMonth;
+    const effectiveYear = useSharedFilters ? (sharedFilters?.year || selectedYear) : selectedYear;
+    const effectiveRegional = useSharedFilters ? (sharedFilters?.regional || '') : selectedRegional;
+    const sharedUnitIds = useMemo(
+        () => (useSharedFilters ? (sharedFilters?.unitIds || []).map((id) => String(id)).filter(Boolean) : []),
+        [useSharedFilters, sharedFilters?.unitIds]
+    );
+    const month = `${effectiveYear}-${effectiveMonth}`;
     const yearOptions = useMemo(() => {
         const current = now.getFullYear();
         const options = [];
@@ -85,21 +93,23 @@ export default function ManagerDashboardPage() {
     }, [now]);
 
     const visibleUnits = useMemo(() => {
-        const selectedRegionalValue = String(selectedRegional || '').trim();
+        const selectedRegionalValue = String(effectiveRegional || '').trim();
         if (!selectedRegionalValue) return units;
 
         const unidadesPorRegional = rawData?.filters?.unidadesPorRegional || {};
         const regionalKey = Object.keys(unidadesPorRegional).find((key) => normalizeText(key) === normalizeText(selectedRegionalValue));
         const allowedUnitNames = new Set((unidadesPorRegional[regionalKey] || []).map((name) => normalizeText(name)));
         return units.filter((unit) => allowedUnitNames.has(normalizeText(unit?.nome)));
-    }, [units, selectedRegional, rawData?.filters?.unidadesPorRegional]);
+    }, [units, effectiveRegional, rawData?.filters?.unidadesPorRegional]);
 
     // Filtramos os dados baseado na seleção (Single, All ou Comparison)
     const filteredData = useMemo(() => {
         if (!rawData.acceptedByQuinzena) return rawData;
 
         const isComparison = selectedUnit !== 'all';
-        const targetIds = isComparison ? [selectedUnit, ...comparisonUnits] : null;
+        const targetIds = useSharedFilters
+            ? (sharedUnitIds.length ? sharedUnitIds : null)
+            : (isComparison ? [selectedUnit, ...comparisonUnits] : null);
 
         const filterQuinzena = (list) => {
             if (!targetIds) return list;
@@ -128,7 +138,7 @@ export default function ManagerDashboardPage() {
             occupancyBreakdown,
             topDoctorsByUnit
         };
-    }, [rawData, selectedUnit, comparisonUnits]);
+    }, [rawData, selectedUnit, comparisonUnits, sharedUnitIds, useSharedFilters]);
 
     const totalAlocados = useMemo(
         () => (filteredData.acceptedByQuinzena?.q1 || []).reduce((sum, row) => sum + (row.totalOcupadas || 0), 0) +
@@ -150,6 +160,17 @@ export default function ManagerDashboardPage() {
     );
 
     useEffect(() => {
+        if (!useSharedFilters) return;
+        if (!sharedUnitIds.length) {
+            setSelectedUnit('all');
+            setComparisonUnits([]);
+            return;
+        }
+        setSelectedUnit(sharedUnitIds[0]);
+        setComparisonUnits(sharedUnitIds.slice(1));
+    }, [useSharedFilters, sharedUnitIds]);
+
+    useEffect(() => {
         const gestorId = session?.id;
         if (!gestorId) return;
 
@@ -160,9 +181,9 @@ export default function ManagerDashboardPage() {
             try {
                 // Se estiver comparando, SEMPRE pega 'all' para filtrar no front. 
                 // Se for single e sem comparação, pega apenas a unidade.
-                const needsAllData = selectedUnit === 'all' || comparisonUnits.length > 0;
+                const needsAllData = useSharedFilters ? true : (selectedUnit === 'all' || comparisonUnits.length > 0);
                 const unitQuery = !needsAllData ? `&unidadeId=${encodeURIComponent(selectedUnit)}` : '';
-                const regionalQuery = selectedRegional ? `&regional=${encodeURIComponent(selectedRegional)}` : '';
+                const regionalQuery = effectiveRegional ? `&regional=${encodeURIComponent(effectiveRegional)}` : '';
 
                 const response = await fetch(`/api/manager/dashboard-summary?month=${encodeURIComponent(month)}&gestorId=${encodeURIComponent(gestorId)}${regionalQuery}${unitQuery}`);
                 const payload = await readApiResponse(response);
@@ -178,7 +199,7 @@ export default function ManagerDashboardPage() {
         return () => {
             cancelled = true;
         };
-    }, [month, selectedRegional, selectedUnit, comparisonUnits.length > 0, session?.id]); // Recarrega se entrar no modo comparação
+    }, [month, effectiveRegional, selectedUnit, comparisonUnits.length > 0, session?.id, useSharedFilters]); // Recarrega se entrar no modo comparação
 
     useEffect(() => {
         const gestorId = session?.id;
@@ -227,6 +248,7 @@ export default function ManagerDashboardPage() {
                         <h2 className="mt-2 text-3xl font-black text-white md:text-4xl">Dashboards de Escala</h2>
                         <p className="mt-2 text-sm text-slate-300">Visão mensal de alocação e cobertura das escalas por unidade.</p>
                     </div>
+                    {!useSharedFilters ? (
                     <div className="grid w-full max-w-5xl gap-3 sm:grid-cols-4">
                         <div>
                             <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Mês</label>
@@ -293,6 +315,7 @@ export default function ManagerDashboardPage() {
                             </select>
                         </div>
                     </div>
+                    ) : null}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -315,7 +338,7 @@ export default function ManagerDashboardPage() {
                 </div>
 
                 {/* Submenu de Comparação BI */}
-                {selectedUnit !== 'all' && (
+                {!useSharedFilters && selectedUnit !== 'all' && (
                     <div className="mt-8 animate-in slide-in-from-top-4 duration-500">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="h-1 w-8 bg-sky-500 rounded-full" />

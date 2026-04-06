@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, CalendarRange, LayoutDashboard, FileText, LayoutTemplate, Ban, BrainCircuit } from 'lucide-react';
+import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, CalendarRange, LayoutDashboard, LayoutTemplate, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManagerAccess from '../components/Manager/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerCancelamentosPage from './ManagerCancelamentosPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
-import ManagerDashboardPage from './ManagerDashboardPage.jsx';
-import ManagerPredicaoPage from './ManagerPredicaoPage.jsx';
-import ManagerRelatoriosPage from './ManagerRelatoriosPage.jsx';
 import ManagerEscalaTemplatePage from './ManagerEscalaTemplatePage.jsx';
+import ManagerVisaoAnaliticaPage from './ManagerVisaoAnaliticaPage.jsx';
 import { readApiResponse } from '../utils/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
@@ -205,7 +203,7 @@ function GestorChrome() {
 
                 <nav className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-col">
                     <NavLink
-                        to="/gestor/dashboard"
+                        to="/gestor/visao-analitica"
                         className={({ isActive }) =>
                             `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                                 isActive
@@ -215,7 +213,7 @@ function GestorChrome() {
                         }
                     >
                         <LayoutDashboard size={18} />
-                        Dashboards
+                        Visão Analítica
                     </NavLink>
 
                     <NavLink
@@ -259,37 +257,6 @@ function GestorChrome() {
                         <LayoutTemplate size={18} />
                         Modelos de Escala
                     </NavLink>
-                    
-                    <NavLink
-                        to="/gestor/relatorios"
-                        className={({ isActive }) => 
-                            `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                isActive 
-                                    ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                            }`
-                        }
-                    >
-                        <FileText size={18} />
-                        Relatórios
-                    </NavLink>
-
-                    {isMaster && (
-                        <NavLink
-                            to="/gestor/predicao"
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                                    isActive
-                                        ? 'bg-sky-500/10 text-sky-300 border border-sky-400/20 shadow-[0_0_15px_rgba(56,189,248,0.1)]'
-                                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
-                                }`
-                            }
-                        >
-                            <BrainCircuit size={18} />
-                            Predição Analítica
-                        </NavLink>
-                    )}
-
                     {!isMaster && (
                         <NavLink
                             to="/gestor/trocas"
@@ -364,12 +331,13 @@ function GestorChrome() {
                 <div className="px-4 py-6 sm:px-6 lg:p-10">
                     <div className={mainInnerClass}>
                         <Routes>
-                            <Route path="dashboard" element={<ManagerDashboardPage />} />
+                            <Route path="visao-analitica" element={<ManagerVisaoAnaliticaPage />} />
+                            <Route path="dashboard" element={<Navigate to="/gestor/visao-analitica?aba=dashboard" replace />} />
                             <Route path="acessos" element={<ManagerAccess />} />
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
                             <Route path="escala-modelos" element={<ManagerEscalaTemplatePage />} />
-                            <Route path="relatorios" element={<ManagerRelatoriosPage />} />
-                            <Route path="predicao" element={isMaster ? <ManagerPredicaoPage /> : <Navigate to="/gestor/acessos" replace />} />
+                            <Route path="relatorios" element={<Navigate to="/gestor/visao-analitica?aba=relatorios" replace />} />
+                            <Route path="predicao" element={<Navigate to={isMaster ? "/gestor/visao-analitica?aba=predicao" : "/gestor/visao-analitica?aba=dashboard"} replace />} />
                             <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
                             <Route path="aceites-assumir" element={<Navigate to="/gestor/trocas" replace />} />
                             <Route
@@ -378,8 +346,8 @@ function GestorChrome() {
                             />
                             <Route path="calendario" element={<Navigate to="/gestor/acessos" replace />} />
                             <Route path="agenda" element={<Navigate to="/gestor/acessos" replace />} />
-                            <Route path="" element={<Navigate to="/gestor/dashboard" replace />} />
-                            <Route path="*" element={<Navigate to="/gestor/dashboard" replace />} />
+                            <Route path="" element={<Navigate to="/gestor/visao-analitica" replace />} />
+                            <Route path="*" element={<Navigate to="/gestor/visao-analitica" replace />} />
                         </Routes>
                     </div>
                 </div>
@@ -399,4 +367,3 @@ function GestorChrome() {
         </div>
     );
 }
-

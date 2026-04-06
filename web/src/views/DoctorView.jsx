@@ -111,13 +111,13 @@ const loadBookingConfigs = (doctorId) => {
 const buildBookingConfigLabel = (config) => {
     if (!config) return '';
     if (config.bookingType === 'PARCIAL') {
-        return `Parcial â€¢ ${config.startTime} às ${config.endTime}`;
+        return `Parcial • ${config.startTime} às ${config.endTime}`;
     }
     if (config.bookingType === 'FIXO') {
         if (config.fixedMode === 'PARCIAL') {
-            return `Fixo parcial â€¢ até ${formatDisplayDate(config.fixedEndDate)} â€¢ ${config.startTime} às ${config.endTime}`;
+            return `Fixo parcial • até ${formatDisplayDate(config.fixedEndDate)} • ${config.startTime} às ${config.endTime}`;
         }
-        return `Fixo completo â€¢ até ${formatDisplayDate(config.fixedEndDate)}`;
+        return `Fixo completo • até ${formatDisplayDate(config.fixedEndDate)}`;
     }
     return 'Completo';
 };
@@ -125,7 +125,7 @@ const buildBookingConfigLabel = (config) => {
 const buildEscalaBookingLabel = (escalaItem, fallbackConfig) => {
     if (escalaItem?.tipoPlantao === 'PARCIAL') {
         return escalaItem.horaInicio && escalaItem.horaFim
-            ? `Parcial â€¢ ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`
+            ? `Parcial • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`
             : 'Parcial';
     }
 
@@ -138,10 +138,10 @@ const buildEscalaBookingLabel = (escalaItem, fallbackConfig) => {
                   : 'Sequência fixa';
 
         if (escalaItem.horaInicio && escalaItem.horaFim) {
-            return `Fixo parcial â€¢ ${rangeLabel} â€¢ ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`;
+            return `Fixo parcial • ${rangeLabel} • ${escalaItem.horaInicio.slice(0, 5)} às ${escalaItem.horaFim.slice(0, 5)}`;
         }
 
-        return `Fixo completo â€¢ ${rangeLabel}`;
+        return `Fixo completo • ${rangeLabel}`;
     }
 
     return buildBookingConfigLabel(fallbackConfig) || 'Completo';
@@ -224,7 +224,7 @@ const ProfileModal = ({ doctor, pedidosTroca, onRefreshTrocas, onClose, onUpdate
                 body: JSON.stringify({ aceitar })
             });
             const data = await parseJsonSafely(response);
-            if (!response.ok) throw new Error(data?.error || data?.details || 'Nao foi possivel responder.');
+            if (!response.ok) throw new Error(data?.error || data?.details || 'Não foi possível responder.');
             await onRefreshTrocas?.();
         } catch (err) {
             setError(err.message);
@@ -436,7 +436,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
             });
             const data = await parseJsonSafely(response);
             if (!response.ok) {
-                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+                throw new Error(data?.error || data?.details || 'Não foi possível concluir o pedido.');
             }
             setConfirmAssumirOpen(false);
             setPedidoSucessoTipo('assumir');
@@ -463,13 +463,13 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
                     unidadeId,
                     data_plantao: date,
                     turno,
-                    colegaMedicoId: colegaParaTrocaId,
+                    colegaMédicoId: colegaParaTrocaId,
                     escalaOferecidaId: offeredShiftId || null
                 })
             });
             const data = await parseJsonSafely(response);
             if (!response.ok) {
-                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+                throw new Error(data?.error || data?.details || 'Não foi possível concluir o pedido.');
             }
             setConfirmTrocaOpen(false);
             setPedidoSucessoTipo('troca');
@@ -496,7 +496,7 @@ const ShiftDetailModal = ({ modal, unitNome, medicoId, bookedShiftIds, onClose, 
             });
             const data = await parseJsonSafely(response);
             if (!response.ok) {
-                throw new Error(data?.error || data?.details || 'Nao foi possivel concluir o pedido.');
+                throw new Error(data?.error || data?.details || 'Não foi possível concluir o pedido.');
             }
             setConfirmCancelarOpen(false);
             setPedidoSucessoTipo('cancelamento');
@@ -841,7 +841,7 @@ export default function DoctorView() {
 
         try {
             const queryUnit = unitId ? `&unitId=${unitId}` : '';
-            const response = await fetch(`/api/medicos/${doctorId}/calendario?month=${month}${queryUnit}`);
+            const response = await fetch(`/api/medicos/${doctorId}/calendário?month=${month}${queryUnit}`);
             const data = await parseJsonSafely(response);
 
             if (!response.ok) {
@@ -857,7 +857,7 @@ export default function DoctorView() {
                     logout();
                     return;
                 }
-                const msg = data?.details ? `${data.error} (${data.details})` : data?.error || 'Nao foi possivel carregar o calendario.';
+                const msg = data?.details ? `${data.error} (${data.details})` : data?.error || 'Não foi possível carregar o calendário.';
                 throw new Error(msg);
             }
 

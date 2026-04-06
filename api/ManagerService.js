@@ -525,9 +525,9 @@ export const updateDoctorProfileByManager = async (req, res) => {
             payload.unidadeFixaId = unidadeFixaId;
         }
         const updated = await dbModel.updateDoctorProfile(id, payload);
-        res.json({ message: 'Perfil do medico atualizado pelo gestor.', doctor: updated });
+        res.json({ message: 'Perfil do médico atualizado pelo gestor.', doctor: updated });
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao atualizar perfil do medico pelo gestor.', details: err.message });
+        res.status(500).json({ error: 'Erro ao atualizar perfil do médico pelo gestor.', details: err.message });
     }
 };
 
@@ -553,7 +553,7 @@ export const getAnalyticalPredictionData = async (req, res) => {
         const manager = await getScopedManager(req, res);
         if (!manager) return;
         if (!isMasterManager(manager)) {
-            return res.status(403).json({ error: 'Funcao disponivel apenas para gestor master.' });
+            return res.status(403).json({ error: 'Função disponível apenas para gestor master.' });
         }
 
         const unidadeIds = parseCsvIds(req.query?.unidadeIds);
@@ -564,16 +564,27 @@ export const getAnalyticalPredictionData = async (req, res) => {
             unidades = unidadeIds.map((id) => unitNameById.get(String(id))).filter(Boolean);
         }
 
+        const normalizeForPs = (value) =>
+            String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toLowerCase();
+        unidades = unidades.filter((name) => normalizeForPs(name).startsWith('ps '));
+
+        const unidadeQuery = typeof req.query?.unidade === 'string' ? req.query.unidade.trim() : '';
+        const unidadeSomentePs = normalizeForPs(unidadeQuery).startsWith('ps ') ? unidadeQuery : '';
+
         const payload = await getAnalyticalPredictionSnapshotV2({
             unidades,
-            unidade: typeof req.query?.unidade === 'string' ? req.query.unidade.trim() : '',
+            unidade: unidadeSomentePs,
             regional: typeof req.query?.regional === 'string' ? req.query.regional.trim() : '',
             turno: typeof req.query?.turno === 'string' ? req.query.turno.trim() : ''
         });
 
         res.json(payload);
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar predicao analitica.', details: err.message });
+        res.status(500).json({ error: 'Erro ao carregar predição analítica.', details: err.message });
     }
 };
 
@@ -582,13 +593,13 @@ export const postRecalculateAnalyticalPrediction = async (req, res) => {
         const manager = await getScopedManager(req, res);
         if (!manager) return;
         if (!isMasterManager(manager)) {
-            return res.status(403).json({ error: 'Funcao disponivel apenas para gestor master.' });
+            return res.status(403).json({ error: 'Função disponível apenas para gestor master.' });
         }
 
         const payload = await recalculateAnalyticalPredictionV2();
         res.json(payload);
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao recalcular predicao analitica.', details: err.message });
+        res.status(500).json({ error: 'Erro ao recalcular predição analítica.', details: err.message });
     }
 };
 
@@ -889,7 +900,7 @@ export const postDecidirAssumirGestor = async (req, res) => {
 
         if (aprovar) {
             await dbModel.aprovarPedidoAssumirGestorRpc(pedidoId);
-            res.json({ message: 'Pedido aprovado. O medico foi locado na escala.' });
+            res.json({ message: 'Pedido aprovado. O médico foi locado na escala.' });
         } else {
             await dbModel.recusarPedidoAssumirGestor(pedidoId);
             res.json({ message: 'Pedido de assumir recusado pelo gestor.' });
@@ -1049,7 +1060,7 @@ export const postEscalaLinha = async (req, res) => {
     const { unidadeId, medicoId, data_plantao, turno } = req.body ?? {};
 
     if (!unidadeId || !medicoId || !data_plantao || !turno) {
-        return res.status(400).json({ error: 'Campos obrigatorios: unidadeId, medicoId, data_plantao, turno.' });
+        return res.status(400).json({ error: 'Campos obrigatórios: unidadeId, medicoId, data_plantao, turno.' });
     }
 
     if (!TURNOS_ESCALA.has(turno)) {
@@ -1074,7 +1085,7 @@ export const postEscalaLinha = async (req, res) => {
         res.status(201).json({ id: row.id });
     } catch (err) {
         if (/duplicate|unique/i.test(err.message)) {
-            return res.status(409).json({ error: 'Este medico ja esta locado neste turno.' });
+            return res.status(409).json({ error: 'Este médico já está locado neste turno.' });
         }
         res.status(500).json({ error: 'Erro ao inserir linha na escala.', details: err.message });
     }
@@ -1105,7 +1116,7 @@ export const patchMoverEscalaLinha = async (req, res) => {
 
         const existingRow = await dbModel.getEscalaById(id);
         if (!existingRow || String(existingRow.unidade_id) !== String(unidadeId)) {
-            return res.status(404).json({ error: 'Linha da escala nao encontrada para esta unidade.' });
+            return res.status(404).json({ error: 'Linha da escala não encontrada para esta unidade.' });
         }
 
         await dbModel.moveEscalaRowById({
@@ -1129,11 +1140,11 @@ export const patchMoverEscalaLinha = async (req, res) => {
         });
         res.json({ ok: true });
     } catch (err) {
-        if (/linha nao encontrada|not found/i.test(err.message)) {
-            return res.status(404).json({ error: 'Linha da escala nao encontrada para esta unidade.' });
+        if (/linha não encontrada|not found/i.test(err.message)) {
+            return res.status(404).json({ error: 'Linha da escala não encontrada para esta unidade.' });
         }
         if (/duplicate|unique/i.test(err.message)) {
-            return res.status(409).json({ error: 'Este medico ja esta locado no destino selecionado.' });
+            return res.status(409).json({ error: 'Este médico já está locado no destino selecionado.' });
         }
         res.status(500).json({ error: 'Erro ao mover linha na escala.', details: err.message });
     }

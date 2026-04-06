@@ -47,8 +47,9 @@ const normalizeText = (value) =>
 const areSameIds = (left = [], right = []) =>
     left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
 
-export default function ManagerRelatoriosPage() {
+export default function ManagerRelatoriosPage({ embedded = false, sharedFilters = null }) {
     const { session } = useAuth();
+    const useSharedFilters = Boolean(embedded && sharedFilters);
     const [activeTab, setActiveTab] = useState('efetividade'); 
     const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
@@ -91,7 +92,7 @@ export default function ManagerRelatoriosPage() {
             const data = await readApiResponse(resp);
             const unitList = Array.isArray(data) ? data : [];
             setUnits(unitList);
-            if (session.isMaster && selectedUnitIds.length === 0) {
+            if (session.isMaster && !useSharedFilters && selectedUnitIds.length === 0) {
                 setSelectedUnitIds(unitList.map((u) => String(u.id)));
             }
         } catch (err) {
@@ -127,6 +128,17 @@ export default function ManagerRelatoriosPage() {
         }
     };
 
+    useEffect(() => {
+        if (!useSharedFilters) return;
+        const unitIds = (sharedFilters?.unitIds || []).map((id) => String(id)).filter(Boolean);
+        setSelectedMonth(sharedFilters?.month || selectedMonth);
+        setSelectedYear(sharedFilters?.year || selectedYear);
+        setSelectedRegional(sharedFilters?.regional || '');
+        setSelectedTurno(sharedFilters?.turno && sharedFilters.turno !== 'TOTAL' ? sharedFilters.turno : 'ALL');
+        setSelectedUnitIds(unitIds);
+        if (unitIds[0]) setSelectedUnit(unitIds[0]);
+    }, [useSharedFilters, sharedFilters?.month, sharedFilters?.year, sharedFilters?.regional, sharedFilters?.turno, sharedFilters?.unitIds]);
+
     useEffect(() => { fetchUnits(); }, []);
     useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit, selectedUnitIds, selectedRegional, selectedTurno]);
 
@@ -138,6 +150,7 @@ export default function ManagerRelatoriosPage() {
     };
 
     useEffect(() => {
+        if (useSharedFilters) return;
         if (!session.isMaster) return;
         const allowedIds = new Set((visibleUnits || []).map((u) => String(u.id)));
         setSelectedUnitIds((current) => {
@@ -149,7 +162,7 @@ export default function ManagerRelatoriosPage() {
             const next = kept.length > 0 ? kept : (visibleUnits || []).map((u) => String(u.id));
             return areSameIds(current, next) ? current : next;
         });
-    }, [visibleUnits, session.isMaster, selectedRegional, units]);
+    }, [visibleUnits, session.isMaster, selectedRegional, units, useSharedFilters]);
 
     const handleGenerateProfessionalReport = () => {
         if (!reportData) return;
@@ -407,7 +420,7 @@ export default function ManagerRelatoriosPage() {
                     </div>
 
                     <div className="flex flex-wrap items-end gap-4 lg:gap-6">
-                        <div className="space-y-2">
+                        <div className={useSharedFilters ? 'hidden' : 'space-y-2'}>
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
                                 <CalendarDays size={12} className="text-blue-400" />
                                 Período Referência
@@ -430,7 +443,7 @@ export default function ManagerRelatoriosPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className={useSharedFilters ? 'hidden' : 'space-y-2'}>
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
                                 <Filter size={12} className="text-sky-400" />
                                 Regional
@@ -449,7 +462,7 @@ export default function ManagerRelatoriosPage() {
                             </select>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className={useSharedFilters ? 'hidden' : 'space-y-2'}>
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
                                 <CalendarDays size={12} className="text-amber-400" />
                                 Turno
@@ -468,7 +481,7 @@ export default function ManagerRelatoriosPage() {
                             </select>
                         </div>
 
-                        {!session.isMaster ? (
+                        {!session.isMaster && !useSharedFilters ? (
                             <div className="w-full space-y-2 lg:w-64">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Unidade Foco</label>
                                 <select
@@ -493,7 +506,7 @@ export default function ManagerRelatoriosPage() {
                     </div>
                 </div>
 
-                {session.isMaster ? (
+                {session.isMaster && !useSharedFilters ? (
                     <div className="mt-6 rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <div className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Comparação multiunidade</div>

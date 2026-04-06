@@ -45,7 +45,7 @@ const filterCurrentAndFutureShifts = (shifts, referenceDate = new Date()) => {
 const mapShiftForClient = (shift) => ({
     id: shift.id,
     unidadeId: shift.unidade_id,
-    local: shift.unidades?.nome ?? 'Unidade nao informada',
+    local: shift.unidades?.nome ?? 'Unidade não informada',
     data: shift.data_plantao,
     turno: shift.turno,
     vagas: Math.max(shift.vagas_totais - shift.vagas_ocupadas, 0),
@@ -106,7 +106,7 @@ const buildShiftsFromEscalaRows = (rows, doctorEspecialidade) => {
 const mapDoctorForClient = (doctor) => {
     const baseUnit = {
         id: doctor.unidade_fixa_id,
-        nome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        nome: doctor.unidades?.nome ?? 'Unidade não informada',
         tipo: 'BASE'
     };
 
@@ -128,7 +128,7 @@ const mapDoctorForClient = (doctor) => {
         telefone: doctor.telefone,
         especialidade: doctor.especialidade,
         unidadeFixaId: doctor.unidade_fixa_id,
-        unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade nao informada',
+        unidadeFixaNome: doctor.unidades?.nome ?? 'Unidade não informada',
         unidadesAutorizadas: allAuthorized
     };
 };
@@ -158,10 +158,11 @@ export const getPublicShifts = async (req, res) => {
 
 export const getDoctors = async (req, res) => {
     try {
+        await dbModel.ensureManagersPerUnit();
         const doctors = await dbModel.getDoctors();
         res.json(doctors.map(mapDoctorForClient));
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar medicos.', details: err.message });
+        res.status(500).json({ error: 'Erro ao carregar médicos.', details: err.message });
     }
 };
 
@@ -174,7 +175,7 @@ export const getDoctorCalendar = async (req, res) => {
         const doctor = await dbModel.getDoctorById(medicoId);
 
         if (!doctor) {
-            return res.status(404).json({ error: 'Medico nao encontrado.' });
+            return res.status(404).json({ error: 'Médico não encontrado.' });
         }
 
         const mappedDoctor = mapDoctorForClient(doctor);
@@ -252,7 +253,7 @@ export const getDoctorCalendar = async (req, res) => {
             motivoOcultacao: null
         });
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar calendario do medico.', details: err.message });
+        res.status(500).json({ error: 'Erro ao carregar calendário do medico.', details: err.message });
     }
 };
 
@@ -263,7 +264,7 @@ export const getDoctorAgenda = async (req, res) => {
         const doctor = await dbModel.getDoctorById(medicoId);
         if (!doctor) return res.status(404).json({ error: 'Médico não encontrado.' });
 
-        const escalaLinhas = await dbModel.getEscalaAgendaForMedico(medicoId);
+        const escalaLinhas = await dbModel.getEscalaAgendaForMédico(medicoId);
 
         const mappedAgenda = (escalaLinhas || [])
             .map((row) => ({
@@ -309,10 +310,10 @@ export const postAssumirEscala = async (req, res) => {
 
         const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
         if (!resolved) {
-            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+            return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.includes(medicoId)) {
             return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
         }
@@ -352,10 +353,10 @@ export const postPedidoAssumirEscala = async (req, res) => {
 
         const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
         if (!resolved) {
-            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+            return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.includes(medicoId)) {
             return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
         }
@@ -394,16 +395,16 @@ export const postPedidoAssumirEscala = async (req, res) => {
 
 export const postPedidoTrocaEscala = async (req, res) => {
     const { medicoId } = req.params;
-    const { unidadeId, data_plantao, turno, colegaMedicoId, escalaOferecidaId } = req.body ?? {};
+    const { unidadeId, data_plantao, turno, colegaMédicoId, escalaOferecidaId } = req.body ?? {};
 
     try {
         if (!unidadeId || !data_plantao || !turno) {
             return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
         }
-        if (!colegaMedicoId) {
+        if (!colegaMédicoId) {
             return res.status(400).json({ error: 'Selecione o colega para a troca de plantao.' });
         }
-        if (colegaMedicoId === medicoId) {
+        if (colegaMédicoId === medicoId) {
             return res.status(400).json({ error: 'Selecione um colega diferente de voce.' });
         }
         if (!TURNOS_ESCALA.has(turno)) {
@@ -412,23 +413,23 @@ export const postPedidoTrocaEscala = async (req, res) => {
 
         const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
         if (!resolved) {
-            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+            return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.length === 0) {
             return res.status(400).json({ error: 'Turno vazio na escala. Use Assumir.' });
         }
         if (present.includes(medicoId)) {
             return res.status(400).json({ error: 'Voce ja esta neste turno.' });
         }
-        if (!present.includes(colegaMedicoId)) {
-            return res.status(400).json({ error: 'O colega indicado nao esta locado neste turno.' });
+        if (!present.includes(colegaMédicoId)) {
+            return res.status(400).json({ error: 'O colega indicado não está locado neste turno.' });
         }
 
-        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, colegaMedicoId);
+        const escalaLinha = await dbModel.getEscalaRowIdForMédicoSlot(unidadeId, data_plantao, turno, colegaMédicoId);
         if (!escalaLinha?.id) {
-            return res.status(400).json({ error: 'Linha da escala do colega nao encontrada.' });
+            return res.status(400).json({ error: 'Linha da escala do colega não encontrada.' });
         }
 
         let escalaLinhaOferecida = null;
@@ -445,7 +446,7 @@ export const postPedidoTrocaEscala = async (req, res) => {
                 dataPlantao: data_plantao,
                 turno,
                 solicitanteId: medicoId,
-                alvoId: colegaMedicoId,
+                alvoId: colegaMédicoId,
                 escalaAlvoId: escalaLinha.id,
                 escalaOferecidaId: escalaLinhaOferecida ? escalaLinhaOferecida.id : null,
                 dataPlantaoOferecida: escalaLinhaOferecida ? escalaLinhaOferecida.data_plantao : null,
@@ -482,12 +483,12 @@ export const postPedidoCancelamento = async (req, res) => {
 
         const resolved = await resolveDoctorAuthorizedUnit(medicoId, unidadeId);
         if (!resolved) {
-            return res.status(403).json({ error: 'Medico nao encontrado ou sem permissao nesta unidade.' });
+            return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId);
+        const escalaLinha = await dbModel.getEscalaRowIdForMédicoSlot(unidadeId, data_plantao, turno, medicoId);
         if (!escalaLinha?.id) {
-            return res.status(400).json({ error: 'Voce nao esta locado num turno correspondente na escala desta unidade.' });
+            return res.status(400).json({ error: 'Você não está locado num turno correspondente na escala desta unidade.' });
         }
 
         try {
@@ -521,10 +522,10 @@ export const getDoctorTrocas = async (req, res) => {
     try {
         const doctor = await dbModel.getDoctorById(medicoId);
         if (!doctor) {
-            return res.status(404).json({ error: 'Medico nao encontrado.' });
+            return res.status(404).json({ error: 'Médico não encontrado.' });
         }
 
-        const pedidos = await dbModel.listPedidosTrocaPorMedico(medicoId);
+        const pedidos = await dbModel.listPedidosTrocaPorMédico(medicoId);
         const pendentesColega = await dbModel.countPedidosTrocaAguardandoColega(medicoId);
 
         res.json({
@@ -547,7 +548,7 @@ export const postResponderTrocaColega = async (req, res) => {
 
         const pedidoAtual = await dbModel.getPedidoTrocaById(pedidoId);
         if (!pedidoAtual) {
-            return res.status(404).json({ error: 'Pedido nao encontrado.' });
+            return res.status(404).json({ error: 'Pedido não encontrado.' });
         }
         if (pedidoAtual.medico_alvo_id !== medicoId) {
             return res.status(403).json({ error: 'Apenas o colega indicado pode responder a este pedido.' });
@@ -562,7 +563,7 @@ export const postResponderTrocaColega = async (req, res) => {
             message: aceitar ? 'Colega aceitou. Troca efetivada automaticamente.' : 'Pedido recusado pelo colega.'
         });
     } catch (err) {
-        const status = /nao encontrado|nao esta|Apenas o colega/i.test(err.message) ? 403 : 400;
+        const status = /não encontrado|não está|Apenas o colega/i.test(err.message) ? 403 : 400;
         res.status(status).json({ error: err.message });
     }
 };
@@ -607,17 +608,17 @@ export const holdShift = async (req, res) => {
 
     try {
         if (!medicoId) {
-            return res.status(400).json({ error: 'Selecione um medico para iniciar a reserva.' });
+            return res.status(400).json({ error: 'Selecione um médico para iniciar a reserva.' });
         }
 
         const shift = await dbModel.getShiftById(id);
 
         if (!shift) {
-            return res.status(404).json({ error: 'Plantao nao encontrado.' });
+            return res.status(404).json({ error: 'Plantão não encontrado.' });
         }
 
         if (shift.status !== 'ABERTO' || shift.vagas_ocupadas >= shift.vagas_totais) {
-            return res.status(409).json({ error: 'Plantao indisponivel para confirmacao.' });
+            return res.status(409).json({ error: 'Plantão indisponível para confirmação.' });
         }
 
         const hold = await dbModel.acquireShiftHold(id, medicoId);
@@ -632,11 +633,11 @@ export const holdShift = async (req, res) => {
     } catch (err) {
         if (isReservationHoldTableMissing(err.message)) {
             return res.status(503).json({
-                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+                error: 'A fila temporária de reserva ainda não foi criada no banco. Rode a migração de reserva_holds no Supabase.'
             });
         }
 
-        const statusCode = /confirmacao por outro medico|nao encontrado|indisponivel/i.test(err.message) ? 409 : 500;
+        const statusCode = /confirmação por outro médico|não encontrado|indisponível/i.test(err.message) ? 409 : 500;
         res.status(statusCode).json({ error: err.message });
     }
 };
@@ -647,7 +648,7 @@ export const releaseShiftHold = async (req, res) => {
 
     try {
         if (!medicoId) {
-            return res.status(400).json({ error: 'Selecione um medico para liberar a reserva.' });
+            return res.status(400).json({ error: 'Selecione um médico para liberar a reserva.' });
         }
 
         await dbModel.releaseShiftHold(id, medicoId);
@@ -658,7 +659,7 @@ export const releaseShiftHold = async (req, res) => {
     } catch (err) {
         if (isReservationHoldTableMissing(err.message)) {
             return res.status(503).json({
-                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+                error: 'A fila temporária de reserva ainda não foi criada no banco. Rode a migração de reserva_holds no Supabase.'
             });
         }
 
@@ -672,7 +673,7 @@ export const selectShift = async (req, res) => {
 
     try {
         if (!medicoId) {
-            return res.status(400).json({ error: 'Selecione um medico para reservar o plantao.' });
+            return res.status(400).json({ error: 'Selecione um médico para reservar o plantão.' });
         }
 
         const updatedShift = await dbModel.reserveShift(id, medicoId, {
@@ -686,17 +687,17 @@ export const selectShift = async (req, res) => {
         cacheModel.delete(PUBLIC_SHIFTS_CACHE_KEY);
 
         res.json({
-            message: 'Plantao reservado com sucesso.',
+            message: 'Plantão reservado com sucesso.',
             selectedShift: mapShiftForClient(updatedShift)
         });
     } catch (err) {
         if (isReservationHoldTableMissing(err.message)) {
             return res.status(503).json({
-                error: 'A fila temporaria de reserva ainda nao foi criada no banco. Rode a migracao de reserva_holds no Supabase.'
+                error: 'A fila temporária de reserva ainda não foi criada no banco. Rode a migração de reserva_holds no Supabase.'
             });
         }
 
-        const statusCode = /CONFLITO|nao encontrado|indisponivel|sem vagas|ja reservou|confirmacao expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
+        const statusCode = /CONFLITO|não encontrado|indisponível|sem vagas|já reservou|confirmação expirou|repassada|TEMPO EXCEDIDO/i.test(err.message) ? 409 : 500;
         res.status(statusCode).json({ error: err.message });
     }
 };

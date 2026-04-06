@@ -81,7 +81,7 @@ export default function ManagerEscalaEditorPage() {
     const [doctors, setDoctors] = useState([]);
     const [doctorsLoading, setDoctorsLoading] = useState(false);
     const [addSlotModal, setAddSlotModal] = useState(null);
-    const [modalMedicoId, setModalMedicoId] = useState('');
+    const [modalMédicoId, setModalMédicoId] = useState('');
     const [modalError, setModalError] = useState('');
     const [templates, setTemplates] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -218,7 +218,7 @@ export default function ManagerEscalaEditorPage() {
             const mesKey = date.slice(0, 7);
             setExpanded((prev) => ({ ...prev, [mesKey]: true }));
             setAddSlotModal(null);
-            setModalMedicoId('');
+            setModalMédicoId('');
             setModalError('');
             await loadEditor({ preserveUi: true });
             window.requestAnimationFrame(() => {
@@ -237,7 +237,7 @@ export default function ManagerEscalaEditorPage() {
 
     const confirmAddFromModal = async () => {
         if (!addSlotModal) return;
-        if (!modalMedicoId) {
+        if (!modalMédicoId) {
             setModalError('Escolha um médico na lista antes de confirmar.');
             return;
         }
@@ -245,13 +245,13 @@ export default function ManagerEscalaEditorPage() {
             setModalError('Selecione uma unidade acima.');
             return;
         }
-        await addLinha(addSlotModal.date, addSlotModal.turno, modalMedicoId);
+        await addLinha(addSlotModal.date, addSlotModal.turno, modalMédicoId);
     };
 
-    const openAddMedicoModal = (date, turno) => {
+    const openAddMédicoModal = (date, turno) => {
         setError('');
         setModalError('');
-        setModalMedicoId('');
+        setModalMédicoId('');
         setAddSlotModal({ date, turno });
     };
 
@@ -262,7 +262,7 @@ export default function ManagerEscalaEditorPage() {
         }
         const payload = {
             rowId: row.id,
-            medicoNome: row.medicos?.nome ?? 'Medico',
+            medicoNome: row.medicos?.nome ?? 'Médico',
             originDate,
             originTurno
         };
@@ -313,7 +313,7 @@ export default function ManagerEscalaEditorPage() {
         setMoveTurnoDestino(turno);
         setMoveModal({
             rowId: payload.rowId,
-            medicoNome: payload.medicoNome ?? 'Medico',
+            medicoNome: payload.medicoNome ?? 'Médico',
             originDate: payload.originDate,
             originTurno: payload.originTurno,
             destinationDate: date,
@@ -874,7 +874,7 @@ export default function ManagerEscalaEditorPage() {
                                                                             <button
                                                                                 type="button"
                                                                                 disabled={Boolean(busyKey)}
-                                                                                onClick={() => openAddMedicoModal(entry.date, turno)}
+                                                                                onClick={() => openAddMédicoModal(entry.date, turno)}
                                                                                 className="text-[10px] font-bold text-sky-400 hover:text-sky-300 disabled:opacity-40"
                                                                             >
                                                                                 Adicionar
@@ -1046,9 +1046,9 @@ export default function ManagerEscalaEditorPage() {
 
                         <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-500">Médico</label>
                         <select
-                            value={modalMedicoId}
+                            value={modalMédicoId}
                             onChange={(e) => {
-                                setModalMedicoId(e.target.value);
+                                setModalMédicoId(e.target.value);
                                 setModalError('');
                             }}
                             disabled={Boolean(busyKey) || doctorsLoading}
@@ -1078,7 +1078,7 @@ export default function ManagerEscalaEditorPage() {
                             </button>
                             <button
                                 type="button"
-                                disabled={Boolean(busyKey) || !modalMedicoId || doctors.length === 0}
+                                disabled={Boolean(busyKey) || !modalMédicoId || doctors.length === 0}
                                 onClick={confirmAddFromModal}
                                 className="flex-1 rounded-2xl bg-sky-500 py-3 text-sm font-black text-slate-950 hover:bg-sky-400 disabled:opacity-50"
                             >

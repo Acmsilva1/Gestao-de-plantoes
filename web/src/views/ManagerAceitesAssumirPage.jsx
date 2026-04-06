@@ -39,7 +39,7 @@ export default function ManagerAceitesAssumirPage() {
                 : `?gestorId=${encodeURIComponent(gestorId)}`;
             const r = await fetch(`/api/manager/assumir-pendentes${q}`);
             const data = await readApiResponse(r);
-            if (!r.ok) throw new Error(data.error || data.details || 'Nao foi possivel carregar.');
+            if (!r.ok) throw new Error(data.error || data.details || 'Não foi possível carregar.');
             setPedidos(data.pedidos || []);
         } catch (e) {
             setError(e.message);

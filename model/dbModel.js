@@ -64,6 +64,30 @@ const buildDoctorUsernameBase = (fullName) => {
     return `${first}.${last}`;
 };
 
+const PRODUCTION_UNITS_CATALOG = [
+    'UTI Vitória - ES',
+    'PS Vitória - ES',
+    'ENFERMARIA Vitória - ES',
+    'PS Vila Velha - ES',
+    'PS Campo grande - RJ',
+    'PS Botafogo - RS',
+    'PS Barra da Tijuca - RJ',
+    'PS Vitural - Web',
+    'Anestesista MG',
+    'PS Taguatinga - DF',
+    'PS Sig - DF',
+    'PS Pampulha - MG'
+];
+
+const normalizeCatalogName = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+
+const isPsUnitName = (value) => normalizeCatalogName(value).startsWith('ps ');
+
 export const dbModel = {
     async getUnits() {
         const response = await supabase.from('unidades').select('id, nome, endereco').order('nome', { ascending: true });
@@ -77,6 +101,72 @@ export const dbModel = {
             .maybeSingle();
 
         return unwrap(response, 'Falha ao carregar unidade');
+    },
+    async ensureProductionCatalogProfiles() {
+        const existingUnits = await this.getUnits();
+        const byNormalizedName = new Map((existingUnits || []).map((unit) => [normalizeCatalogName(unit.nome), unit]));
+
+        const unitsToInsert = PRODUCTION_UNITS_CATALOG
+            .filter((name) => !byNormalizedName.has(normalizeCatalogName(name)))
+            .map((name) => ({
+                nome: name,
+                endereco: null
+            }));
+
+        if (unitsToInsert.length > 0) {
+            const insertUnitsResp = await supabase.from('unidades').insert(unitsToInsert);
+            unwrap(insertUnitsResp, 'Falha ao criar unidades do catalogo de producao');
+        }
+
+        const allUnits = await this.getUnits();
+        const targetUnits = (allUnits || []).filter((unit) =>
+            PRODUCTION_UNITS_CATALOG.some((name) => normalizeCatalogName(name) === normalizeCatalogName(unit.nome))
+        );
+        if (!targetUnits.length) return;
+
+        const targetUnitIds = targetUnits.map((unit) => unit.id);
+        const doctorsByUnitResp = await supabase
+            .from('medicos')
+            .select('id, unidade_fixa_id')
+            .in('unidade_fixa_id', targetUnitIds);
+        const doctorsByUnit = unwrap(doctorsByUnitResp, 'Falha ao mapear medicos do catalogo de producao');
+        const unitIdsWithDoctor = new Set((doctorsByUnit || []).map((doctor) => String(doctor.unidade_fixa_id)).filter(Boolean));
+
+        for (let index = 0; index < targetUnits.length; index += 1) {
+            const unit = targetUnits[index];
+            if (unitIdsWithDoctor.has(String(unit.id))) continue;
+
+            const unitSlug = normalizeLabelToSlug(unit.nome);
+            const defaultUser = `medico.${unitSlug}.${String(index + 1).padStart(2, '0')}`;
+            const defaultName = `Médico ${unit.nome}`;
+            const specialty = isPsUnitName(unit.nome) ? 'Plantonista PS' : 'Clínico';
+            const crmBase = `AUTO${String(index + 1).padStart(3, '0')}${String(unit.id || '').slice(0, 4).toUpperCase()}`;
+
+            let crmCandidate = crmBase;
+            let attempt = 0;
+            while (attempt < 20) {
+                const existingDoctor = await this.getDoctorByCrm(crmCandidate);
+                if (!existingDoctor) break;
+                attempt += 1;
+                crmCandidate = `${crmBase}${attempt}`;
+            }
+
+            const doctor = await this.createDoctor({
+                nome: defaultName,
+                usuario: defaultUser,
+                crm: crmCandidate,
+                especialidade: specialty,
+                unidadeFixaId: unit.id,
+                telefone: '',
+                senha: '12345'
+            });
+
+            const accessResp = await supabase.from('medico_acessos_unidade').upsert(
+                [{ medico_id: doctor.id, unidade_id: unit.id }],
+                { onConflict: 'medico_id,unidade_id' }
+            );
+            unwrap(accessResp, 'Falha ao garantir acesso base do medico na unidade');
+        }
     },
     async getDoctors() {
         const response = await supabase
@@ -1269,6 +1359,8 @@ export const dbModel = {
         return unwrap(response, 'Falha ao listar gestores');
     },
     async ensureManagersPerUnit() {
+        await this.ensureProductionCatalogProfiles();
+
         const units = await this.getUnits();
         if (!units?.length) return [];
 

@@ -27,6 +27,19 @@ function gestorSelectLabel(p) {
     return nome || user || String(p.id ?? '');
 }
 
+function medicoSelectLabel(p) {
+    const nome = (p.nome ?? '').trim();
+    const crm = (p.crm ?? '').trim();
+    const especialidade = (p.especialidade ?? '').trim();
+    const unidade =
+        (p.unidadeFixaNome ?? '').trim() ||
+        ((Array.isArray(p.unidadesAutorizadas) && p.unidadesAutorizadas[0]?.nome) ? String(p.unidadesAutorizadas[0].nome).trim() : '');
+
+    const left = [nome, crm ? `CRM ${crm}` : null].filter(Boolean).join(' - ');
+    const right = [unidade || 'Unidade nao informada', especialidade || 'Sem especialidade'].join(' | ');
+    return `${left} (${right})`;
+}
+
 export default function LoginView() {
     const { login } = useAuth();
     const navigate = useNavigate();
@@ -212,7 +225,7 @@ export default function LoginView() {
                             >
                                 {medicoList.map((p) => (
                                     <option key={p.id} value={p.id}>
-                                        {p.nome} — {p.crm} ({p.especialidade})
+                                        {medicoSelectLabel(p)}
                                     </option>
                                 ))}
                             </select>
@@ -291,3 +304,4 @@ export default function LoginView() {
         </div>
     );
 }
+

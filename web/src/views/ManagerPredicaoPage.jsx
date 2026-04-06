@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
     AlertCircle, 
     BrainCircuit, 
@@ -58,9 +58,10 @@ const normalizeText = (value) =>
 const areSameIds = (left = [], right = []) =>
     left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
 
-export default function ManagerPredicaoPage() {
+export default function ManagerPredicaoPage({ embedded = false, sharedFilters = null }) {
     const { session } = useAuth();
     const isMaster = Boolean(session?.isMaster || session?.perfil === 'GESTOR_MASTER');
+    const useSharedFilters = Boolean(embedded && sharedFilters);
     const [units, setUnits] = useState([]);
     const [selectedUnitIds, setSelectedUnitIds] = useState([]);
     const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -111,6 +112,20 @@ export default function ManagerPredicaoPage() {
         return arr;
     }, []);
 
+    useEffect(() => {
+        if (!useSharedFilters) return;
+        const unitIds = (sharedFilters?.unitIds || []).map((id) => String(id)).filter(Boolean);
+        setSelectedMonth(sharedFilters?.month || selectedMonth);
+        setSelectedYear(sharedFilters?.year || selectedYear);
+        setSelectedUnitIds(unitIds);
+        setFilters((current) => ({
+            ...current,
+            regional: sharedFilters?.regional || '',
+            turno: sharedFilters?.turno || 'TOTAL',
+            unidade: unitIds.length === 1 ? String(unitIds[0]) : ''
+        }));
+    }, [useSharedFilters, sharedFilters?.month, sharedFilters?.year, sharedFilters?.regional, sharedFilters?.turno, sharedFilters?.unitIds]);
+
     const queryString = useMemo(() => {
         const params = new URLSearchParams();
         params.set('gestorId', session?.id || '');
@@ -139,6 +154,7 @@ export default function ManagerPredicaoPage() {
     }, [units, filters.regional, data?.filters?.unidadesPorRegional]);
 
     useEffect(() => {
+        if (useSharedFilters) return;
         const visibleIds = new Set((visibleUnits || []).map((u) => String(u.id)));
         setSelectedUnitIds((current) => {
             if (filters.unidade) {
@@ -153,15 +169,16 @@ export default function ManagerPredicaoPage() {
             const next = kept.length > 0 ? kept : (visibleUnits || []).map((u) => String(u.id));
             return areSameIds(current, next) ? current : next;
         });
-    }, [visibleUnits, filters.regional, filters.unidade, units]);
+    }, [visibleUnits, filters.regional, filters.unidade, units, useSharedFilters]);
 
     useEffect(() => {
+        if (useSharedFilters) return;
         if (!filters.unidade) return;
         const existsInVisible = (visibleUnits || []).some((u) => String(u.id) === String(filters.unidade));
         if (!existsInVisible) {
             setFilters((current) => ({ ...current, unidade: '' }));
         }
-    }, [filters.unidade, visibleUnits]);
+    }, [filters.unidade, visibleUnits, useSharedFilters]);
 
     const displayedRows = useMemo(() => {
         if (filters.turno !== 'TOTAL') {
@@ -224,7 +241,7 @@ export default function ManagerPredicaoPage() {
     }, [scopedRows]);
 
     const fetchPrediction = async () => {
-        const response = await fetch(`/api/manager/predicao-analitica?${queryString}`);
+        const response = await fetch(`/api/manager/predição-analítica?${queryString}`);
         const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar predição analítica.');
         setData(payload);
@@ -295,7 +312,7 @@ export default function ManagerPredicaoPage() {
                     <div class="text-[11px] font-black uppercase tracking-[0.45em] text-sky-300">Gestor Master</div>
                     <h1 class="mt-3 text-4xl font-black tracking-tight lg:text-5xl">Predicao Analitica</h1>
                     <p class="mt-3 max-w-3xl text-sm text-slate-300">
-                        Relatorio gerado a partir da visao atual do modulo, respeitando unidade, regional e turno selecionados.
+                        Relatorio gerado a partir da visao atual do módulo, respeitando unidade, regional e turno selecionados.
                     </p>
                 </div>
                 <div class="rounded-[1.5rem] border border-white/10 bg-white/5 px-5 py-4 text-right">
@@ -353,7 +370,7 @@ export default function ManagerPredicaoPage() {
                     ${escapeHtml(
                         filters.turno === 'TOTAL'
                             ? 'Visao consolidada por dia com base no filtro atual.'
-                            : 'Detalhamento do turno selecionado no modulo de predicao.'
+                            : 'Detalhamento do turno selecionado no módulo de predição.'
                     )}
                 </p>
             </div>
@@ -431,7 +448,7 @@ export default function ManagerPredicaoPage() {
             setLoading(true);
             setError('');
             try {
-                const response = await fetch(`/api/manager/predicao-analitica?${queryString}`);
+                const response = await fetch(`/api/manager/predição-analítica?${queryString}`);
                 const payload = await readApiResponse(response);
                 if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar predição analítica.');
                 if (!cancelled) setData(payload);
@@ -451,7 +468,7 @@ export default function ManagerPredicaoPage() {
         setRecalculating(true);
         setError('');
         try {
-            const response = await fetch('/api/manager/predicao-analitica/recalcular', {
+            const response = await fetch('/api/manager/predição-analítica/recalcular', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gestorId: session.id })
@@ -516,6 +533,7 @@ export default function ManagerPredicaoPage() {
                     </div>
                 </div>
 
+                {!useSharedFilters ? (
                 <div className="mt-5 grid gap-4 md:grid-cols-3">
                     <div>
                         <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Mês</label>
@@ -548,6 +566,7 @@ export default function ManagerPredicaoPage() {
                         </div>
                     </div>
                 </div>
+                ) : null}
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
@@ -600,6 +619,7 @@ export default function ManagerPredicaoPage() {
                 </div>
             </section>
 
+            {!useSharedFilters ? (
             <section className={cardClass}>
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -705,6 +725,7 @@ export default function ManagerPredicaoPage() {
                     </div>
                 </div>
             </section>
+            ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
                 <section className={cardClass}>
@@ -787,7 +808,7 @@ export default function ManagerPredicaoPage() {
                         <p className="text-sm text-slate-400">
                             {filters.turno === 'TOTAL'
                                 ? 'Visão inicial consolidada por dia. Use o filtro de turno para ver o detalhamento.'
-                                : 'Detalhamento do turno selecionado com dados persistidos em `dados_predicao`.'}
+                                : 'Detalhamento do turno selecionado com dados persistidos em `dados_predição`.'}
                         </p>
                     </div>
                     <div className="text-sm text-slate-400">{scopedRows.length} linhas exibidas</div>
