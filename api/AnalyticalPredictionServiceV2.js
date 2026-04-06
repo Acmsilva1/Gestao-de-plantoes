@@ -49,8 +49,9 @@ const inferConfidenceFromDemand = (demand) => {
     return 'Baixa';
 };
 
-const buildSummary = (enrichedRows = []) => {
+const buildSummary = (enrichedRows = [], actualRows = []) => {
     const totalDemand = enrichedRows.reduce((sum, row) => sum + (Number(row.demandaEstimada) || 0), 0);
+    const totalActual = actualRows.reduce((sum, row) => sum + (Number(row.demanda) || 0), 0);
     const byDate = new Map();
     const byUnit = new Map();
     const confidenceCounts = { Alta: 0, Média: 0, Baixa: 0 };
@@ -66,7 +67,6 @@ const buildSummary = (enrichedRows = []) => {
         if (confidenceCounts[confidence] !== undefined) {
             confidenceCounts[confidence] += 1;
         } else {
-            // Fallback para evitar erro se a normalização retornar algo inesperado
             confidenceCounts['Baixa'] += 1;
         }
     }
@@ -76,6 +76,7 @@ const buildSummary = (enrichedRows = []) => {
 
     return {
         totalDemand,
+        totalActual,
         totalRows: enrichedRows.length,
         totalDays: new Set(enrichedRows.map((row) => row.dataPrevista)).size,
         averageDemandPerRow: enrichedRows.length ? Number((totalDemand / enrichedRows.length).toFixed(2)) : 0,
@@ -144,10 +145,17 @@ export const recalculateAnalyticalPredictionV2 = async () => {
 
 export const getAnalyticalPredictionSnapshotV2 = async (filters = {}) => {
     const horizonDates = getPredictionHorizonDates();
-    const [allRows, historyRows] = await Promise.all([dbModel.getPredictionData({
-        startDate: horizonDates[0] || null,
-        endDate: horizonDates[horizonDates.length - 1] || null
-    }), dbModel.getHistoricalPredictionData(getPredictionLookbackStartDate())]);
+    const today = new Date().toISOString().slice(0, 10);
+    const startOfMonth = today.slice(0, 8) + '01';
+
+    const [allRows, historyRows, actualRows] = await Promise.all([
+        dbModel.getPredictionData({
+            startDate: horizonDates[0] || null,
+            endDate: horizonDates[horizonDates.length - 1] || null
+        }),
+        dbModel.getHistoricalPredictionData(getPredictionLookbackStartDate()),
+        dbModel.getHistoricalPredictionData(startOfMonth)
+    ]);
 
     const contextIndex = buildContextHistoryIndex((historyRows || []).map(normalizeHistoricalPredictionRow).filter(Boolean));
 
@@ -167,15 +175,29 @@ export const getAnalyticalPredictionSnapshotV2 = async (filters = {}) => {
         return formatPredictionRow(row, diagnostics);
     });
 
+    const actualsMapped = (actualRows || []).filter(row => {
+        if (Array.isArray(filters.unidades) && filters.unidades.length && !filters.unidades.includes(row.unidade)) return false;
+        if (filters.unidade && row.unidade !== filters.unidade) return false;
+        if (filters.regional && row.regional !== filters.regional) return false;
+        if (filters.turno && row.turno !== filters.turno) return false;
+        return true;
+    }).map(row => ({
+        data: row.data,
+        unidade: row.unidade,
+        regional: row.regional,
+        turno: row.turno,
+        demanda: Number(row.demanda) || 0
+    }));
+
     return {
-        summary: buildSummary(enrichedRows),
+        summary: buildSummary(enrichedRows, actualsMapped),
         filters: buildFilters(allRows || []),
-        rows: enrichedRows
-            .sort((a, b) => {
-                if (a.dataPrevista !== b.dataPrevista) return a.dataPrevista.localeCompare(b.dataPrevista);
-                if (a.unidade !== b.unidade) return a.unidade.localeCompare(b.unidade, 'pt-BR');
-                return a.turno.localeCompare(b.turno, 'pt-BR');
-            }),
+        rows: enrichedRows.sort((a, b) => {
+            if (a.dataPrevista !== b.dataPrevista) return a.dataPrevista.localeCompare(b.dataPrevista);
+            if (a.unidade !== b.unidade) return a.unidade.localeCompare(b.unidade, 'pt-BR');
+            return a.turno.localeCompare(b.turno, 'pt-BR');
+        }),
+        actuals: actualsMapped,
         generatedAt
     };
 };

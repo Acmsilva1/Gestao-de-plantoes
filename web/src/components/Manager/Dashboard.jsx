@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Calendar, ChevronLeft, ChevronRight, Activity, Users, MapPin, Globe, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { readApiResponse } from '../../utils/api';
@@ -24,9 +24,37 @@ const getForecastWindow = () => {
     return { current, next };
 };
 
+const EMPTY_ARRAY = [];
+
 const isOutsideForecastWindow = (month) => {
     const { current, next } = getForecastWindow();
     return month < current || month > next;
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="rounded-xl border border-slate-700 bg-slate-900/95 p-4 shadow-xl">
+                <p className="mb-2 font-black text-white">Dia {label}</p>
+                {payload.map((entry, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                        <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: entry.color }} />
+                        <span className="text-slate-300">{entry.name}:</span>
+                        <span className="font-bold text-white">{entry.value}</span>
+                    </div>
+                ))}
+                {/* Exibe o Total (Geral) se existir no objeto de dados original */}
+                {payload[0]?.payload?.Geral !== undefined && (
+                    <div className="mt-2 border-t border-slate-700 pt-2 flex items-center gap-2 text-sm font-bold text-emerald-400">
+                        <div className="h-3 w-3 rounded-sm bg-emerald-400/20 border border-emerald-400" />
+                        <span>Total do Dia:</span>
+                        <span>{payload[0].payload.Geral}</span>
+                    </div>
+                )}
+            </div>
+        );
+    }
+    return null;
 };
 
 export default function ManagerDashboard() {
@@ -92,39 +120,13 @@ export default function ManagerDashboard() {
         return () => clearInterval(pollTimerRef.current);
     }, [fetchMetrics]);
 
-    const chartVacanciesQ1 = data?.vacancies?.q1 || [];
-    const chartVacanciesQ2 = data?.vacancies?.q2 || [];
-    const chartDemandsQ1   = data?.demands?.q1 || [];
-    const chartDemandsQ2   = data?.demands?.q2 || [];
+    const chartVacanciesQ1 = data?.vacancies?.q1 || EMPTY_ARRAY;
+    const chartVacanciesQ2 = data?.vacancies?.q2 || EMPTY_ARRAY;
+    const chartDemandsQ1   = data?.demands?.q1 || EMPTY_ARRAY;
+    const chartDemandsQ2   = data?.demands?.q2 || EMPTY_ARRAY;
 
     const outsideForecast = isOutsideForecastWindow(month);
     const { current: forecastCurrent, next: forecastNext } = getForecastWindow();
-
-    const CustomTooltip = ({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="rounded-xl border border-slate-700 bg-slate-900/95 p-4 shadow-xl">
-                    <p className="mb-2 font-black text-white">Dia {label}</p>
-                    {payload.map((entry, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                            <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: entry.color }} />
-                            <span className="text-slate-300">{entry.name}:</span>
-                            <span className="font-bold text-white">{entry.value}</span>
-                        </div>
-                    ))}
-                    {/* Exibe o Total (Geral) se existir no objeto de dados original */}
-                    {payload[0]?.payload?.Geral !== undefined && (
-                        <div className="mt-2 border-t border-slate-700 pt-2 flex items-center gap-2 text-sm font-bold text-emerald-400">
-                            <div className="h-3 w-3 rounded-sm bg-emerald-400/20 border border-emerald-400" />
-                            <span>Total do Dia:</span>
-                            <span>{payload[0].payload.Geral}</span>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        return null;
-    };
 
     return (
         <div className="animate-in fade-in zoom-in-95 duration-500 pb-10">
@@ -255,7 +257,7 @@ export default function ManagerDashboard() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                             <XAxis dataKey="dia" stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
+                                            <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="Disponíveis" fill="#34d399" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Disponíveis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
@@ -283,7 +285,7 @@ export default function ManagerDashboard() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                             <XAxis dataKey="dia" stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
+                                            <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="Disponíveis" fill="#34d399" radius={[4, 4, 0, 0]}>
                                                 <LabelList dataKey="Disponíveis" position="top" fill="#94a3b8" fontSize={11} fontWeight="bold" />
@@ -311,7 +313,7 @@ export default function ManagerDashboard() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                             <XAxis dataKey="dia" stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
+                                            <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="Manhã" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
                                                 <LabelList dataKey="Manhã" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />
@@ -346,7 +348,7 @@ export default function ManagerDashboard() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                             <XAxis dataKey="dia" stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
+                                            <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(51, 65, 85, 0.2)' }} />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="Manhã" stackId="a" fill="#fbbf24" radius={[0, 0, 4, 4]}>
                                                 <LabelList dataKey="Manhã" position="center" fill="#78350f" fontSize={11} fontWeight="black" formatter={(val) => (val > 0 ? val : '')} />

@@ -1440,6 +1440,14 @@ export const dbModel = {
 
         return unwrap(response, 'Falha ao atualizar perfil do gestor.');
     },
+    async deleteManager(managerId) {
+        const response = await supabase
+            .from('gestores')
+            .delete()
+            .eq('id', managerId);
+            
+        return unwrap(response, 'Falha ao excluir gestor do sistema.');
+    },
     async getDashboardsDataStraddle(startMonthDate, endMonthDate, unidadeId = null) {
         // Busca turnos/vagas para agregar via js
         let query = supabase

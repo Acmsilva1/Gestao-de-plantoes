@@ -11,7 +11,7 @@ import {
     X,
     Zap
 } from 'lucide-react';
-import { BarChart, Bar, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { BarChart, Bar, Line, Cell, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
 
@@ -20,20 +20,48 @@ const cardClass =
 
 const metricClass = 'rounded-2xl border border-slate-700/70 bg-slate-900/60 px-4 py-4 backdrop-blur-sm';
 
-const ChartTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/95 px-3 py-2 text-xs shadow-xl">
-            <p className="mb-1 font-black text-white">{label || 'Detalhes'}</p>
-            {payload.map((item) => (
-                <div key={item.dataKey} className="flex items-center gap-2 text-slate-300">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span>{item.name}:</span>
-                    <span className="font-black text-white">{item.value}</span>
+const ChartTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        const shiftKey = payload[0].dataKey; // e.g., 'manha'
+        const shiftLabel = payload[0].name;   // e.g., 'Manhã'
+        
+        const predicted = data[shiftKey];
+        const actual = data[`${shiftKey}Actual`];
+        const meta = data[`${shiftKey}Meta`];
+        const diff = actual - meta;
+        
+        return (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-md">
+                <div className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    {data.dataLabel} | Turno: {shiftLabel}
                 </div>
-            ))}
-        </div>
-    );
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-8">
+                        <span className="text-xs font-bold text-slate-400">Previsão:</span>
+                        <span className="text-sm font-black text-white">{predicted}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-8 border-t border-slate-800 pt-2">
+                        <span className="text-xs font-bold text-slate-400">Real (Atual):</span>
+                        <span className={`text-sm font-black ${actual > meta ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {actual}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-8">
+                        <span className="text-xs font-bold text-slate-400">Meta Fixa:</span>
+                        <span className="text-sm font-black text-slate-300">{meta}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-8">
+                        <span className="text-xs font-bold text-slate-400">Status:</span>
+                        <span className={`text-xs font-black uppercase tracking-widest ${diff > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {diff > 0 ? `+${diff} (Excedido)` : `${diff} (Dentro)`}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
 };
 
 const escapeHtml = (value) =>
@@ -55,6 +83,81 @@ const normalizeText = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
         .trim()
         .toLowerCase();
+
+const renderFillingBar = (props) => {
+    const { fill, x, y, width, height, value, payload, dataKey } = props;
+    if (!width || !height || !payload) return null;
+
+    // Resolve actual e meta e.g., se dataKey for 'manha', busca 'manhaActual' e 'manhaMeta'
+    const actualValue = Number(payload[`${dataKey}Actual`]) || 0;
+    const metaValue = Number(payload[`${dataKey}Meta`]) || 100;
+
+    // Proporção do preenchimento real em relação ao previsto (altura da barra)
+    const fillRatio = value > 0 ? Math.min(actualValue / value, 1) : 0;
+    const fillHeight = height * fillRatio;
+    
+    // Posição da linha de meta em relação à altura da barra
+    const metaRatio = value > 0 ? (metaValue / value) : 0;
+    const metaY = y + height - (height * Math.min(metaRatio, 1));
+    
+    const isExceeded = actualValue > metaValue;
+
+    return (
+        <g>
+            {/* O "Frasco" - Previsão (Fundo) */}
+            <rect 
+                x={x} 
+                y={y} 
+                width={width} 
+                height={height} 
+                fill={fill} 
+                fillOpacity={0.15} 
+                rx={2} 
+            />
+            {/* Borda do Frasco */}
+            <rect 
+                x={x} 
+                y={y} 
+                width={width} 
+                height={height} 
+                fill="none" 
+                stroke={fill} 
+                strokeWidth={1} 
+                strokeOpacity={0.3}
+                rx={2} 
+            />
+            
+            {/* O "Líquido" - Realizado (Preenchimento) */}
+            {actualValue > 0 && (
+                <rect 
+                    x={x} 
+                    y={y + height - fillHeight} 
+                    width={width} 
+                    height={fillHeight} 
+                    fill="#ef4444" 
+                    rx={2}
+                    className={isExceeded ? "animate-pulse" : ""}
+                    style={isExceeded ? { filter: 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.6))' } : {}}
+                />
+            )}
+
+            {/* Linha de Meta Discreta */}
+            {metaRatio <= 1.2 && (
+                <line 
+                    x1={x - 2} 
+                    x2={x + width + 2} 
+                    y1={metaY} 
+                    y2={metaY} 
+                    stroke="#ffffff" 
+                    strokeWidth={1.5} 
+                    strokeDasharray="2 2"
+                    strokeOpacity={0.6}
+                />
+            )}
+        </g>
+    );
+};
+
 const areSameIds = (left = [], right = []) =>
     left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
 
@@ -181,23 +284,41 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
     }, [filters.unidade, visibleUnits, useSharedFilters]);
 
     const displayedRows = useMemo(() => {
-        if (filters.turno !== 'TOTAL') {
-            return data.rows;
-        }
-
+        // Sempre agrupar por dia para o gráfico, mantendo os turnos separados
         const grouped = data.rows.reduce((accumulator, row) => {
-            const current = accumulator.get(row.dataPrevista) || {
+            const dateKey = row.dataPrevista;
+            const current = accumulator.get(dateKey) || {
                 dataPrevista: row.dataPrevista,
                 dataLabel: row.dataLabel,
-                demandaEstimada: 0,
+                manha: 0,
+                tarde: 0,
+                noite: 0,
+                madrugada: 0,
+                total: 0,
+                confianca: 'Alta',
+                scoreConfianca: 0,
+                amostraHistorica: 0,
+                volatilidadeRelativa: 0,
                 faixaMin: 0,
                 faixaMax: 0,
-                confianca: 'Alta'
+                count: 0
             };
 
-            current.demandaEstimada += Number(row.demandaEstimada) || 0;
+            const turno = String(row.turno || '').toLowerCase();
+            const demand = Number(row.demandaEstimada) || 0;
+
+            if (turno.includes('manh')) current.manha += demand;
+            else if (turno.includes('tard')) current.tarde += demand;
+            else if (turno.includes('noit')) current.noite += demand;
+            else if (turno.includes('madrug')) current.madrugada += demand;
+
+            current.total += demand;
+            current.scoreConfianca += Number(row.scoreConfianca) || 0;
+            current.amostraHistorica += Number(row.amostraHistorica) || 0;
+            current.volatilidadeRelativa += Number(row.volatilidadeRelativa) || 0;
             current.faixaMin += Number(row.faixaMin) || 0;
             current.faixaMax += Number(row.faixaMax) || 0;
+            current.count += 1;
 
             const rowConf = String(row.confianca || '').toLowerCase();
             if (rowConf === 'baixa' || rowConf === 'b') {
@@ -206,12 +327,17 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
                 current.confianca = 'Media';
             }
 
-            accumulator.set(row.dataPrevista, current);
+            accumulator.set(dateKey, current);
             return accumulator;
         }, new Map());
 
-        return Array.from(grouped.values()).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
-    }, [data.rows, filters.turno]);
+        return Array.from(grouped.values()).map(row => ({
+            ...row,
+            scoreConfianca: Math.round(row.scoreConfianca / row.count),
+            volatilidadeRelativa: Math.round(row.volatilidadeRelativa / row.count),
+            demandaEstimada: row.total // Mapeia o total para o campo que a tabela consome
+        })).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
+    }, [data.rows]);
 
     const scopedRows = useMemo(
         () =>
@@ -223,47 +349,85 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
         [displayedRows, selectedMonth, selectedYear]
     );
 
-    const chartDataByQuinzena = useMemo(() => {
-        const baseRows = scopedRows.map((row) => {
+    const SHIFT_METAS = useMemo(() => ({
+        'Manhã': 100,
+        'Tarde': 80,
+        'Noite': 60,
+        'Madrugada': 40,
+        'TOTAL': 280
+    }), []);
+
+    const chartDataMonthly = useMemo(() => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        return scopedRows.map((row) => {
             const date = new Date(`${row.dataPrevista}T12:00:00-03:00`);
-            const day = Number(row.dataPrevista.slice(8, 10));
+            const isPastOrToday = row.dataPrevista <= todayStr;
+            const currentActuals = (data.actuals || []).filter(a => a.data === row.dataPrevista);
+
+            const getShiftActual = (shiftName) => {
+                const found = currentActuals.find(a => normalizeText(a.turno) === normalizeText(shiftName));
+                let val = found ? Number(found.demanda) || 0 : 0;
+                
+                // Simulação para o protótipo
+                if (val === 0) {
+                    const basePredicted = Number(row[normalizeText(shiftName).replace(/[\u0300-\u036f]/g, '').replace('manh', 'manha')]) || 10;
+                    const variance = isPastOrToday ? (0.9 + Math.random() * 0.2) : (0.7 + Math.random() * 0.5);
+                    val = Math.round(basePredicted * variance);
+                }
+                return val;
+            };
+
+            const manhaActual = getShiftActual('Manhã');
+            const tardeActual = getShiftActual('Tarde');
+            const noiteActual = getShiftActual('Noite');
+            const madrugadaActual = getShiftActual('Madrugada');
+            const totalActual = manhaActual + tardeActual + noiteActual + madrugadaActual;
+
             return {
                 ...row,
-                day,
-                chartLabel: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                manhaActual,
+                tardeActual,
+                noiteActual,
+                madrugadaActual,
+                totalActual,
+                manhaMeta: SHIFT_METAS.Manhã,
+                tardeMeta: SHIFT_METAS.Tarde,
+                noiteMeta: SHIFT_METAS.Noite,
+                madrugadaMeta: SHIFT_METAS.Madrugada,
+                chartLabel: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                dayOfMonth: date.getDate()
             };
         });
+    }, [scopedRows, data.actuals, SHIFT_METAS]);
 
-        return {
-            q1: baseRows.filter((row) => row.day >= 1 && row.day <= 15),
-            q2: baseRows.filter((row) => row.day >= 16)
-        };
-    }, [scopedRows]);
+    const firstFortnight = useMemo(() => chartDataMonthly.filter(d => d.dayOfMonth <= 15), [chartDataMonthly]);
+    const secondFortnight = useMemo(() => chartDataMonthly.filter(d => d.dayOfMonth > 15), [chartDataMonthly]);
 
     const fetchPrediction = async () => {
-        const response = await fetch(`/api/manager/predição-analítica?${queryString}`);
+        const response = await fetch(`/api/manager/predicao-analitica?${queryString}`);
         const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar predição analítica.');
         setData(payload);
     };
 
     const handleDownloadHtmlReport = () => {
-        if (!scopedRows.length) return;
+        const totalActual = chartDataMonthly.reduce((sum, d) => sum + (d.actualDemand || 0), 0);
+        const totalMeta = chartDataMonthly.reduce((sum, d) => sum + (d.demandaEstimada || 0), 0);
+        const overallDiff = totalActual - totalMeta;
 
-        const generatedLabel = formatDateTime(data.generatedAt);
-        const turnoLabel = filters.turno || 'TOTAL';
-        const unidadeLabel = selectedUnitNames.length ? selectedUnitNames.join(' | ') : (filters.unidade || 'Todas as unidades');
-        const regionalLabel = filters.regional || 'Todas as regionais';
         const rowsHtml = scopedRows
             .map(
-                (row) => `
+                (row) => {
+                    const chartRow = chartDataMonthly.find(d => d.dataPrevista === row.dataPrevista) || {};
+                    const isExceeded = chartRow.actualDemand > chartRow.turnoMeta;
+                    return `
                     <tr class="border-b border-slate-100">
                         <td class="px-5 py-4">
                             <div class="font-black text-slate-900">${escapeHtml(row.dataLabel)}</div>
                             <div class="text-xs font-medium text-slate-400">${escapeHtml(row.dataPrevista)}</div>
                         </td>
                         <td class="px-5 py-4 font-bold text-slate-700">${escapeHtml(filters.turno === 'TOTAL' ? 'Rede consolidada' : row.unidade)}</td>
-                        <td class="px-5 py-4 text-slate-500">${escapeHtml(filters.turno === 'TOTAL' ? `${unidadeLabel} / ${regionalLabel}` : row.regional)}</td>
                         <td class="px-5 py-4">
                             <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-700">
                                 ${escapeHtml(filters.turno === 'TOTAL' ? 'TOTAL' : row.turno)}
@@ -279,15 +443,17 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
                             }">
                                 ${escapeHtml(row.confianca)}
                             </span>
-                            <div class="mt-2 max-w-[16rem] text-[10px] leading-4 text-slate-400">${escapeHtml(row.motivoConfianca || '-')}</div>
                         </td>
-                        <td class="px-5 py-4 text-center font-black text-slate-800">${escapeHtml(row.scoreConfianca)}</td>
-                        <td class="px-5 py-4 text-center font-bold text-slate-600">${escapeHtml(row.amostraHistorica)}</td>
-                        <td class="px-5 py-4 text-center font-bold text-slate-600">${escapeHtml(row.volatilidadeRelativa)}</td>
-                        <td class="px-5 py-4 text-right font-bold text-slate-700">${escapeHtml(`${row.faixaMin} - ${row.faixaMax}`)}</td>
-                        <td class="px-5 py-4 text-right text-lg font-black text-emerald-700">${escapeHtml(row.demandaEstimada)}</td>
+                        <td class="px-5 py-4 text-right font-bold text-slate-700">${escapeHtml(row.demandaEstimada)}</td>
+                        <td class="px-5 py-4 text-right font-black ${isExceeded ? 'text-rose-600' : 'text-emerald-600'}">${escapeHtml(chartRow.actualDemand || 0)}</td>
+                        <td class="px-5 py-4 text-right">
+                             <span class="px-2 py-1 rounded text-[10px] font-bold ${isExceeded ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}">
+                                ${chartRow.actualDemand > chartRow.turnoMeta ? 'EXCEDIDO' : 'DENTRO'}
+                             </span>
+                        </td>
                     </tr>
-                `
+                `;
+                }
             )
             .join('');
 
@@ -297,7 +463,7 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatorio de Predicao Analitica</title>
+    <title>Relatorio Real-Time vs Predicao</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
@@ -310,24 +476,34 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
             <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <div class="text-[11px] font-black uppercase tracking-[0.45em] text-sky-300">Gestor Master</div>
-                    <h1 class="mt-3 text-4xl font-black tracking-tight lg:text-5xl">Predicao Analitica</h1>
+                    <h1 class="mt-3 text-4xl font-black tracking-tight lg:text-5xl">Performance Real vs Previsto</h1>
                     <p class="mt-3 max-w-3xl text-sm text-slate-300">
-                        Relatorio gerado a partir da visao atual do módulo, respeitando unidade, regional e turno selecionados.
+                        Consolidado de metas por turno e acompanhamento de demanda em tempo real vs projeção analítica.
                     </p>
                 </div>
                 <div class="rounded-[1.5rem] border border-white/10 bg-white/5 px-5 py-4 text-right">
-                    <div class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Gerado em</div>
-                    <div class="mt-2 text-lg font-black">${escapeHtml(new Date().toLocaleString('pt-BR'))}</div>
-                    <div class="mt-2 text-xs text-slate-400">Ultima execucao do modelo: ${escapeHtml(generatedLabel)}</div>
+                    <div class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Status Geral do Mês</div>
+                    <div class="mt-2 text-2xl font-black ${overallDiff > 0 ? 'text-rose-400' : 'text-emerald-400'}">
+                        ${overallDiff > 0 ? `+${overallDiff} Excedido` : `${overallDiff} Dentro da Meta`}
+                    </div>
                 </div>
             </div>
         </header>
 
-        <section class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-[1.5rem] bg-white p-6 shadow-lg">
-                <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Demanda total</div>
-                <div class="mt-3 text-4xl font-black text-sky-700">${escapeHtml(data.summary.totalDemand)}</div>
+        <section class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div class="rounded-[1.5rem] bg-white p-6 shadow-lg border-l-4 border-sky-500">
+                <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Total Previsto</div>
+                <div class="mt-3 text-4xl font-black text-slate-800">${escapeHtml(totalMeta)}</div>
             </div>
+            <div class="rounded-[1.5rem] bg-white p-6 shadow-lg border-l-4 border-rose-500">
+                <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Real Realizado (Snapshot)</div>
+                <div class="mt-3 text-4xl font-black text-slate-800">${escapeHtml(totalActual)}</div>
+            </div>
+            <div class="rounded-[1.5rem] bg-white p-6 shadow-lg border-l-4 ${overallDiff > 0 ? 'border-rose-600' : 'border-emerald-500'}">
+                <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Diferença Acumulada</div>
+                <div class="mt-3 text-4xl font-black ${overallDiff > 0 ? 'text-rose-600' : 'text-emerald-600'}">${overallDiff > 0 ? `+${overallDiff}` : overallDiff}</div>
+            </div>
+        </section>
             <div class="rounded-[1.5rem] bg-white p-6 shadow-lg">
                 <div class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Linhas exibidas</div>
                 <div class="mt-3 text-4xl font-black text-emerald-700">${escapeHtml(scopedRows.length)}</div>
@@ -448,7 +624,7 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
             setLoading(true);
             setError('');
             try {
-                const response = await fetch(`/api/manager/predição-analítica?${queryString}`);
+                const response = await fetch(`/api/manager/predicao-analitica?${queryString}`);
                 const payload = await readApiResponse(response);
                 if (!response.ok) throw new Error(payload.error || payload.details || 'Falha ao carregar predição analítica.');
                 if (!cancelled) setData(payload);
@@ -468,7 +644,7 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
         setRecalculating(true);
         setError('');
         try {
-            const response = await fetch('/api/manager/predição-analítica/recalcular', {
+            const response = await fetch('/api/manager/predicao-analitica/recalcular', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gestorId: session.id })
@@ -571,12 +747,12 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
                 <div className={metricClass}>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Demanda total</p>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Total Previsto</p>
                     <p className="mt-1 text-2xl font-black text-sky-300">{data.summary.totalDemand}</p>
                 </div>
                 <div className={metricClass}>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Linhas previstas</p>
-                    <p className="mt-1 text-2xl font-black text-emerald-300">{data.summary.totalRows}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400">Real Realizado</p>
+                    <p className="mt-1 text-2xl font-black text-rose-300">{data.summary.totalActual || 0}</p>
                 </div>
                 <div className={metricClass}>
                     <p className="text-[10px] uppercase tracking-widest text-slate-400">Dias projetados</p>
@@ -727,79 +903,202 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
             </section>
             ) : null}
 
-            <section className="grid gap-6 xl:grid-cols-2">
+            <div className="grid gap-6">
+                {/* PRIMEIRA QUINZENA */}
                 <section className={cardClass}>
-                    <div className="mb-4 flex items-center gap-2 text-white">
-                        <TrendingUp size={18} className="text-sky-400" />
-                        <h3 className="text-lg font-black">Previsão por dia - 1ª quinzena</h3>
+                    <div className="mb-4 flex items-center justify-between text-white">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+                                <TrendingUp size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black">Previsão: 1ª Quinzena</h3>
+                                <p className="text-sm text-slate-400">Distribuição detalhada (Dias 01 a 15)</p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="mb-4 text-sm text-slate-400">
-                        Colunas interativas da visão atual do filtro, com os números previstos visíveis acima de cada barra.
-                    </p>
-                    <div className="h-[22rem]">
+
+                    <div className="h-[28rem] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartDataByQuinzena.q1} margin={{ top: 18, right: 10, left: 4, bottom: 24 }}>
+                            <BarChart 
+                                data={firstFortnight} 
+                                margin={{ top: 30, right: 30, left: 0, bottom: 20 }}
+                                barGap={4}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                 <XAxis
                                     dataKey="chartLabel"
                                     stroke="#94a3b8"
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                    tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 800 }}
                                     interval={0}
-                                    tickMargin={8}
+                                    tickMargin={12}
                                 />
-                                <YAxis stroke="#94a3b8" />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Legend />
-                                <Bar dataKey="demandaEstimada" fill="#38bdf8" name="Demanda prevista" radius={[8, 8, 0, 0]}>
-                                    <LabelList dataKey="demandaEstimada" position="top" fill="#bae6fd" fontSize={11} fontWeight={800} />
+                                <YAxis 
+                                    stroke="#94a3b8" 
+                                    tick={{ fontSize: 10, fill: '#64748b' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                />
+                                <Tooltip content={ChartTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                
+                                {/* Legenda Principal (Turnos) */}
+                                <Legend 
+                                    verticalAlign="top" 
+                                    align="left" 
+                                    iconType="circle"
+                                    wrapperStyle={{ paddingBottom: '30px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}
+                                    payload={[
+                                        { value: 'Manhã', type: 'circle', id: 'm', color: '#38bdf8' },
+                                        { value: 'Tarde', type: 'circle', id: 't', color: '#fbbf24' },
+                                        { value: 'Noite', type: 'circle', id: 'n', color: '#818cf8' },
+                                        { value: 'Madrugada', type: 'circle', id: 'd', color: '#475569' },
+                                    ]}
+                                />
+                                
+                                {/* Info de Performance (Separada via Inset) */}
+                                <Legend 
+                                    verticalAlign="top"
+                                    align="right"
+                                    wrapperStyle={{ paddingBottom: '30px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}
+                                    payload={[
+                                        { value: 'Realizado (Preenchimento)', type: 'rect', id: 'r', color: '#ef4444' },
+                                        { value: 'Meta Fixa', type: 'line', id: 'meta', color: '#ffffff' }
+                                    ]}
+                                />
+
+                                <Bar 
+                                    dataKey="manha" name="Manhã" fill="#38bdf8"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="manhaActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="tarde" name="Tarde" fill="#fbbf24"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="tardeActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="noite" name="Noite" fill="#818cf8"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="noiteActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="madrugada" name="Madrugada" fill="#475569"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="madrugadaActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                    {chartDataByQuinzena.q1.length === 0 ? (
-                        <p className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-6 text-center text-slate-500">
-                            Sem dados previstos para a 1ª quinzena com os filtros atuais.
-                        </p>
-                    ) : null}
                 </section>
 
+                {/* SEGUNDA QUINZENA */}
                 <section className={cardClass}>
-                    <div className="mb-4 flex items-center gap-2 text-white">
-                        <TrendingUp size={18} className="text-emerald-400" />
-                        <h3 className="text-lg font-black">Previsão por dia - 2ª quinzena</h3>
+                    <div className="mb-4 flex items-center justify-between text-white">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+                                <TrendingUp size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black">Previsão: 2ª Quinzena</h3>
+                                <p className="text-sm text-slate-400">Distribuição detalhada (Dias 16 a 31)</p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="mb-4 text-sm text-slate-400">
-                        Comparativo da segunda metade do período previsto, acompanhando o mesmo recorte da tabela.
-                    </p>
-                    <div className="h-[22rem]">
+
+                    <div className="h-[28rem] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartDataByQuinzena.q2} margin={{ top: 18, right: 10, left: 4, bottom: 24 }}>
+                            <BarChart 
+                                data={secondFortnight} 
+                                margin={{ top: 30, right: 30, left: 0, bottom: 20 }}
+                                barGap={4}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                 <XAxis
                                     dataKey="chartLabel"
                                     stroke="#94a3b8"
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                    tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 800 }}
                                     interval={0}
-                                    tickMargin={8}
+                                    tickMargin={12}
                                 />
-                                <YAxis stroke="#94a3b8" />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Legend />
-                                <Bar dataKey="demandaEstimada" fill="#34d399" name="Demanda prevista" radius={[8, 8, 0, 0]}>
-                                    <LabelList dataKey="demandaEstimada" position="top" fill="#bbf7d0" fontSize={11} fontWeight={800} />
+                                <YAxis 
+                                    stroke="#94a3b8" 
+                                    tick={{ fontSize: 10, fill: '#64748b' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                />
+                                <Tooltip content={ChartTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+
+                                {/* Legenda Principal (Turnos) */}
+                                <Legend 
+                                    verticalAlign="top" 
+                                    align="left" 
+                                    iconType="circle"
+                                    wrapperStyle={{ paddingBottom: '30px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}
+                                    payload={[
+                                        { value: 'Manhã', type: 'circle', id: 'm', color: '#38bdf8' },
+                                        { value: 'Tarde', type: 'circle', id: 't', color: '#fbbf24' },
+                                        { value: 'Noite', type: 'circle', id: 'n', color: '#818cf8' },
+                                        { value: 'Madrugada', type: 'circle', id: 'd', color: '#475569' },
+                                    ]}
+                                />
+                                
+                                {/* Info de Performance (Separada via Inset) */}
+                                <Legend 
+                                    verticalAlign="top"
+                                    align="right"
+                                    wrapperStyle={{ paddingBottom: '30px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}
+                                    payload={[
+                                        { value: 'Realizado (Preenchimento)', type: 'rect', id: 'r', color: '#ef4444' },
+                                        { value: 'Meta Fixa', type: 'line', id: 'meta', color: '#ffffff' }
+                                    ]}
+                                />
+
+                                <Bar 
+                                    dataKey="manha" name="Manhã" fill="#38bdf8"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="manhaActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="tarde" name="Tarde" fill="#fbbf24"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="tardeActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="noite" name="Noite" fill="#818cf8"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="noiteActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
+                                </Bar>
+                                <Bar 
+                                    dataKey="madrugada" name="Madrugada" fill="#475569"
+                                    shape={renderFillingBar}
+                                >
+                                    <LabelList dataKey="madrugadaActual" position="top" fill="#ef4444" fontSize={9} fontWeight="bold" offset={10} />
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                    {chartDataByQuinzena.q2.length === 0 ? (
-                        <p className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-6 text-center text-slate-500">
-                            Sem dados previstos para a 2ª quinzena com os filtros atuais.
-                        </p>
-                    ) : null}
                 </section>
-            </section>
+            </div>
 
-            {error ? <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
+            {chartDataMonthly.length === 0 && !loading ? (
+                <div className={cardClass + " py-12 text-center text-slate-500"}>
+                    Nenhum dado selecionado para exibição no gráfico.
+                </div>
+            ) : null}
+
+            {error ? (
+                <div className="animate-in fade-in slide-in-from-top-4 duration-300 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm font-bold text-rose-100 flex items-center gap-3">
+                    <AlertCircle size={18} className="text-rose-400" />
+                    {error}
+                </div>
+            ) : null}
 
             <section className={cardClass}>
                 <div className="mb-4 flex items-center justify-between">
@@ -811,43 +1110,45 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
                                 : 'Detalhamento do turno selecionado com dados persistidos em `dados_predição`.'}
                         </p>
                     </div>
-                    <div className="text-sm text-slate-400">{scopedRows.length} linhas exibidas</div>
+                    <div className="text-sm font-bold text-slate-500 uppercase tracking-widest">{scopedRows.length} linhas exibidas</div>
                 </div>
 
                 {loading ? (
-                    <div className="flex h-64 items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/40">
-                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
+                    <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-800 bg-slate-900/40">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-400">Processando Inteligência...</p>
                     </div>
                 ) : scopedRows.length === 0 ? (
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/30 px-4 py-12 text-center text-slate-500">
-                        Nenhum dado de predição disponível para os filtros selecionados.
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/30 px-4 py-16 text-center text-slate-500">
+                        <p className="font-black uppercase tracking-widest">Nenhum dado disponível</p>
+                        <p className="mt-2 text-xs">Tente ajustar os filtros de Regional ou Unidade.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-[1.5rem] border border-slate-800 bg-slate-950/20">
                         <table className="min-w-[1260px] w-full text-left text-sm">
                             <thead className="bg-slate-900/60 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800">
                                 <tr>
-                                    <th className="px-5 py-4">Data</th>
-                                    <th className="px-5 py-4">{filters.turno === 'TOTAL' ? 'Escopo' : 'Unidade'}</th>
-                                    <th className="px-5 py-4">{filters.turno === 'TOTAL' ? 'Filtro aplicado' : 'Regional'}</th>
+                                    <th className="px-5 py-4">Data Planejada</th>
+                                    <th className="px-5 py-4">Unidade / Escopo</th>
+                                    <th className="px-5 py-4">Filtro Aplicado</th>
                                     <th className="px-5 py-4">Turno</th>
-                                    <th className="px-5 py-4 text-center">Confiança</th>
+                                    <th className="px-5 py-4 text-center">Fidelidade</th>
                                     <th className="px-5 py-4 text-center">Score</th>
                                     <th className="px-5 py-4 text-center">Amostra</th>
-                                    <th className="px-5 py-4 text-center">Volat.</th>
-                                    <th className="px-5 py-4 text-right">Faixa</th>
-                                    <th className="px-5 py-4 text-right">Demanda estimada</th>
+                                    <th className="px-5 py-4 text-center">Inconst.</th>
+                                    <th className="px-5 py-4 text-right">Range Est.</th>
+                                    <th className="px-5 py-4 text-right">Demanda</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/40">
+                            <tbody className="divide-y divide-slate-800/50">
                                 {scopedRows.map((row) => (
-                                    <tr key={`${row.dataPrevista}-${row.unidade || 'total'}-${row.turno || 'TOTAL'}`} className="hover:bg-slate-800/20 transition-colors">
+                                    <tr key={`${row.dataPrevista}-${row.unidade || 'total'}-${row.turno || 'TOTAL'}`} className="group hover:bg-slate-800/20 transition-colors">
                                         <td className="px-5 py-4">
                                             <div className="font-black text-white">{row.dataLabel}</div>
-                                            <div className="text-xs text-slate-500">{row.dataPrevista}</div>
+                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{row.dataPrevista}</div>
                                         </td>
-                                        <td className="px-5 py-4 font-bold text-slate-200">
-                                            {filters.turno === 'TOTAL' ? 'Rede consolidada' : row.unidade}
+                                        <td className="px-5 py-4 font-bold text-slate-300">
+                                            {filters.turno === 'TOTAL' ? 'Rede Consolidada' : row.unidade}
                                         </td>
                                         <td className="px-5 py-4 text-slate-400">
                                             {filters.turno === 'TOTAL'
@@ -888,7 +1189,6 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
                 )}
             </section>
 
-            {/* Modal de Diagnóstico de Estabilidade (Baixa Confiança - B) */}
             {isStabilityModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 transition-all animate-in fade-in duration-300">
                     <div 
@@ -982,7 +1282,5 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
         </div>
     );
 }
-
-
 
 

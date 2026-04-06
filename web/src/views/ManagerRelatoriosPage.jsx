@@ -164,6 +164,10 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
         });
     }, [visibleUnits, session.isMaster, selectedRegional, units, useSharedFilters]);
 
+    const occupancyChartData = useMemo(() => {
+        return reportData?.occupancyByUnit ? reportData.occupancyByUnit.slice(0, 15) : [];
+    }, [reportData?.occupancyByUnit]);
+
     const handleGenerateProfessionalReport = () => {
         if (!reportData) return;
 
@@ -573,7 +577,7 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
 
                                 <div className="h-[350px] mb-12">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={reportData.occupancyByUnit.slice(0, 15)} margin={{ top: 20, bottom: 20, left: 10, right: 10 }}>
+                                        <BarChart data={occupancyChartData} margin={{ top: 20, bottom: 20, left: 10, right: 10 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                                             <XAxis dataKey="unidade" stroke="#94a3b8" fontSize={9} angle={-30} textAnchor="end" height={60} interval={0} />
                                             <YAxis stroke="#94a3b8" fontSize={9} />

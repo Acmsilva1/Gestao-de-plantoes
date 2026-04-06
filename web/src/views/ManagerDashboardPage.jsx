@@ -21,6 +21,8 @@ const MONTHS = [
     { value: '12', label: 'Dezembro' }
 ];
 
+const EMPTY_ARRAY = [];
+
 const cardClass =
     'overflow-hidden rounded-[2rem] border border-slate-700/70 bg-[linear-gradient(150deg,rgba(15,23,42,0.95),rgba(2,6,23,0.92))] p-6 shadow-[0_24px_70px_-28px_rgba(15,23,42,0.9)]';
 
@@ -401,7 +403,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                             </div>
                             <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={filteredData.acceptedByQuinzena?.q1 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
+                                    <BarChart data={filteredData.acceptedByQuinzena?.q1 || EMPTY_ARRAY} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                         <XAxis
                                             dataKey="unidade"
@@ -414,7 +416,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                             tickMargin={8}
                                         />
                                         <YAxis stroke="#94a3b8" />
-                                        <Tooltip content={<ChartTooltip />} />
+                                        <Tooltip content={ChartTooltip} />
                                         <Legend />
                                         <Bar dataKey="totalOcupadas" fill="#38bdf8" name="Ocupadas" radius={[6, 6, 0, 0]}>
                                             <LabelList dataKey="totalOcupadas" position="top" fill="#bae6fd" fontSize={11} fontWeight={800} />
@@ -434,7 +436,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                             </div>
                             <div className="h-[22rem]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={filteredData.acceptedByQuinzena?.q2 || []} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
+                                    <BarChart data={filteredData.acceptedByQuinzena?.q2 || EMPTY_ARRAY} margin={{ top: 18, right: 10, left: 4, bottom: 56 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                         <XAxis
                                             dataKey="unidade"
@@ -447,7 +449,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                             tickMargin={8}
                                         />
                                         <YAxis stroke="#94a3b8" />
-                                        <Tooltip content={<ChartTooltip />} />
+                                        <Tooltip content={ChartTooltip} />
                                         <Legend />
                                         <Bar dataKey="totalOcupadas" fill="#34d399" name="Ocupadas" radius={[6, 6, 0, 0]}>
                                             <LabelList dataKey="totalOcupadas" position="top" fill="#bbf7d0" fontSize={11} fontWeight={800} />
@@ -470,7 +472,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={filteredData.occupancyBreakdown || []}
+                                        data={filteredData.occupancyBreakdown || EMPTY_ARRAY}
                                         dataKey="total"
                                         nameKey="categoria"
                                         cx="50%"
@@ -482,7 +484,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                             <Cell key={`${entry.categoria}-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip content={<ChartTooltip />} />
+                                    <Tooltip content={ChartTooltip} />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
