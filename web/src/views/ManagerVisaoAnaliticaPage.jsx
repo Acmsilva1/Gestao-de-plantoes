@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, CalendarDays, FileText, Filter, MapPinned } from 'lucide-react';
+import { BarChart3, CalendarDays, FileText, Filter, MapPinned, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerRelatoriosPage from './ManagerRelatoriosPage';
+import ManagerPredicaoPage from './ManagerPredicaoPage';
 
 const MONTHS = [
     { value: '01', label: 'Janeiro' },
@@ -56,11 +57,17 @@ export default function ManagerVisaoAnaliticaPage() {
     }));
 
     const availableTabs = useMemo(
-        () => [
-            { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            { key: 'relatorios', label: 'Relatórios', icon: FileText }
-        ],
-        []
+        () => {
+            const tabs = [
+                { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+                { key: 'relatorios', label: 'Relatórios', icon: FileText }
+            ];
+            if (isMaster) {
+                tabs.push({ key: 'predicao', label: 'Análise de Meta', icon: TrendingUp });
+            }
+            return tabs;
+        },
+        [isMaster]
     );
 
     const selectedTab = useMemo(() => {
@@ -377,6 +384,7 @@ export default function ManagerVisaoAnaliticaPage() {
 
             {!loadingUnits && selectedTab === 'dashboard' ? <ManagerDashboardPage embedded sharedFilters={sharedFilters} /> : null}
             {!loadingUnits && selectedTab === 'relatorios' ? <ManagerRelatoriosPage embedded sharedFilters={sharedFilters} /> : null}
+            {!loadingUnits && selectedTab === 'predicao' ? <ManagerPredicaoPage embedded sharedFilters={sharedFilters} /> : null}
         </div>
     );
 }

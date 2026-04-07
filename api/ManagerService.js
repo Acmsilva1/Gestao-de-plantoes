@@ -136,83 +136,149 @@ export const getManagerProfiles = async (_req, res) => {
     }
 };
 
-export const getDashboardMetrics = async (req, res) => {
-    const { month, unidadeId } = req.query; // YYYY-MM
-    if (!month) {
-        return res.status(400).json({ error: 'Mês não informado.' });
-    }
-
+export const getHistoricalAnalyticalData = async (req, res) => {
     try {
         const manager = await getScopedManager(req, res);
         if (!manager) return;
 
-        const { startMonthDate, endMonthDate } = getMonthDates(month);
-        const scopedUnitId = unidadeId || manager.unidade_id;
-        if (!assertUnitScope(res, manager, scopedUnitId)) return;
-
-        const vacancies = await dbModel.getDashboardsDataStraddle(startMonthDate, endMonthDate, scopedUnitId);
-
-        const endDay = parseInt(endMonthDate.slice(-2), 10);
-        
-        const vacancies_q1 = [];
-        const vacancies_q2 = [];
-        const demands_q1 = [];
-        const demands_q2 = [];
-
-        for (let i = 1; i <= endDay; i++) {
-            const dayStr = String(i).padStart(2, '0');
-            if (i <= 15) {
-                vacancies_q1.push({ dia: dayStr, Totais: 0, Ocupadas: 0, "Disponíveis": 0 });
-                demands_q1.push({ dia: dayStr, "Manhã": 0, "Tarde": 0, "Noite": 0, "Madrugada": 0, Geral: 0 });
-            } else {
-                vacancies_q2.push({ dia: dayStr, Totais: 0, Ocupadas: 0, "Disponíveis": 0 });
-                demands_q2.push({ dia: dayStr, "Manhã": 0, "Tarde": 0, "Noite": 0, "Madrugada": 0, Geral: 0 });
-            }
+        if (!isMasterManager(manager)) {
+            return res.status(403).json({ error: 'Acesso restrito ao Gestor Master.' });
         }
 
-        // Aggregation of vacancies AND demand (both from disponibilidade - contains predictor forecast)
-        (vacancies || []).forEach(v => {
-            const dayNum = Number(v.data_plantao.slice(-2));
-            const available = Math.max(v.vagas_totais - v.vagas_ocupadas, 0);
-            
-            const vTargetArray = dayNum <= 15 ? vacancies_q1 : vacancies_q2;
-            const vEntry = vTargetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
-            
-            if (vEntry) {
-                vEntry.Totais += v.vagas_totais;
-                vEntry.Ocupadas += v.vagas_ocupadas;
-                vEntry["Disponíveis"] += available;
+        const unidadeIds = parseCsvIds(req.query.unidadeIds);
+        const historyAll = await dbModel.getHistoricalAttendance({
+            unidadeIds,
+            startDate: '2000-01-01',
+            endDate: '2099-12-31'
+        });
+
+        if (!historyAll || historyAll.length === 0) {
+            return res.json({ history: [], meta: {} });
+        }
+
+        // Determinar a data de referência (hoje ou a data mais recente no banco)
+        const mostRecentInDb = historyAll.reduce((max, h) => h.data_atendimento > max ? h.data_atendimento : max, '1900-01-01');
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        
+        // Se a data mais recente for muito antiga (> 30 dias de hoje), usamos ela como referência para o demo
+        const refDateStr = mostRecentInDb < todayStr ? mostRecentInDb : todayStr;
+        const refDate = new Date(`${refDateStr}T12:00:00Z`);
+
+        // Meta baseada nos 90 dias anteriores à data de referência
+        const startDateMeta = new Date(refDate);
+        startDateMeta.setUTCDate(refDate.getUTCDate() - 90);
+        const startDateMetaStr = startDateMeta.toISOString().slice(0, 10);
+
+        const history = historyAll.filter(h => h.data_atendimento >= startDateMetaStr && h.data_atendimento <= refDateStr);
+
+        if (!history || history.length === 0) {
+            return res.json({ history: [], meta: {} });
+        }
+
+        // 1. Calcular Metas Dinâmicas (Média por Dia da Semana e Turno nos últimos 90 dias)
+        // Estrutura: { [unidadeId]: { [weekday]: { [turno]: { total, count } } } }
+        const metaStats = {};
+        
+        history.forEach(row => {
+            const uid = row.unidade_id;
+            const turno = (row.periodo || '').toLowerCase();
+            const count = row.atendimento_count || 0;
+            const date = new Date(`${row.data_atendimento}T12:00:00Z`);
+            const weekday = date.getUTCDay();
+
+            if (!metaStats[uid]) metaStats[uid] = {};
+            if (!metaStats[uid][weekday]) metaStats[uid][weekday] = {};
+            if (!metaStats[uid][weekday][turno]) metaStats[uid][weekday][turno] = { sum: 0, n: 0 };
+
+            metaStats[uid][weekday][turno].sum += count;
+            metaStats[uid][weekday][turno].n += 1;
+        });
+
+        const metasCalculadas = {};
+        Object.keys(metaStats).forEach(uid => {
+            metasCalculadas[uid] = {};
+            Object.keys(metaStats[uid]).forEach(wd => {
+                metasCalculadas[uid][wd] = {};
+                Object.keys(metaStats[uid][wd]).forEach(t => {
+                    const s = metaStats[uid][wd][t];
+                    metasCalculadas[uid][wd][t] = Math.round(s.sum / s.n);
+                });
+            });
+        });
+
+        // 2. Preparar dados dos últimos 30 dias para exibição
+        const startDateDisplay = new Date(refDate);
+        startDateDisplay.setUTCDate(refDate.getUTCDate() - 30);
+        const startDateDisplayStr = startDateDisplay.toISOString().slice(0, 10);
+
+        const displayHistory = history.filter(h => h.data_atendimento >= startDateDisplayStr);
+        
+        // Agrupar por data para o gráfico
+        const chartDataMap = {};
+        displayHistory.forEach(row => {
+            const dateStr = row.data_atendimento;
+            const turno = (row.periodo || '').toLowerCase();
+            const valor = row.atendimento_count || 0;
+            const uid = row.unidade_id;
+            const dateObj = new Date(`${dateStr}T12:00:00Z`);
+            const weekday = dateObj.getUTCDay();
+
+            if (!chartDataMap[dateStr]) {
+                chartDataMap[dateStr] = { 
+                    data: dateStr, 
+                    dia: dateStr.slice(8, 10),
+                    manha: 0, tarde: 0, noite: 0, madrugada: 0,
+                    excesso_manha: 0, excesso_tarde: 0, excesso_noite: 0, excesso_madrugada: 0,
+                    total: 0,
+                    total_excesso: 0
+                };
             }
 
-            // Also aggregate demand from turno field in disponibilidade
-            const dTargetArray = dayNum <= 15 ? demands_q1 : demands_q2;
-            const dEntry = dTargetArray.find(e => e.dia === String(dayNum).padStart(2, '0'));
+            // Mapeamento de turno para campos do objeto
+            const field = turno.includes('manh') ? 'manha' : 
+                         turno.includes('tard') ? 'tarde' : 
+                         turno.includes('noit') ? 'noite' : 
+                         turno.includes('madrug') ? 'madrugada' : null;
 
-            if (dEntry && v.turno) {
-                const turno = (v.turno || '').toLowerCase();
-                
-                // Soma ao Geral (Total do dia) independente do turno
-                dEntry['Geral'] += v.vagas_totais;
+            if (field) {
+                chartDataMap[dateStr][field] += valor;
+                chartDataMap[dateStr].total += valor;
 
-                if (turno.includes('manh')) {
-                    dEntry['Manhã'] += v.vagas_totais;
-                } else if (turno.includes('tard')) {
-                    dEntry['Tarde'] += v.vagas_totais;
-                } else if (turno.includes('noit')) {
-                    dEntry['Noite'] += v.vagas_totais;
-                } else if (turno.includes('madrug')) {
-                    dEntry['Madrugada'] += v.vagas_totais;
-                }
+                // Calcular excesso baseado na meta dinâmica
+                const metaTurno = metasCalculadas[uid]?.[weekday]?.[turno] || 0;
+                const excesso = Math.max(0, valor - metaTurno);
+                chartDataMap[dateStr][`excesso_${field}`] += excesso;
+                chartDataMap[dateStr].total_excesso += excesso;
             }
         });
 
-        res.json({
-            vacancies: { q1: vacancies_q1, q2: vacancies_q2 },
-            demands:   { q1: demands_q1, q2: demands_q2 }
+        // Calcular máximos para equalizar eixos
+        let maxDemanda = 0;
+        let maxExcesso = 0;
+        
+        Object.values(chartDataMap).forEach(d => {
+            if (d.total > maxDemanda) maxDemanda = d.total;
+            
+            // Para gráfico agrupado, o máximo é o maior valor individual de turno
+            const individualMax = Math.max(d.excesso_manha, d.excesso_tarde, d.excesso_noite, d.excesso_madrugada);
+            if (individualMax > maxExcesso) maxExcesso = individualMax;
         });
+
+        // Adicionar margem de 10% aos máximos
+        maxDemanda = Math.ceil(maxDemanda * 1.1);
+        maxExcesso = Math.ceil(maxExcesso * 1.1);
+
+        const historySorted = Object.values(chartDataMap).sort((a, b) => a.data.localeCompare(b.data));
+
+        return res.json({ 
+            history: historySorted, 
+            metas: metasCalculadas,
+            limits: { maxDemanda, maxExcesso }
+        });
+
     } catch (err) {
-        // Ignorar falha se não tiver tasy_raw_history no ambiente (mock fallback)
-        res.status(500).json({ error: 'Erro ao carregar m?tricas.', details: err.message });
+        res.status(500).json({ error: 'Erro ao processar análise analítica.', details: err.message });
     }
 };
 

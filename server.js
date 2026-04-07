@@ -27,7 +27,7 @@ import {
     getDoctorFutureShiftsForSwap
 } from './api/DirecionadorService.js';
 import {
-    getDashboardMetrics,
+    getHistoricalAnalyticalData,
     getDashboardSummary,
     getManagerProfiles,
     getDoctorAccesses,
@@ -123,7 +123,7 @@ app.delete('/api/vagas/:id/bloquear', releaseShiftHold);
 app.post('/api/vagas/:id/selecionar', selectShift);
 
 // --- Rotas do Gestor ---
-app.get('/api/manager/dashboard', getDashboardMetrics);
+app.get('/api/manager/analise-atendimento', getHistoricalAnalyticalData);
 app.get('/api/manager/dashboard-summary', getDashboardSummary);
 app.get('/api/manager/perfis', getManagerProfiles);
 app.get('/api/manager/medicos', getDoctorAccesses);

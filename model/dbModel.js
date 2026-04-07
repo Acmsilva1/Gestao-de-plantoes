@@ -1924,7 +1924,240 @@ export const dbModel = {
             .maybeSingle();
 
         return unwrap(response, 'Falha ao buscar status da pipeline');
+    },
+
+    async getHistoricalAttendance({ unidadeIds, startDate, endDate }) {
+        let query = supabase
+        const now = new Date();
+        const yyyyMmDd = now.toISOString().split('T')[0];
+        
+        const response = await supabase
+            .from('escala')
+            .select('id, data_plantao, turno')
+            .eq('medico_id', medicoId)
+            .eq('unidade_id', unidadeId)
+            .gte('data_plantao', yyyyMmDd)
+            .order('data_plantao', { ascending: true });
+            
+        const rows = unwrap(response, 'Falha ao listar plantões futuros') || [];
+        
+        // Filter out shifts that are specifically in the past today
+        const shiftTurnConfigs = { 'Madrugada': '01:00:00', 'Manhã': '07:00:00', 'Tarde': '13:00:00', 'Noite': '19:00:00' };
+        return rows.filter(r => {
+            const time = shiftTurnConfigs[r.turno];
+            if (!time) return false;
+            const shiftDate = new Date(`${r.data_plantao}T${time}-03:00`);
+            return shiftDate.getTime() > now.getTime();
+        });
+    },
+
+    // --- MÉTODOS PARA O DATA TRANSPORT (ETL) ---
+
+    async getHistoricalPredictionStats() {
+        const response = await supabase
+            .from('historico_predicao')
+            .select('data', { count: 'exact' })
+            .order('data', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        
+        const data = unwrap(response, 'Falha ao buscar estatísticas do histórico');
+        return {
+            maxDate: data?.data || null
+        };
+    },
+
+    async getHistoricalSourceRows(afterDate) {
+        // Simulando a busca do DB Principal (Oracle/Source). 
+        // No momento, buscamos de uma tabela que atua como nosso buffer de teste.
+        let query = supabase.from('historico_tasy').select('*');
+        
+        if (afterDate) {
+            query = query.gt('data', afterDate); // dt_atendimento no Oracle
+        }
+
+        const response = await query.order('data', { ascending: true });
+        return unwrap(response, 'Falha ao buscar dados da fonte');
+    },
+
+    async upsertHistoricalPrediction(rows) {
+        if (!rows?.length) return [];
+        
+        const response = await supabase
+            .from('historico_predicao')
+            .upsert(rows, { onConflict: 'data,turno,unidade' })
+            .select('data');
+            
+        return unwrap(response, 'Falha ao carregar novos dados de predição');
+    },
+
+    async pruneOldHistoricalPrediction(days = 365) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        const isoCutoff = cutoffDate.toISOString().split('T')[0];
+
+        const response = await supabase
+            .from('historico_predicao')
+            .delete()
+            .lt('data', isoCutoff)
+            .select('data');
+            
+        const rows = unwrap(response, 'Falha na limpeza do histórico');
+        return rows?.length || 0;
+    },
+
+    async getHistoricalPredictionData(startDate = null) {
+        let query = supabase.from('historico_predicao').select('*');
+        if (startDate) {
+            query = query.gte('data', startDate);
+        }
+        const response = await query.order('data', { ascending: true });
+        return unwrap(response, 'Falha ao carregar histórico de predição');
+    },
+
+    async upsertHistoricalTasyMl(rows) {
+        if (!rows || rows.length === 0) return [];
+        const response = await supabase
+            .from('historico_tasy_ml')
+            .upsert(rows, { onConflict: 'unidade,turno,dia_semana' })
+            .select('*');
+        return unwrap(response, 'Falha ao salvar multiplicadores de ML');
+    },
+
+    // --- MÉTODOS ADMINISTRATIVOS (RELATÓRIOS) ---
+
+    async getAdminProductivityReport({ startDate, endDate, medicoId, unidadeId }) {
+        let query = supabase
+            .from('escala')
+            .select(`
+                id,
+                data_plantao,
+                turno,
+                medicos (id, nome, especialidade, crm),
+                unidades (id, nome)
+            `)
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate);
+
+        if (medicoId) query = query.eq('medico_id', medicoId);
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('data_plantao', { ascending: true });
+        return unwrap(response, 'Falha ao gerar relatório de produtividade');
+    },
+
+    async getAdminExchangesReport({ startDate, endDate, medicoId, unidadeId }) {
+        let query = supabase
+            .from('pedidos_troca_escala')
+            .select(`
+                id,
+                data_plantao,
+                turno,
+                status,
+                created_at,
+                medico_solicitante:medicos!medico_solicitante_id (nome),
+                medico_alvo:medicos!medico_alvo_id (nome),
+                unidades (nome)
+            `)
+            .gte('data_plantao', startDate)
+            .lte('data_plantao', endDate);
+
+        if (medicoId) {
+            query = query.or(`medico_solicitante_id.eq.${medicoId},medico_alvo_id.eq.${medicoId}`);
+        }
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('data_plantao', { ascending: true });
+        return unwrap(response, 'Falha ao gerar relatório de trocas');
+    },
+
+    async getAdminCancellationsReport({ startDate, endDate, medicoId, unidadeId }) {
+        // Assumindo estrutura similar à escala/trocas
+        let query = supabase
+            .from('pedidos_cancelamento_escala')
+            .select(`
+                *,
+                medicos (nome),
+                unidades (nome)
+            `)
+            .gte('created_at', `${startDate}T00:00:00Z`)
+            .lte('created_at', `${endDate}T23:59:59Z`);
+
+        if (medicoId) query = query.eq('medico_id', medicoId);
+        if (unidadeId) query = query.eq('unidade_id', unidadeId);
+
+        const response = await query.order('created_at', { ascending: false });
+        return unwrap(response, 'Falha ao gerar relatório de cancelamentos');
+    },
+
+    async updateAdminProfile(adminId, data) {
+        const response = await supabase
+            .from('admins')
+            .update(data)
+            .eq('id', adminId)
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar perfil de administrador');
+    },
+
+    async updatePipelineStatus(data) {
+        const response = await supabase
+            .from('pipeline_status')
+            .upsert({ id: 'main_etl', ...data, updated_at: new Date().toISOString() })
+            .select('*')
+            .single();
+
+        return unwrap(response, 'Falha ao atualizar status da pipeline');
+    },
+
+    async getPipelineStatus() {
+        const response = await supabase
+            .from('pipeline_status')
+            .select('*')
+            .eq('id', 'main_etl')
+            .maybeSingle();
+
+        return unwrap(response, 'Falha ao buscar status da pipeline');
+    },
+
+    async getHistoricalAttendance({ unidadeIds, startDate, endDate }) {
+        // Obter os nomes das unidades para filtrar a tabela de texto historico_tasy
+        let unitNames = [];
+        if (unidadeIds && unidadeIds.length > 0 && !unidadeIds.includes('all')) {
+            const units = await this.getUnits();
+            unitNames = units
+                .filter(u => unidadeIds.includes(String(u.id)))
+                .map(u => u.nome);
+        }
+
+        let query = supabase
+            .from('historico_tasy')
+            .select('*')
+            .gte('data', startDate)
+            .lte('data', endDate);
+
+        // Se houver filtro de unidade, tentamos um match parcial no campo de texto 'unidade'
+        if (unitNames.length > 0) {
+            // Construímos um filtro OR para os nomes das unidades
+            const filters = unitNames.map(name => {
+                // Remove prefixos comuns e UF para melhor match (ex: PS Sig - DF -> PS Sig)
+                const clean = name.replace(/\s*-\s*\w{2}$/, '').trim();
+                return `unidade.ilike.%${clean}%`;
+            });
+            query = query.or(filters.join(','));
+        }
+
+        const response = await query.order('data', { ascending: true });
+        const data = unwrap(response, 'Falha ao buscar atendimentos históricos de historico_tasy');
+
+        // Mapear para o formato esperado pelo ManagerService
+        return (data || []).map(row => ({
+            data_atendimento: row.data,
+            periodo: row.turno,
+            atendimento_count: row.total_atendimentos,
+            unidade_id: row.unidade, // Usamos o texto original como ID temporário para agrupamento
+            unidade_nome: row.unidade
+        }));
     }
 };
-
-
