@@ -1,4 +1,4 @@
-﻿import { dbModel } from '../model/dbModel.js';
+import { dbModel } from '../model/dbModel.js';
 import { TURNOS_ESCALA } from './DirecionadorService.js';
 import { cacheService, escalaEditorCacheKey, escalaEditorCachePattern } from './CacheService.js';
 import { queueService } from './QueueService.js';
@@ -26,7 +26,7 @@ const parseCsvIds = (value) =>
         .map((v) => v.trim())
         .filter(Boolean);
 
-const isMasterManager = (manager) => manager.perfis.nome === 'GESTOR_MASTER';
+const isMasterManager = (manager) => manager?.perfis?.nome === 'GESTOR_MASTER';
 
 const getScopedManager = async (req, res, options = {}) => {
     const { allowMasterWithoutUnit = true } = options;
@@ -82,9 +82,9 @@ export const managerLogin = async (req, res) => {
                 nome: manager.nome,
                 usuario: manager.usuario,
                 senha: manager.senha, // Enviando para que o modal de perfil possa pr?-preencher
-                perfil: manager.perfis.nome || 'GESTOR',
+                perfil: manager.perfis?.nome || 'GESTOR',
                 unidadeId: manager.unidade_id || null,
-                unidadeNome: manager.unidades.nome || null,
+                unidadeNome: manager.unidades?.nome || null,
                 isMaster: isMasterManager(manager)
             }
         });
@@ -106,9 +106,9 @@ export const updateManagerProfile = async (req, res) => {
                 nome: updated.nome,
                 usuario: updated.usuario,
                 senha: updated.senha,
-                perfil: updated.perfis.nome || 'GESTOR',
+                perfil: updated.perfis?.nome || 'GESTOR',
                 unidadeId: updated.unidade_id || null,
-                unidadeNome: updated.unidades.nome || null,
+                unidadeNome: updated.unidades?.nome || null,
                 isMaster: isMasterManager(updated)
             }
         });
@@ -119,15 +119,15 @@ export const updateManagerProfile = async (req, res) => {
 
 export const getManagerProfiles = async (_req, res) => {
     try {
-        const managers = await dbModel.ensureManagersPerUnit();
+        const managers = await dbModel.listManagerProfiles();
         const mapped = (managers || []).map((manager) => ({
             id: manager.id,
             nome: manager.nome,
             usuario: manager.usuario,
             senha: manager.senha || '',
-            perfil: manager.perfis.nome || 'GESTOR',
+            perfil: manager.perfis?.nome || 'GESTOR',
             unidadeId: manager.unidade_id || null,
-            unidadeNome: manager.unidades.nome || '',
+            unidadeNome: manager.unidades?.nome || '',
             isMaster: isMasterManager(manager)
         }));
         res.json(mapped);

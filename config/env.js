@@ -5,8 +5,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = path.resolve(__dirname, '..', '.env');
 
-dotenv.config({ path: rootEnvPath });
-dotenv.config();
+dotenv.config({ path: rootEnvPath, override: true });
+dotenv.config({ override: true }); // Carregamento padrão também com override
+// Triggering restart after port change
 
 export const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY'];
 

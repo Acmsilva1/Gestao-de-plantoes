@@ -78,7 +78,8 @@ export default function LoginView() {
                         setError(`API médicos: ${data.error}. Usando perfis locais.`);
                     }
                 }
-            } catch {
+            } catch (err) {
+                console.error('[LoginView] Erro ao carregar medicos:', err);
                 if (!cancelled) {
                     setMedicoList(FALLBACK_MEDICO_PROFILES);
                     setMedicoId(FALLBACK_MEDICO_PROFILES[0]?.id ?? '');
@@ -120,7 +121,8 @@ export default function LoginView() {
                     setManagerList(GESTOR_PROFILES);
                     setGestorId(GESTOR_PROFILES[0]?.id ?? '');
                 }
-            } catch {
+            } catch (err) {
+                console.error('[LoginView] Erro ao carregar gestores:', err);
                 if (!cancelled) {
                     setManagerList(GESTOR_PROFILES);
                     setGestorId(GESTOR_PROFILES[0]?.id ?? '');
