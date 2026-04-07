@@ -1,0 +1,28 @@
+#!/bin/sh
+
+echo "[pre-commit] Pipeline Guard: iniciando inspeção..."
+
+if command -v python >/dev/null 2>&1; then
+  python pipeline_guard.py --once
+  status=$?
+elif command -v python3 >/dev/null 2>&1; then
+  python3 pipeline_guard.py --once
+  status=$?
+elif command -v py >/dev/null 2>&1; then
+  py -3 pipeline_guard.py --once
+  status=$?
+else
+  echo "[pre-commit] ERRO: Python não encontrado no PATH."
+  echo "[pre-commit] Commit bloqueado."
+  exit 1
+fi
+
+if [ $status -ne 0 ]; then
+  echo "[pre-commit] Falha na inspeção. Commit bloqueado."
+  echo "[pre-commit] Verifique: pipeline_guard_logs/events.log"
+  exit 1
+fi
+
+echo "[pre-commit] Inspeção concluída com sucesso."
+exit 0
+

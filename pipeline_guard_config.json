@@ -1,0 +1,71 @@
+﻿{
+  "watch_roots": [
+    "api",
+    "web/src",
+    "server.js",
+    "package.json",
+    "checkpoint.md"
+  ],
+  "ignore_globs": [
+    ".git/*",
+    "node_modules/*",
+    "web/node_modules/*",
+    "web/dist/*",
+    "dist/*",
+    ".codex-logs/*",
+    "pipeline_guard_logs/*"
+  ],
+  "scan_files_for_encoding": [
+    "web/src/views/ManagerVisaoAnaliticaPage.jsx",
+    "web/src/views/ManagerDashboardPage.jsx",
+    "web/src/views/ManagerRelatoriosPage.jsx",
+    "api/ManagerService.js",
+    "api/CronService.js",
+    "web/src/utils/api.js"
+  ],
+  "encoding_bad_patterns": [
+    "Ã¡",
+    "Ã¢",
+    "Ã£",
+    "Ã§",
+    "Ã©",
+    "Ãª",
+    "Ã­",
+    "Ã³",
+    "Ã´",
+    "Ãµ",
+    "Ãº",
+    "Ã ",
+    "Â",
+    "ï¿½"
+  ],
+  "commands": [
+    {
+      "name": "backend_syntax_manager_service",
+      "cmd": [
+        "node",
+        "--check",
+        "api/ManagerService.js"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "backend_syntax_cron_service",
+      "cmd": [
+        "node",
+        "--check",
+        "api/CronService.js"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "frontend_build",
+      "cmd": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "web"
+    }
+  ]
+}

@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, BrainCircuit, CalendarDays, FileText, Filter, MapPinned } from 'lucide-react';
+import { BarChart3, CalendarDays, FileText, Filter, MapPinned } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../utils/api';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerRelatoriosPage from './ManagerRelatoriosPage';
-import ManagerPredicaoPage from './ManagerPredicaoPage';
 
 const MONTHS = [
     { value: '01', label: 'Janeiro' },
@@ -57,18 +56,11 @@ export default function ManagerVisaoAnaliticaPage() {
     }));
 
     const availableTabs = useMemo(
-        () =>
-            isMaster
-                ? [
-                      { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                      { key: 'relatorios', label: 'Relatórios', icon: FileText },
-                      { key: 'predicao', label: 'Predição', icon: BrainCircuit }
-                  ]
-                : [
-                      { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                      { key: 'relatorios', label: 'Relatórios', icon: FileText }
-                  ],
-        [isMaster]
+        () => [
+            { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+            { key: 'relatorios', label: 'Relatórios', icon: FileText }
+        ],
+        []
     );
 
     const selectedTab = useMemo(() => {
@@ -237,7 +229,7 @@ export default function ManagerVisaoAnaliticaPage() {
                     <div>
                         <p className="text-[11px] font-black uppercase tracking-[0.35em] text-sky-300/80">Monitoramento BI</p>
                         <h2 className="mt-2 text-3xl font-black text-white sm:text-4xl">Visão Analítica</h2>
-                        <p className="mt-2 text-sm text-slate-300">Filtro global único para análise macro nas abas de Dashboard, Relatórios e Predição.</p>
+                        <p className="mt-2 text-sm text-slate-300">Filtro global único para análise macro nas abas de Dashboard e Relatórios.</p>
                     </div>
 
                     <div className="grid w-full max-w-6xl gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -385,7 +377,8 @@ export default function ManagerVisaoAnaliticaPage() {
 
             {!loadingUnits && selectedTab === 'dashboard' ? <ManagerDashboardPage embedded sharedFilters={sharedFilters} /> : null}
             {!loadingUnits && selectedTab === 'relatorios' ? <ManagerRelatoriosPage embedded sharedFilters={sharedFilters} /> : null}
-            {!loadingUnits && selectedTab === 'predicao' && isMaster ? <ManagerPredicaoPage embedded sharedFilters={sharedFilters} /> : null}
         </div>
     );
 }
+
+

@@ -337,7 +337,6 @@ function GestorChrome() {
                             <Route path="escala" element={<ManagerEscalaEditorPage />} />
                             <Route path="escala-modelos" element={<ManagerEscalaTemplatePage />} />
                             <Route path="relatorios" element={<Navigate to="/gestor/visao-analitica?aba=relatorios" replace />} />
-                            <Route path="predicao" element={<Navigate to={isMaster ? "/gestor/visao-analitica?aba=predicao" : "/gestor/visao-analitica?aba=dashboard"} replace />} />
                             <Route path="trocas" element={isMaster ? <Navigate to="/gestor/acessos" replace /> : <ManagerTrocasPage />} />
                             <Route path="aceites-assumir" element={<Navigate to="/gestor/trocas" replace />} />
                             <Route

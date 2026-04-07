@@ -10,7 +10,11 @@
     "web:dev": "npm --prefix web run dev -- --host localhost --port 5173 --strictPort",
     "web:build": "npm --prefix web run build",
     "web:preview": "npm --prefix web run preview",
-    "dev:full": "concurrently \"npm run dev\" \"npm run web:dev\""
+    "dev:full": "concurrently \"npm run dev\" \"npm run web:dev\"",
+    "pipeline:watch": "python pipeline_guard.py",
+    "pipeline:once": "python pipeline_guard.py --once",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "hooks:path": "git config --get core.hooksPath"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

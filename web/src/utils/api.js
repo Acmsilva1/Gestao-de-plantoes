@@ -40,7 +40,7 @@ export async function readApiResponse(response) {
 
     if (!trimmed) {
         return {
-            error: `Sem corpo na resposta (${statusHint}). Confirme que o backend esta a correr (ex.: \`npm run dev\` ou \`dev:full\` na raiz) e que o proxy Vite aponta para a porta correta (PORT no .env).`
+            error: `Sem corpo na resposta (${statusHint}). Confirme que o backend está em execução (ex.: \`npm run dev\` ou \`npm run dev:full\` na raiz), verifique os logs do servidor e valide se o proxy do Vite aponta para a porta correta (PORT no .env).`
         };
     }
 

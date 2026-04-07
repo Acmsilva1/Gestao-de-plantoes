@@ -1,10 +1,10 @@
+﻿import cron from 'node-cron';
 import { dataTransport } from './DataTransportService.js';
 import { calibrationService } from './CalibrationService.js';
-import { recalculateAnalyticalPredictionV2 } from './AnalyticalPredictionServiceV2.js';
 
 /**
- * Serviço de Agendamento (Cron)
- * Orquestra as tarefas de segundo plano da aplicação.
+ * Servico de Agendamento (Cron)
+ * Orquestra as tarefas de segundo plano da aplicacao.
  */
 class CronService {
     constructor() {
@@ -15,43 +15,40 @@ class CronService {
      * Inicializa todos os agendamentos configurados.
      */
     start() {
-        console.log("[Cron] Orquestrador de tarefas iniciado.");
+        console.log('[Cron] Orquestrador de tarefas iniciado.');
 
-        // 1. Sincronização de Dados (Transporte Incremental)
+        // 1. Sincronizacao de Dados (Transporte Incremental)
         // Agendamento: De hora em hora (0 * * * *)
         const syncJob = cron.schedule('0 * * * *', async () => {
             const agora = new Date().toLocaleTimeString('pt-BR');
-            console.log(`[Cron] Executando transporte de dados horário às ${agora}...`);
-            
+            console.log(`[Cron] Executando transporte de dados horario as ${agora}...`);
+
             await dataTransport.syncSlidingWindow();
-            
-            console.log("[Cron] Ciclo de atualização finalizado.");
+
+            console.log('[Cron] Ciclo de atualizacao finalizado.');
         }, {
             scheduled: true,
-            timezone: "America/Sao_Paulo"
+            timezone: 'America/Sao_Paulo'
         });
 
         this.jobs.push(syncJob);
 
-        // 2. Auto-Calibração IA (Tendências Semanais)
-        // Agendamento: Domingos às 01:00 (0 1 * * 0)
+        // 2. Auto-Calibracao IA (Tendencias Semanais)
+        // Agendamento: Domingos as 01:00 (0 1 * * 0)
         const calibrationJob = cron.schedule('0 1 * * 0', async () => {
-            console.log("[Cron] Iniciando ciclo semanal de Auto-Calibração IA...");
-            
+            console.log('[Cron] Iniciando ciclo semanal de Auto-Calibracao IA...');
+
             await calibrationService.autoCalibrate();
-            
-            // Após calibrar, recalculamos a predição atual para usar os novos multiplicadores
-            await recalculateAnalyticalPredictionV2();
-            
-            console.log("[Cron] Calibração e recálculo finalizados.");
+
+            console.log('[Cron] Calibracao finalizada.');
         }, {
             scheduled: true,
-            timezone: "America/Sao_Paulo"
+            timezone: 'America/Sao_Paulo'
         });
 
         this.jobs.push(calibrationJob);
-        
-        // Execução imediata para conferir se há novos dados no startup (opcional, mas bom para debug)
+
+        // Execucao imediata para conferir se ha novos dados no startup (opcional, mas bom para debug)
         // dataTransport.syncSlidingWindow();
         // calibrationService.autoCalibrate();
     }
@@ -60,10 +57,11 @@ class CronService {
      * Interrompe todos os jobs ativos.
      */
     stop() {
-        this.jobs.forEach(job => job.stop());
+        this.jobs.forEach((job) => job.stop());
         this.jobs = [];
-        console.log("[Cron] Orquestrador de tarefas parado.");
+        console.log('[Cron] Orquestrador de tarefas parado.');
     }
 }
 
 export const cronService = new CronService();
+

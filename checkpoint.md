@@ -2,6 +2,12 @@
 
 Este documento rastreia o estado atual da arquitetura, integracoes e proximos passos do projeto.
 
+## 0. Regra Operacional (Codex)
+- Toda alteracao no projeto deve incluir validacao de regressao da tela `Visão Analítica` (Dashboard e Relatórios), cobrindo:
+- integridade visual/textual (sem caracteres corrompidos como `VisÃ£o`, `RelatÃ³rios`, `MÃªs`);
+- fluxo funcional (sem loops, sem erro 500, sem falha de carregamento de filtros e abas);
+- verificacao backend+frontend apos mudancas (`npm run dev`/`npm run dev:full` e build do web).
+
 ## 1. Arquitetura e Estrutura [Status: CONCLUIDO]
 - Modularizacao: aplicacao organizada em estrutura de servicos na pasta `api/`.
 - Limpeza: codigo otimizado e focado em um motor de predicao robusto.

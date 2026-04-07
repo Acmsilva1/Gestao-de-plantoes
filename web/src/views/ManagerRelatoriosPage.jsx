@@ -88,7 +88,7 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
 
     const fetchUnits = async () => {
         try {
-            const resp = await fetch(`/api/manager/unidades?gestorId=${session.id}`);
+            const resp = await fetch(`/api/manager/unidades?gestorId=${encodeURIComponent(session.id)}`);
             const data = await readApiResponse(resp);
             const unitList = Array.isArray(data) ? data : [];
             setUnits(unitList);
@@ -130,14 +130,14 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
 
     useEffect(() => {
         if (!useSharedFilters) return;
-        const unitIds = (sharedFilters?.unitIds || []).map((id) => String(id)).filter(Boolean);
-        setSelectedMonth(sharedFilters?.month || selectedMonth);
-        setSelectedYear(sharedFilters?.year || selectedYear);
-        setSelectedRegional(sharedFilters?.regional || '');
-        setSelectedTurno(sharedFilters?.turno && sharedFilters.turno !== 'TOTAL' ? sharedFilters.turno : 'ALL');
+        const unitIds = (sharedFilters.unitIds || []).map((id) => String(id)).filter(Boolean);
+        setSelectedMonth(sharedFilters.month || selectedMonth);
+        setSelectedYear(sharedFilters.year || selectedYear);
+        setSelectedRegional(sharedFilters.regional || '');
+        setSelectedTurno(sharedFilters.turno && sharedFilters.turno !== 'TOTAL' ? sharedFilters.turno : 'ALL');
         setSelectedUnitIds(unitIds);
         if (unitIds[0]) setSelectedUnit(unitIds[0]);
-    }, [useSharedFilters, sharedFilters?.month, sharedFilters?.year, sharedFilters?.regional, sharedFilters?.turno, sharedFilters?.unitIds]);
+    }, [useSharedFilters, sharedFilters.month, sharedFilters.year, sharedFilters.regional, sharedFilters.turno, sharedFilters.unitIds]);
 
     useEffect(() => { fetchUnits(); }, []);
     useEffect(() => { fetchReport(); }, [selectedMonth, selectedYear, selectedUnit, selectedUnitIds, selectedRegional, selectedTurno]);
@@ -156,8 +156,8 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
         setSelectedUnitIds((current) => {
             if (!selectedRegional) {
                 const allIds = (units || []).map((u) => String(u.id));
-                return areSameIds(current, allIds) ? current : allIds;
-            }
+                    return areSameIds(current, allIds) ? current : allIds;
+                }
             const kept = current.filter((id) => allowedIds.has(String(id)));
             const next = kept.length > 0 ? kept : (visibleUnits || []).map((u) => String(u.id));
             return areSameIds(current, next) ? current : next;
@@ -177,8 +177,8 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
             .filter(Boolean);
         const unitLabel = session.isMaster
             ? (selectedNames.length ? selectedNames.join(' | ') : 'CONSOLIDADO REDE')
-            : (selectedUnit === 'all' ? 'CONSOLIDADO REDE' : units.find(u => String(u.id) === String(selectedUnit))?.nome?.toUpperCase());
-        const monthLabel = MONTHS.find(m => m.value === selectedMonth)?.label?.toUpperCase();
+            : (selectedUnit === 'all' ? 'CONSOLIDADO REDE' : units.find((u) => String(u.id) === String(selectedUnit))?.nome?.toUpperCase?.() || 'CONSOLIDADO REDE');
+        const monthLabel = MONTHS.find(m => m.value === selectedMonth).label.toUpperCase();
         
         const occupancyRows = reportData.occupancyByUnit.map((u, idx) => `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -243,7 +243,7 @@ export default function ManagerRelatoriosPage({ embedded = false, sharedFilters 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2family=Inter:wght@400;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
