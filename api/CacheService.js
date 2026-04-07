@@ -10,6 +10,8 @@ class CacheService {
         this.client = null;
         this.connectingPromise = null;
         this.warnedDisabled = false;
+        this.lastError = '';
+        this.retryAfter = 0;
     }
 
     isEnabled() {
@@ -24,16 +26,28 @@ class CacheService {
             }
             return null;
         }
+        if (Date.now() < this.retryAfter) return null;
         if (this.client?.isOpen) return this.client;
         if (this.connectingPromise) return this.connectingPromise;
 
         this.connectingPromise = (async () => {
-            const client = createClient({ url: env.redisUrl });
+            const client = createClient({
+                url: env.redisUrl,
+                socket: {
+                    reconnectStrategy: false
+                }
+            });
             client.on('error', (err) => {
-                console.error('[cache] erro redis:', err.message);
+                const message = err?.message || 'erro desconhecido';
+                if (message !== this.lastError) {
+                    console.error('[cache] erro redis:', message);
+                }
+                this.lastError = err.message;
             });
             await client.connect();
             this.client = client;
+            this.lastError = '';
+            this.retryAfter = 0;
             console.log('[cache] Redis conectado.');
             return this.client;
         })();
@@ -42,6 +56,16 @@ class CacheService {
             return await this.connectingPromise;
         } catch (err) {
             console.error('[cache] falha ao conectar Redis:', err.message);
+            this.lastError = err.message;
+            this.retryAfter = Date.now() + 30_000;
+            if (this.client) {
+                try {
+                    this.client.removeAllListeners();
+                    await this.client.quit();
+                } catch {
+                    // noop
+                }
+            }
             this.client = null;
             return null;
         } finally {
@@ -97,6 +121,25 @@ class CacheService {
         } catch (err) {
             console.error('[cache] erro em delByPattern:', err.message);
             return deleted;
+        }
+    }
+
+    async getHealth() {
+        const enabled = this.isEnabled();
+        if (!enabled) {
+            return { enabled: false, connected: false, status: 'disabled', lastError: this.lastError || null };
+        }
+        const client = await this.ensureClient();
+        const connected = Boolean(client?.isOpen);
+        if (!connected) {
+            return { enabled: true, connected: false, status: 'degraded', lastError: this.lastError || 'redis indisponivel' };
+        }
+        try {
+            await client.ping();
+            return { enabled: true, connected: true, status: 'ok', lastError: null };
+        } catch (err) {
+            this.lastError = err.message;
+            return { enabled: true, connected: false, status: 'degraded', lastError: err.message };
         }
     }
 }

@@ -14,7 +14,10 @@
     "pipeline:watch": "python pipeline_guard.py",
     "pipeline:once": "python pipeline_guard.py --once",
     "hooks:install": "git config core.hooksPath .githooks",
-    "hooks:path": "git config --get core.hooksPath"
+    "hooks:path": "git config --get core.hooksPath",
+    "infra:up": "docker compose -f docker-compose.infra.yml up -d",
+    "infra:down": "docker compose -f docker-compose.infra.yml down",
+    "infra:logs": "docker compose -f docker-compose.infra.yml logs -f --tail=150"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

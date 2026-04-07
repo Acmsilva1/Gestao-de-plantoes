@@ -1353,7 +1353,8 @@ export const getReportsData = async (req, res) => {
         // 1. Occupancy Data (4 turnos obrigatorios por dia em cada unidade)
         const [reportYear, reportMonth] = month.split('-').map(Number);
         const daysInMonth = new Date(Date.UTC(reportYear, reportMonth, 0)).getUTCDate();
-        const unitsCatalog = scopedUnitIds.length
+        const hasScopedUnitIds = Array.isArray(scopedUnitIds) && scopedUnitIds.length > 0;
+        const unitsCatalog = hasScopedUnitIds
             ? (unitsCatalogRaw || []).filter((u) => scopedUnitIds.includes(String(u.id)))
             : unitsCatalogRaw || [];
         const unitNameCatalog = new Map((unitsCatalog || []).map((u) => [u.id, u.nome]));
@@ -1362,41 +1363,45 @@ export const getReportsData = async (req, res) => {
         unitsCatalog.forEach((u) => {
             if (u.id && u.nome) unitNameById.set(u.id, u.nome);
         });
-        disponibilidadeRows.forEach(r => { if (r.unidade_id && r.unidades.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
-        escalaRows.forEach(r => { if (r.unidade_id && r.unidades.nome) unitNameById.set(r.unidade_id, r.unidades.nome); });
+        disponibilidadeRows.forEach((r) => {
+            if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
+        });
+        escalaRows.forEach((r) => {
+            if (r?.unidade_id && r?.unidades?.nome) unitNameById.set(r.unidade_id, r.unidades.nome);
+        });
 
         const isRegionalMatch = (unidadeNome) => {
             if (!regionalFiltro) return true;
             const mapped = regionaisPorUnidade.get(normalizeText(unidadeNome));
-            if (!mapped.size) return false;
+            if (!mapped || !mapped.size) return false;
             return Array.from(mapped).some((r) => normalizeText(r) === normalizeText(regionalFiltro));
         };
 
         const escalaRowsFiltradas = (escalaRows || []).filter((row) => {
-            const unidadeNome = row.unidades.nome || unitNameCatalog.get(row.unidade_id) || '';
+            const unidadeNome = row?.unidades?.nome || unitNameCatalog.get(row?.unidade_id) || '';
             if (!isRegionalMatch(unidadeNome)) return false;
-            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            if (turnoFiltro && normalizeTurno(row?.turno) !== turnoFiltro) return false;
             return true;
         });
 
         const swapRequestsFiltradas = (swapRequests || []).filter((row) => {
-            const unidadeNome = row.unidade.nome || '';
+            const unidadeNome = row?.unidade?.nome || '';
             if (!isRegionalMatch(unidadeNome)) return false;
-            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            if (turnoFiltro && normalizeTurno(row?.turno) !== turnoFiltro) return false;
             return true;
         });
 
         const cancelamentoRowsFiltradas = (cancelamentoRows || []).filter((row) => {
-            const unidadeNome = row.unidades.nome || '';
+            const unidadeNome = row?.unidades?.nome || '';
             if (!isRegionalMatch(unidadeNome)) return false;
-            if (turnoFiltro && normalizeTurno(row.turno) !== turnoFiltro) return false;
+            if (turnoFiltro && normalizeTurno(row?.turno) !== turnoFiltro) return false;
             return true;
         });
 
         const occupiedByUnit = new Map();
 
         escalaRowsFiltradas.forEach(row => {
-            const unitId = row.unidade_id;
+            const unitId = row?.unidade_id;
             const current = occupiedByUnit.get(unitId) || 0;
             occupiedByUnit.set(unitId, current + 1);
         });
@@ -1427,8 +1432,8 @@ export const getReportsData = async (req, res) => {
             if (!doctorByUnit.has(key)) {
                 doctorByUnit.set(key, {
                     unidade: unitNameById.get(row.unidade_id) || 'Unidade',
-                    medico: row.medicos.nome || 'M?dico',
-                    crm: row.medicos.crm || '',
+                    medico: row?.medicos?.nome || 'Médico',
+                    crm: row?.medicos?.crm || '',
                     total: 0
                 });
             }
@@ -1439,11 +1444,11 @@ export const getReportsData = async (req, res) => {
         // 3. Swap Demands
         const swapDemands = swapRequestsFiltradas.map(r => ({
             id: r.id,
-            unidade: r.unidade.nome || 'Unidade',
+            unidade: r?.unidade?.nome || 'Unidade',
             data: r.data_plantao,
             turno: r.turno,
-            solicitante: r.solicitante.nome || 'M?dico',
-            alvo: r.alvo.nome || 'M?dico',
+            solicitante: r?.solicitante?.nome || 'Médico',
+            alvo: r?.alvo?.nome || 'Médico',
             status: r.status,
             criado_em: r.created_at
         }));
@@ -1451,11 +1456,11 @@ export const getReportsData = async (req, res) => {
         // 4. Cancelamentos
         const cancelamentos = cancelamentoRowsFiltradas.map(r => ({
             id: r.id,
-            unidade: r.unidades.nome || 'Unidade',
+            unidade: r?.unidades?.nome || 'Unidade',
             data: r.data_plantao,
             turno: r.turno,
-            medico: r.medicos.nome || 'M?dico',
-            crm: r.medicos.crm || '',
+            medico: r?.medicos?.nome || 'Médico',
+            crm: r?.medicos?.crm || '',
             status: r.status,
             criado_em: r.created_at
         }));

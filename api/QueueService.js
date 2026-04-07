@@ -7,6 +7,7 @@ class QueueService {
         this.channel = null;
         this.connectingPromise = null;
         this.warnedDisabled = false;
+        this.lastError = '';
     }
 
     isEnabled() {
@@ -28,6 +29,7 @@ class QueueService {
             this.connection = await amqp.connect(env.rabbitMqUrl);
             this.connection.on('error', (err) => {
                 console.error('[queue] erro de conexao RabbitMQ:', err.message);
+                this.lastError = err.message;
                 this.connection = null;
                 this.channel = null;
             });
@@ -37,6 +39,7 @@ class QueueService {
             });
             this.channel = await this.connection.createChannel();
             await this.channel.assertExchange(env.rabbitMqExchange, 'topic', { durable: true });
+            this.lastError = '';
             console.log(`[queue] RabbitMQ conectado. Exchange: ${env.rabbitMqExchange}`);
             return this.channel;
         })();
@@ -45,6 +48,7 @@ class QueueService {
             return await this.connectingPromise;
         } catch (err) {
             console.error('[queue] falha ao conectar RabbitMQ:', err.message);
+            this.lastError = err.message;
             this.connection = null;
             this.channel = null;
             return null;
@@ -66,6 +70,19 @@ class QueueService {
             console.error('[queue] erro ao publicar mensagem:', err.message);
             return false;
         }
+    }
+
+    async getHealth() {
+        const enabled = this.isEnabled();
+        if (!enabled) {
+            return { enabled: false, connected: false, status: 'disabled', lastError: this.lastError || null };
+        }
+        const channel = await this.ensureChannel();
+        const connected = Boolean(channel && this.connection);
+        if (!connected) {
+            return { enabled: true, connected: false, status: 'degraded', lastError: this.lastError || 'rabbitmq indisponivel' };
+        }
+        return { enabled: true, connected: true, status: 'ok', lastError: null };
     }
 }
 

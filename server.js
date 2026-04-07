@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import { env, getMissingEnvVars, hasDatabaseEnv } from './config/env.js';
 import { startPredictionScheduler, triggerPredictionCycle } from './api/SchedulerService.js';
 import { cronService } from './api/CronService.js';
+import { cacheService } from './api/CacheService.js';
+import { queueService } from './api/QueueService.js';
 import {
     getDoctorCalendar,
     getDoctorAgenda,
@@ -86,10 +88,21 @@ app.use('/api', (req, res, next) => {
     });
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+    const cache = await cacheService.getHealth();
+    const queue = await queueService.getHealth();
+    const databaseOk = hasDatabaseEnv();
+    const infraOk =
+        (!cache.enabled || cache.status === 'ok') &&
+        (!queue.enabled || queue.status === 'ok');
+
     res.json({
-        status: hasDatabaseEnv() ? 'ok' : 'degraded',
-        missingEnvVars: getMissingEnvVars()
+        status: databaseOk && infraOk ? 'ok' : 'degraded',
+        missingEnvVars: getMissingEnvVars(),
+        infra: {
+            cache,
+            queue
+        }
     });
 });
 
@@ -182,6 +195,15 @@ if (fs.existsSync(distPath)) {
 
 const server = app.listen(env.port, () => {
     console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
+
+    // Pre-aquecimento não bloqueante para aproximar comportamento de produção
+    if (env.enableRedis) {
+        cacheService.ensureClient().catch(() => {});
+    }
+    if (env.enableQueue) {
+        queueService.ensureChannel().catch(() => {});
+    }
+
     if (hasDatabaseEnv() && !env.disablePredictorScheduler) {
         startPredictionScheduler();
         cronService.start(); // Inicia o transporte de dados (6h e 18h)
