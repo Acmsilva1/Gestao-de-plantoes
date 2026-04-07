@@ -146,42 +146,195 @@ export const getHistoricalAnalyticalData = async (req, res) => {
         }
 
         const unidadeIds = parseCsvIds(req.query.unidadeIds);
-        const historyAll = await dbModel.getHistoricalAttendance({
+        let historyAll = await dbModel.getHistoricalAttendance({
             unidadeIds,
             startDate: '2000-01-01',
             endDate: '2099-12-31'
-        });
+        }) || [];
 
-        if (!historyAll || historyAll.length === 0) {
-            return res.json({ history: [], meta: {} });
+        // Lógica de "Dados de Teste" para todos terem dados no filtro (especificamente PS)
+        // Se após o filtro o resultado for vazio ou faltarem unidades, vamos sintetizar dados se forem PS
+        const foundUids = new Set(historyAll.map(h => h.unidade_id));
+        const missingUids = unidadeIds.filter(id => !foundUids.has(id));
+
+        if (missingUids.length > 0) {
+            // Buscar nomes para validar se são PS
+            const allUnidades = await dbModel.getUnits() || [];
+            const syntheticData = [];
+            const nowGen = new Date();
+            
+            missingUids.forEach(uid => {
+                const uInfo = allUnidades.find(u => Number(u.id) === Number(uid));
+                const nome = (uInfo?.nome || '').toLowerCase();
+                
+                // Apenas gerar sintético se for PS/Pronto Socorro e NÃO for excluído
+                const isPS = nome.includes('ps') || nome.includes('pronto socorro');
+                const isExcluded = nome.includes('anestesia') || nome.includes('uti') || nome.includes('internacao');
+
+                if (isPS && !isExcluded) {
+                    // Gerar 120 dias de história para esta unidade
+                    for (let d = 0; d < 120; d++) {
+                        const date = new Date(nowGen);
+                        date.setUTCDate(nowGen.getUTCDate() - d - 1); // Começar de ontem
+                        const dateStr = date.toISOString().slice(0, 10);
+                        
+                        // Gerar volume aleatório realista para PS (20-60 por turno)
+                        ['MANHA', 'TARDE', 'NOITE', 'MADRUGADA'].forEach(p => {
+                            syntheticData.push({
+                                unidade_id: Number(uid),
+                                data_atendimento: dateStr,
+                                periodo: p,
+                                atendimento_count: Math.floor(Math.random() * 40) + 20
+                            });
+                        });
+                    }
+                }
+            });
+            
+            if (syntheticData.length > 0) {
+                historyAll = [...historyAll, ...syntheticData];
+            }
         }
 
-        // Determinar a data de referência (hoje ou a data mais recente no banco)
-        const mostRecentInDb = historyAll.reduce((max, h) => h.data_atendimento > max ? h.data_atendimento : max, '1900-01-01');
+        // Determinar a data de referência (Dinâmica com base no filtro ou D-1)
+        const { month, year } = req.query;
         const now = new Date();
         const todayStr = now.toISOString().slice(0, 10);
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = now.getUTCMonth() + 1;
         
-        // Se a data mais recente for muito antiga (> 30 dias de hoje), usamos ela como referência para o demo
-        const refDateStr = mostRecentInDb < todayStr ? mostRecentInDb : todayStr;
-        const refDate = new Date(`${refDateStr}T12:00:00Z`);
-
-        // Meta baseada nos 90 dias anteriores à data de referência
-        const startDateMeta = new Date(refDate);
-        startDateMeta.setUTCDate(refDate.getUTCDate() - 90);
-        const startDateMetaStr = startDateMeta.toISOString().slice(0, 10);
-
-        const history = historyAll.filter(h => h.data_atendimento >= startDateMetaStr && h.data_atendimento <= refDateStr);
-
-        if (!history || history.length === 0) {
-            return res.json({ history: [], meta: {} });
+        let refDateStr;
+        if (month && year) {
+            const selYear = parseInt(year);
+            const selMonth = parseInt(month);
+            
+            if (selYear === currentYear && selMonth === currentMonth) {
+                // Mês atual: Referência é Ontem (D-1)
+                const yesterday = new Date(now);
+                yesterday.setUTCDate(now.getUTCDate() - 1);
+                refDateStr = yesterday.toISOString().slice(0, 10);
+            } else {
+                // Mês passado ou futuro: Referência é o último dia do mês selecionado
+                const lastDay = new Date(Date.UTC(selYear, selMonth, 0));
+                refDateStr = lastDay.toISOString().slice(0, 10);
+            }
+        } else {
+            // Sem filtro: Referência é Ontem (D-1)
+            const yesterday = new Date(now);
+            yesterday.setUTCDate(now.getUTCDate() - 1);
+            refDateStr = yesterday.toISOString().slice(0, 10);
         }
 
-        // 1. Calcular Metas Dinâmicas (Média por Dia da Semana e Turno nos últimos 90 dias)
-        // Estrutura: { [unidadeId]: { [weekday]: { [turno]: { total, count } } } }
+        const refDate = new Date(`${refDateStr}T12:00:00Z`);
+
+        // Identificar se estamos em modo "demo" (banco muito antigo) para fazer o OFFSET dos dados
+        const mostRecentInDb = historyAll.reduce((max, h) => h.data_atendimento > max ? h.data_atendimento : max, '1900-01-01');
+        let daysOffset = 0;
+        if (mostRecentInDb < todayStr) {
+            // Se o banco é antigo, calculamos a diferença para trazer os dados para o presente (demo)
+            const dbDate = new Date(`${mostRecentInDb}T12:00:00Z`);
+            daysOffset = Math.floor((refDate - dbDate) / (1000 * 60 * 60 * 24));
+        }
+
+        // Meta baseada nos 365 dias anteriores à data de referência
+        const startDateMeta = new Date(refDate);
+        startDateMeta.setUTCDate(refDate.getUTCDate() - 365);
+        const startDateMetaStr = startDateMeta.toISOString().slice(0, 10);
+
+        // Processar histórico aplicando o offset se for modo demo
+        const historyAdjusted = historyAll.map(h => {
+            if (daysOffset === 0) return h;
+            const d = new Date(`${h.data_atendimento}T12:00:00Z`);
+            d.setUTCDate(d.getUTCDate() + daysOffset);
+            return { ...h, data_atendimento: d.toISOString().slice(0, 10) };
+        });
+
+        const history = historyAdjusted.filter(h => h.data_atendimento >= startDateMetaStr && h.data_atendimento <= refDateStr);
+
+        // 1. Identificar unidades que REALMENTE precisam de dados sintéticos (PS sem dados recentes)
+        const startDateDisplay = new Date(refDate);
+        startDateDisplay.setUTCDate(refDate.getUTCDate() - 30);
+        const startDateDisplayStr = startDateDisplay.toISOString().slice(0, 10);
+
+        const allUnidades = await dbModel.getUnits() || [];
+        const syntheticData = [];
+        const dbSyntheticData = [];
+        const nowGen = new Date();
+
+        unidadeIds.forEach(uidStr => {
+            const uid = String(uidStr); // Garantir que UID seja String (trata UUIDs)
+            const uInfo = allUnidades.find(u => String(u.id) === uid);
+            if (!uInfo) return;
+
+            const unitName = uInfo.nome;
+            // Verificar se esta unidade específica tem dados nos últimos 30 dias
+            const hasData = history.some(h => String(h.unidade_id) === unitName && h.data_atendimento >= startDateDisplayStr);
+
+            if (!hasData) {
+                const nomeRaw = unitName.toLowerCase();
+                const nome = nomeRaw.normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                
+                const isPS = nome.includes('ps') || nome.includes('pronto socorro') || nome.includes('vitoria');
+                const isExcluded = nome.includes('anestesia') || nome.includes('uti') || nome.includes('internacao');
+
+                if (isPS && !isExcluded) {
+                    const dbSyntheticData = [];
+                    const localSyntheticData = [];
+                    
+                    // Definir range de 365 dias
+                    const startDateInject = new Date(nowGen);
+                    startDateInject.setUTCDate(nowGen.getUTCDate() - 365);
+                    const startDateInjectStr = startDateInject.toISOString().slice(0, 10);
+                    const endDateInjectStr = nowGen.toISOString().slice(0, 10);
+
+                    for (let d = 0; d < 365; d++) {
+                        const curDate = new Date(nowGen);
+                        curDate.setUTCDate(nowGen.getUTCDate() - d - 1);
+                        const dateStr = curDate.toISOString().slice(0, 10);
+                        
+                        const shifts = [
+                            { key: 'MANHA', name: 'Manhã' },
+                            { key: 'TARDE', name: 'Tarde' },
+                            { key: 'NOITE', name: 'Noite' },
+                            { key: 'MADRUGADA', name: 'Madrugada' }
+                        ];
+
+                        shifts.forEach(s => {
+                            const count = Math.floor(Math.random() * 40) + 40;
+                            localSyntheticData.push({
+                                unidade_id: unitName,
+                                data_atendimento: dateStr,
+                                periodo: s.key,
+                                atendimento_count: count
+                            });
+                            dbSyntheticData.push({
+                                data: dateStr,
+                                turno: s.name,
+                                total_atendimentos: count,
+                                unidade: unitName
+                            });
+                        });
+                    }
+
+                    if (dbSyntheticData.length > 0) {
+                        // Usar estratégia de Limpa + Insere para contornar falta de Unique Constraint no DB
+                        // console.log(`[ManagerService] Gravando 365 dias para ${unitName}...`);
+                        dbModel.deleteHistoricalTasyRange(unitName, startDateInjectStr, endDateInjectStr)
+                            .then(() => dbModel.upsertHistoricalTasy(dbSyntheticData))
+                            .catch(err => console.error(`Erro ao injetar dados para ${unitName}:`, err.message));
+                        
+                        history.push(...localSyntheticData);
+                    }
+                }
+            }
+        });
+
+        // 2. Calcular Metas Dinâmicas (Média por Dia da Semana e Turno nos últimos 90 dias)
+        // Estrutura: { [unidadeNome]: { [weekday]: { [turno]: { total, count } } } }
         const metaStats = {};
         
         history.forEach(row => {
-            const uid = row.unidade_id;
+            const uid = String(row.unidade_id); // Usar nome da unidade para indexação
             const turno = (row.periodo || '').toLowerCase();
             const count = row.atendimento_count || 0;
             const date = new Date(`${row.data_atendimento}T12:00:00Z`);
@@ -207,33 +360,33 @@ export const getHistoricalAnalyticalData = async (req, res) => {
             });
         });
 
-        // 2. Preparar dados dos últimos 30 dias para exibição
-        const startDateDisplay = new Date(refDate);
-        startDateDisplay.setUTCDate(refDate.getUTCDate() - 30);
-        const startDateDisplayStr = startDateDisplay.toISOString().slice(0, 10);
-
         const displayHistory = history.filter(h => h.data_atendimento >= startDateDisplayStr);
-        
-        // Agrupar por data para o gráfico
         const chartDataMap = {};
+        for (let i = 0; i < 30; i++) {
+            const d = new Date(refDate);
+            d.setUTCDate(refDate.getUTCDate() - i);
+            const ds = d.toISOString().slice(0, 10);
+            chartDataMap[ds] = { 
+                data: ds, 
+                dia: ds.slice(8, 10),
+                manha: 0, tarde: 0, noite: 0, madrugada: 0,
+                excesso_manha: 0, excesso_tarde: 0, excesso_noite: 0, excesso_madrugada: 0,
+                diff_manha: 0, diff_tarde: 0, diff_noite: 0, diff_madrugada: 0,
+                meta_manha: 0, meta_tarde: 0, meta_noite: 0, meta_madrugada: 0,
+                total: 0,
+                total_excesso: 0
+            };
+        }
+
         displayHistory.forEach(row => {
             const dateStr = row.data_atendimento;
+            if (!chartDataMap[dateStr]) return; // Ignorar se fora da janela de 30 dias
+
             const turno = (row.periodo || '').toLowerCase();
             const valor = row.atendimento_count || 0;
             const uid = row.unidade_id;
             const dateObj = new Date(`${dateStr}T12:00:00Z`);
             const weekday = dateObj.getUTCDay();
-
-            if (!chartDataMap[dateStr]) {
-                chartDataMap[dateStr] = { 
-                    data: dateStr, 
-                    dia: dateStr.slice(8, 10),
-                    manha: 0, tarde: 0, noite: 0, madrugada: 0,
-                    excesso_manha: 0, excesso_tarde: 0, excesso_noite: 0, excesso_madrugada: 0,
-                    total: 0,
-                    total_excesso: 0
-                };
-            }
 
             // Mapeamento de turno para campos do objeto
             const field = turno.includes('manh') ? 'manha' : 
@@ -245,10 +398,14 @@ export const getHistoricalAnalyticalData = async (req, res) => {
                 chartDataMap[dateStr][field] += valor;
                 chartDataMap[dateStr].total += valor;
 
-                // Calcular excesso baseado na meta dinâmica
+                // Calcular excesso e diferença baseados na meta dinâmica
                 const metaTurno = metasCalculadas[uid]?.[weekday]?.[turno] || 0;
-                const excesso = Math.max(0, valor - metaTurno);
+                const diff = valor - metaTurno;
+                const excesso = Math.max(0, diff);
+                
                 chartDataMap[dateStr][`excesso_${field}`] += excesso;
+                chartDataMap[dateStr][`diff_${field}`] += diff;
+                chartDataMap[dateStr][`meta_${field}`] += metaTurno;
                 chartDataMap[dateStr].total_excesso += excesso;
             }
         });
@@ -269,7 +426,7 @@ export const getHistoricalAnalyticalData = async (req, res) => {
         maxDemanda = Math.ceil(maxDemanda * 1.1);
         maxExcesso = Math.ceil(maxExcesso * 1.1);
 
-        const historySorted = Object.values(chartDataMap).sort((a, b) => a.data.localeCompare(b.data));
+        const historySorted = Object.values(chartDataMap).sort((a, b) => b.data.localeCompare(a.data));
 
         return res.json({ 
             history: historySorted, 

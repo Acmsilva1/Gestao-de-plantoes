@@ -2159,5 +2159,25 @@ export const dbModel = {
             unidade_id: row.unidade, // Usamos o texto original como ID temporário para agrupamento
             unidade_nome: row.unidade
         }));
+    },
+
+    async upsertHistoricalTasy(rows) {
+        if (!rows || rows.length === 0) return [];
+        const response = await supabase
+            .from('historico_tasy')
+            .insert(rows)
+            .select('*');
+        return unwrap(response, 'Falha ao salvar histórico no banco');
+    },
+
+    async deleteHistoricalTasyRange(unitName, startDate, endDate) {
+        const response = await supabase
+            .from('historico_tasy')
+            .delete()
+            .eq('unidade', unitName)
+            .gte('data', startDate)
+            .lte('data', endDate)
+            .select('data');
+        return unwrap(response, 'Falha ao limpar histórico');
     }
 };

@@ -44,6 +44,8 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
         return session?.unidadeId ? [session.unidadeId] : [];
     }, [sharedFilters?.unitIds, session?.unidadeId]);
 
+    const { month, year } = sharedFilters || {};
+
     useEffect(() => {
         if (!session?.id) return;
 
@@ -54,6 +56,8 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
             try {
                 const params = new URLSearchParams();
                 params.set('gestorId', session.id);
+                if (month) params.set('month', month);
+                if (year) params.set('year', year);
                 if (unitIds.length > 0) params.set('unidadeIds', unitIds.join(','));
 
                 const response = await fetch(`/api/manager/analise-atendimento?${params.toString()}`);
@@ -69,7 +73,7 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
         })();
 
         return () => { cancelled = true; };
-    }, [session?.id, unitIds]);
+    }, [session?.id, unitIds, month, year]);
 
     const q1Data = useMemo(() => data.history.slice(0, 15), [data.history]);
     const q2Data = useMemo(() => data.history.slice(15), [data.history]);
@@ -99,175 +103,148 @@ export default function ManagerPredicaoPage({ embedded = false, sharedFilters = 
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
             {/* Cards de Resumo Analítico */}
             <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md">
+                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md transition-all hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-sky-500/10">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Demanda Total (30d)</p>
                     <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-white">{stats.total}</span>
+                        <span className="text-3xl font-black text-white leading-none">{stats.total}</span>
                         <span className="text-xs text-slate-400">atendimentos</span>
                     </div>
                 </div>
-                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md">
+                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md transition-all hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-rose-500/10">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Volume Extra (Acima Meta)</p>
                     <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-rose-400">{stats.excesso}</span>
+                        <span className="text-3xl font-black text-rose-400 leading-none">{stats.excesso}</span>
                         <span className="text-xs text-slate-400">atendimentos</span>
                     </div>
                 </div>
-                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md">
+                <div className="rounded-[2rem] border border-slate-700/50 bg-slate-900/40 p-6 backdrop-blur-md transition-all hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-amber-500/10">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Frequência de Sobrecarga</p>
                     <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-amber-400">{stats.diasComExcesso}</span>
+                        <span className="text-3xl font-black text-amber-400 leading-none">{stats.diasComExcesso}</span>
                         <span className="text-xs text-slate-400">dias afetados</span>
                     </div>
                 </div>
             </div>
 
-            {/* SEÇÃO 1: DEMANDA TOTAL */}
-            <div className="space-y-6">
+            {/* TABELA 1: DEMANDA REAL */}
+            <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-1 rounded-full bg-sky-500 shadow-[0_0_15px_rgba(14,165,233,0.5)]" />
+                        <div>
+                            <h3 className="text-xl font-black text-white">Demanda Real por Unidade</h3>
+                            <p className="text-xs text-slate-400">Volume diário consolidado nos últimos 30 dias.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className={cardClass + " !p-0"}>
+                    <div className="max-h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                        <table className="w-full text-left border-separate border-spacing-0">
+                            <thead>
+                                <tr className="sticky top-0 z-20 border-b border-slate-800/60 bg-slate-900 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
+                                    <th className="sticky left-0 top-0 bg-slate-900 z-30 px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500">Data</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Manhã</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Tarde</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Noite</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Madrugada</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-sky-400 text-right">Total Dia</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/30">
+                                {data.history.map((row, idx) => {
+                                    const renderValMeta = (val, meta) => (
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <span className="text-[14px] font-black text-white">{val || 0}</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Meta: {meta || 0}</span>
+                                        </div>
+                                    );
+
+                                    return (
+                                        <tr key={idx} className="group hover:bg-white/[0.02] transition-colors">
+                                            <td className="sticky left-0 bg-slate-900/95 z-10 px-6 py-3 border-r border-slate-800/30">
+                                                <span className="text-[13px] font-bold text-slate-300 group-hover:text-white transition-colors">
+                                                    {row.data.split('-').reverse().slice(0, 2).join('/')}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-center">{renderValMeta(row.manha, row.meta_manha)}</td>
+                                            <td className="px-6 py-3 text-center">{renderValMeta(row.tarde, row.meta_tarde)}</td>
+                                            <td className="px-6 py-3 text-center">{renderValMeta(row.noite, row.meta_noite)}</td>
+                                            <td className="px-6 py-3 text-center">{renderValMeta(row.madrugada, row.meta_madrugada)}</td>
+                                            <td className="px-6 py-3 text-right">
+                                                <span className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-xs font-black border border-sky-500/20">
+                                                    {row.total}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            {/* TABELA 2: DESEMPENHO VS META */}
+            <section className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-1 rounded-full bg-sky-500" />
+                    <div className="h-8 w-1 rounded-full bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]" />
                     <div>
-                        <h3 className="text-xl font-black text-white">Demanda Real por Turno</h3>
-                        <p className="text-xs text-slate-400">Volume total de atendimentos realizados nos últimos 30 dias.</p>
+                        <h3 className="text-xl font-black text-white">Análise de Performance vs Meta</h3>
+                        <p className="text-xs text-slate-400">Diferença em relação à média móvel dinâmica de 90 dias.</p>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-8">
-                    <section className={cardClass}>
-                        <div className="mb-4 flex items-center justify-between">
-                            <span className="text-sm font-black uppercase tracking-widest text-sky-400">1ª Quinzena (Dia 1-15)</span>
-                        </div>
-                        <div className="h-[500px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={q1Data} margin={{ top: 20, right: 10, left: 10, bottom: 0 }} barCategoryGap="45%" barGap={2}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={true} />
-                                    <XAxis dataKey="dia" stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} domain={[0, data.limits?.maxDemanda || 'auto']} />
-                                    <Tooltip content={ChartTooltip} />
-                                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                                    <Bar dataKey="manha" name="Manhã" stackId="a" fill={SHIFT_COLORS.manha} minPointSize={10}>
-                                        <LabelList dataKey="manha" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="tarde" name="Tarde" stackId="a" fill={SHIFT_COLORS.tarde} minPointSize={10}>
-                                        <LabelList dataKey="tarde" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="noite" name="Noite" stackId="a" fill={SHIFT_COLORS.noite} minPointSize={10}>
-                                        <LabelList dataKey="noite" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="madrugada" name="Madrugada" stackId="a" fill={SHIFT_COLORS.madrugada} radius={[4, 4, 0, 0]} minPointSize={10}>
-                                        <LabelList dataKey="madrugada" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </section>
+                <div className={cardClass + " !p-0"}>
+                    <div className="max-h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                        <table className="w-full text-left border-separate border-spacing-0">
+                            <thead>
+                                <tr className="sticky top-0 z-20 border-b border-slate-800/60 bg-slate-900 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
+                                    <th className="sticky left-0 top-0 bg-slate-900 z-30 px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500">Data</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Diff Manhã</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Diff Tarde</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Diff Noite</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-tighter text-slate-500 text-center">Diff Madrug.</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/30">
+                                {data.history.map((row, idx) => {
+                                    const renderDiff = (val) => {
+                                        if (val === 0 || val === undefined) return <span className="text-slate-600">-</span>;
+                                        const isPos = val > 0;
+                                        return (
+                                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-black ${isPos ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                                {isPos ? '+' : ''}{val}
+                                            </div>
+                                        );
+                                    };
 
-                    <section className={cardClass}>
-                        <div className="mb-4 flex items-center justify-between">
-                            <span className="text-sm font-black uppercase tracking-widest text-sky-400">2ª Quinzena (Dia 16+)</span>
-                        </div>
-                        <div className="h-[500px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={q2Data} margin={{ top: 20, right: 10, left: 10, bottom: 0 }} barCategoryGap="45%" barGap={4}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={true} />
-                                    <XAxis dataKey="dia" stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} domain={[0, data.limits?.maxDemanda || 'auto']} />
-                                    <Tooltip content={ChartTooltip} />
-                                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                                    <Bar dataKey="manha" name="Manhã" stackId="a" fill={SHIFT_COLORS.manha} minPointSize={10}>
-                                        <LabelList dataKey="manha" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="tarde" name="Tarde" stackId="a" fill={SHIFT_COLORS.tarde} minPointSize={10}>
-                                        <LabelList dataKey="tarde" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="noite" name="Noite" stackId="a" fill={SHIFT_COLORS.noite} minPointSize={10}>
-                                        <LabelList dataKey="noite" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="madrugada" name="Madrugada" stackId="a" fill={SHIFT_COLORS.madrugada} radius={[4, 4, 0, 0]} minPointSize={10}>
-                                        <LabelList dataKey="madrugada" position="center" fill="#fff" fontSize={15} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </section>
-                </div>
-            </div>
-
-            {/* SEÇÃO 2: EXTRAPOLAÇÃO (Gráfico Espelho) */}
-            <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="h-8 w-1 rounded-full bg-rose-500" />
-                    <div>
-                        <h3 className="text-xl font-black text-rose-100">Atendimentos Fora da Meta</h3>
-                        <p className="text-xs text-slate-400">Volume que excedeu o padrão histórico preditivo (Média Móvel Dinâmica).</p>
+                                    return (
+                                        <tr key={idx} className="group hover:bg-white/[0.02] transition-colors">
+                                            <td className="sticky left-0 bg-slate-900/95 z-10 px-6 py-3 border-r border-slate-800/30">
+                                                <span className="text-[13px] font-bold text-slate-300 group-hover:text-white transition-colors">
+                                                    {row.data.split('-').reverse().slice(0, 2).join('/')}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-center">{renderDiff(row.diff_manha)}</td>
+                                            <td className="px-6 py-3 text-center">{renderDiff(row.diff_tarde)}</td>
+                                            <td className="px-6 py-3 text-center">{renderDiff(row.diff_noite)}</td>
+                                            <td className="px-6 py-3 text-center">{renderDiff(row.diff_madrugada)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <div className="flex flex-col gap-8">
-                    <section className={cardClass}>
-                        <div className="mb-4 flex items-center justify-between">
-                            <span className="text-sm font-black uppercase tracking-widest text-rose-400">Extrapolação 1ª Quinzena</span>
-                        </div>
-                        <div className="h-[500px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={q1Data} margin={{ top: 20, right: 10, left: 10, bottom: 0 }} barCategoryGap="45%" barGap={2}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={true} />
-                                    <XAxis dataKey="dia" stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} domain={[0, data.limits?.maxExcesso || 'auto']} />
-                                    <Tooltip content={ChartTooltip} />
-                                    <Bar dataKey="excesso_manha" name="Excesso Manhã" fill={SHIFT_COLORS.manha} minPointSize={8}>
-                                        <LabelList dataKey="excesso_manha" position="top" fill="#bae6fd" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_tarde" name="Excesso Tarde" fill={SHIFT_COLORS.tarde} minPointSize={8}>
-                                        <LabelList dataKey="excesso_tarde" position="top" fill="#fde68a" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_noite" name="Excesso Noite" fill={SHIFT_COLORS.noite} minPointSize={8}>
-                                        <LabelList dataKey="excesso_noite" position="top" fill="#ddd6fe" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_madrugada" name="Excesso Madrugada" fill={SHIFT_COLORS.madrugada} radius={[4, 4, 0, 0]} minPointSize={8}>
-                                        <LabelList dataKey="excesso_madrugada" position="top" fill="#e2e8f0" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </section>
-
-                    <section className={cardClass}>
-                        <div className="mb-4 flex items-center justify-between">
-                            <span className="text-sm font-black uppercase tracking-widest text-rose-400">Extrapolação 2ª Quinzena</span>
-                        </div>
-                        <div className="h-[500px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={q2Data} margin={{ top: 20, right: 10, left: 10, bottom: 0 }} barCategoryGap="45%" barGap={4}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={true} />
-                                    <XAxis dataKey="dia" stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 13, fontWeight: 700 }} domain={[0, data.limits?.maxExcesso || 'auto']} />
-                                    <Tooltip content={ChartTooltip} />
-                                    <Bar dataKey="excesso_manha" name="Excesso Manhã" fill={SHIFT_COLORS.manha} minPointSize={8}>
-                                        <LabelList dataKey="excesso_manha" position="top" fill="#bae6fd" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_tarde" name="Excesso Tarde" fill={SHIFT_COLORS.tarde} minPointSize={8}>
-                                        <LabelList dataKey="excesso_tarde" position="top" fill="#fde68a" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_noite" name="Excesso Noite" fill={SHIFT_COLORS.noite} minPointSize={8}>
-                                        <LabelList dataKey="excesso_noite" position="top" fill="#ddd6fe" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                    <Bar dataKey="excesso_madrugada" name="Excesso Madrugada" fill={SHIFT_COLORS.madrugada} radius={[4, 4, 0, 0]} minPointSize={8}>
-                                        <LabelList dataKey="excesso_madrugada" position="top" fill="#e2e8f0" fontSize={11} fontWeight={900} display={val => val > 0 ? 'block' : 'none'} />
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </section>
-                </div>
-            </div>
+            </section>
 
             <div className="flex items-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4 text-xs text-sky-200/70">
                 <CheckCircle2 size={14} className="text-sky-400" />
-                <span>Os dados acima são atualizados diariamente através da integração automática com o Tasy, recalculando a média móvel das últimas 12 semanas.</span>
+                <span>Os dados acima são atualizados diariamente através da integração automática com o Tasy, recalculando a média móvel das últimas 12 semanas. Valores negativos indicam folga operacional em relação à média histórica.</span>
             </div>
         </div>
     );

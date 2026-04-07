@@ -166,20 +166,34 @@ export default function ManagerVisaoAnaliticaPage() {
     }, [filters.month, filters.year, filters.unitIds, isMaster, session?.id]);
 
     const visibleUnits = useMemo(() => {
-        if (!isMaster) {
-            const fixedId = String(session?.unidadeId || '');
-            return units.filter((unit) => String(unit.id) === fixedId);
+        let baseUnits = units;
+
+        // Filtro específico para o módulo de Análise de Meta (Apenas PS)
+        if (selectedTab === 'predicao') {
+            baseUnits = units.filter(unit => {
+                const name = normalizeText(unit.nome);
+                // Deve conter PS ou PRONTO SOCORRO
+                const isPS = name.includes('ps') || name.includes('pronto socorro');
+                // Nao pode ser anestesia, uti ou internacao
+                const isExcluded = name.includes('anestesia') || name.includes('uti') || name.includes('internacao');
+                return isPS && !isExcluded;
+            });
         }
 
-        if (!filters.regional) return units;
+        if (!isMaster) {
+            const fixedId = String(session?.unidadeId || '');
+            return baseUnits.filter((unit) => String(unit.id) === fixedId);
+        }
+
+        if (!filters.regional) return baseUnits;
 
         const regionalKey = Object.keys(filterMeta.unidadesPorRegional || {}).find(
             (key) => normalizeText(key) === normalizeText(filters.regional)
         );
         const allowedNames = new Set(((filterMeta.unidadesPorRegional || {})[regionalKey] || []).map((name) => normalizeText(name)));
         if (!allowedNames.size) return [];
-        return units.filter((unit) => allowedNames.has(normalizeText(unit.nome)));
-    }, [filterMeta.unidadesPorRegional, filters.regional, isMaster, session?.unidadeId, units]);
+        return baseUnits.filter((unit) => allowedNames.has(normalizeText(unit.nome)));
+    }, [filterMeta.unidadesPorRegional, filters.regional, isMaster, session?.unidadeId, units, selectedTab]);
 
     useEffect(() => {
         if (!isMaster) return;
