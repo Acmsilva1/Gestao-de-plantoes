@@ -8,7 +8,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, repoRoot, '');
-    const apiPort = env.PORT || '3000';
+    const apiPort = process.env.GDP_API_PORT || process.env.PORT || env.PORT || '3000';
 
     return {
         plugins: [react()],

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createLocalSupabaseClient } from './localSupabaseClient.js';
 import { env, getMissingEnvVars } from '../config/env.js';
 
 let supabaseClient = null;
@@ -13,7 +13,7 @@ const getSupabase = () => {
         throw new Error(`Variaveis de ambiente obrigatorias ausentes: ${missingEnvVars.join(', ')}`);
     }
 
-    supabaseClient = createClient(env.supabaseUrl, env.supabaseKey);
+    supabaseClient = createLocalSupabaseClient();
     return supabaseClient;
 };
 

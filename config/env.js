@@ -9,17 +9,17 @@ dotenv.config({ path: rootEnvPath, override: true });
 dotenv.config({ override: true }); // Carregamento padrão também com override
 // Triggering restart after port change
 
-export const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY'];
+export const requiredEnvVars = [];
 
 export const getMissingEnvVars = () =>
     requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
-export const hasDatabaseEnv = () => getMissingEnvVars().length === 0;
+export const hasDatabaseEnv = () => true;
 
 export const env = {
-    port: Number(process.env.PORT || 3000),
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseKey: process.env.SUPABASE_KEY,
+    /** GDP_API_PORT prioriza modo paralelo (ex.: .bat com porta distinta do Hospital BI). */
+    port: Number(process.env.GDP_API_PORT || process.env.PORT || 3000),
+    sqliteDbPath: process.env.SQLITE_DB_PATH,
     enableRedis: process.env.ENABLE_REDIS === 'true' || process.env.ENABLE_REDIS === '1',
     redisUrl: process.env.REDIS_URL || '',
     redisPrefix: process.env.REDIS_PREFIX || 'gdp',

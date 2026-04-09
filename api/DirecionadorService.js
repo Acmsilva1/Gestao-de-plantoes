@@ -264,7 +264,7 @@ export const getDoctorAgenda = async (req, res) => {
         const doctor = await dbModel.getDoctorById(medicoId);
         if (!doctor) return res.status(404).json({ error: 'Médico não encontrado.' });
 
-        const escalaLinhas = await dbModel.getEscalaAgendaForMédico(medicoId);
+        const escalaLinhas = await dbModel.getEscalaAgendaForMedico(medicoId);
 
         const mappedAgenda = (escalaLinhas || [])
             .map((row) => ({
@@ -313,7 +313,7 @@ export const postAssumirEscala = async (req, res) => {
             return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.includes(medicoId)) {
             return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
         }
@@ -356,7 +356,7 @@ export const postPedidoAssumirEscala = async (req, res) => {
             return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.includes(medicoId)) {
             return res.status(409).json({ error: 'Voce ja esta locado neste turno.' });
         }
@@ -395,16 +395,16 @@ export const postPedidoAssumirEscala = async (req, res) => {
 
 export const postPedidoTrocaEscala = async (req, res) => {
     const { medicoId } = req.params;
-    const { unidadeId, data_plantao, turno, colegaMédicoId, escalaOferecidaId } = req.body ?? {};
+    const { unidadeId, data_plantao, turno, colegaMedicoId, escalaOferecidaId } = req.body ?? {};
 
     try {
         if (!unidadeId || !data_plantao || !turno) {
             return res.status(400).json({ error: 'Informe unidadeId, data_plantao e turno.' });
         }
-        if (!colegaMédicoId) {
+        if (!colegaMedicoId) {
             return res.status(400).json({ error: 'Selecione o colega para a troca de plantao.' });
         }
-        if (colegaMédicoId === medicoId) {
+        if (colegaMedicoId === medicoId) {
             return res.status(400).json({ error: 'Selecione um colega diferente de voce.' });
         }
         if (!TURNOS_ESCALA.has(turno)) {
@@ -416,18 +416,18 @@ export const postPedidoTrocaEscala = async (req, res) => {
             return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const present = await dbModel.getEscalaMédicoIdsForSlot(unidadeId, data_plantao, turno);
+        const present = await dbModel.getEscalaMedicoIdsForSlot(unidadeId, data_plantao, turno);
         if (present.length === 0) {
             return res.status(400).json({ error: 'Turno vazio na escala. Use Assumir.' });
         }
         if (present.includes(medicoId)) {
             return res.status(400).json({ error: 'Voce ja esta neste turno.' });
         }
-        if (!present.includes(colegaMédicoId)) {
+        if (!present.includes(colegaMedicoId)) {
             return res.status(400).json({ error: 'O colega indicado não está locado neste turno.' });
         }
 
-        const escalaLinha = await dbModel.getEscalaRowIdForMédicoSlot(unidadeId, data_plantao, turno, colegaMédicoId);
+        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, colegaMedicoId);
         if (!escalaLinha?.id) {
             return res.status(400).json({ error: 'Linha da escala do colega não encontrada.' });
         }
@@ -446,7 +446,7 @@ export const postPedidoTrocaEscala = async (req, res) => {
                 dataPlantao: data_plantao,
                 turno,
                 solicitanteId: medicoId,
-                alvoId: colegaMédicoId,
+                alvoId: colegaMedicoId,
                 escalaAlvoId: escalaLinha.id,
                 escalaOferecidaId: escalaLinhaOferecida ? escalaLinhaOferecida.id : null,
                 dataPlantaoOferecida: escalaLinhaOferecida ? escalaLinhaOferecida.data_plantao : null,
@@ -486,7 +486,7 @@ export const postPedidoCancelamento = async (req, res) => {
             return res.status(403).json({ error: 'Médico não encontrado ou sem permissão nesta unidade.' });
         }
 
-        const escalaLinha = await dbModel.getEscalaRowIdForMédicoSlot(unidadeId, data_plantao, turno, medicoId);
+        const escalaLinha = await dbModel.getEscalaRowIdForMedicoSlot(unidadeId, data_plantao, turno, medicoId);
         if (!escalaLinha?.id) {
             return res.status(400).json({ error: 'Você não está locado num turno correspondente na escala desta unidade.' });
         }
@@ -525,7 +525,7 @@ export const getDoctorTrocas = async (req, res) => {
             return res.status(404).json({ error: 'Médico não encontrado.' });
         }
 
-        const pedidos = await dbModel.listPedidosTrocaPorMédico(medicoId);
+        const pedidos = await dbModel.listPedidosTrocaPorMedico(medicoId);
         const pendentesColega = await dbModel.countPedidosTrocaAguardandoColega(medicoId);
 
         res.json({

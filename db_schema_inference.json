@@ -1,0 +1,78 @@
+{
+  "unidades": [
+    "id",
+    "nome",
+    "endereco",
+    "capacidade_media_atendimento",
+    "created_at"
+  ],
+  "medicos": [
+    "id",
+    "nome",
+    "telefone",
+    "especialidade",
+    "crm",
+    "senha",
+    "unidade_fixa_id",
+    "atendimento_padrao_por_periodo",
+    "created_at",
+    "usuario"
+  ],
+  "medico_acessos_unidade": [
+    "id",
+    "medico_id",
+    "unidade_id",
+    "created_at"
+  ],
+  "historico_tasy": [
+    "id",
+    "data",
+    "turno",
+    "total_atendimentos",
+    "unidade",
+    "regional",
+    "created_at"
+  ],
+  "historico_tasy_ml": [
+    "data",
+    "ano",
+    "mes",
+    "dia",
+    "dia_semana",
+    "turno_id",
+    "regional_id",
+    "unidade_id",
+    "total_atendimentos"
+  ],
+  "dados_predicao": [
+    "id",
+    "data_prevista",
+    "turno",
+    "demanda_estimada",
+    "unidade",
+    "regional",
+    "executado_em",
+    "confianca"
+  ],
+  "disponibilidade": [
+    "id",
+    "unidade_id",
+    "data_plantao",
+    "turno",
+    "vagas_totais",
+    "vagas_ocupadas",
+    "status",
+    "created_at"
+  ],
+  "escala": [
+    "id",
+    "unidade_id",
+    "medico_id",
+    "data_plantao",
+    "turno",
+    "created_at"
+  ],
+  "escala_mes_publicacao": "Empty sequence, no columns inferred.",
+  "pedidos_troca_escala": "Empty sequence, no columns inferred.",
+  "pedidos_assumir_escala": "Empty sequence, no columns inferred."
+}

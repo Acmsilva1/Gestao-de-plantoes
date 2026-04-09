@@ -8,6 +8,8 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "web:dev": "npm --prefix web run dev -- --host localhost --port 5173 --strictPort",
+    "web:dev:5180": "npm --prefix web run dev -- --host 127.0.0.1 --port 5180 --strictPort",
+    "dev:full:5180": "concurrently -n api,web -c blue,magenta \"npm run dev\" \"npm run web:dev:5180\"",
     "web:build": "npm --prefix web run build",
     "web:preview": "npm --prefix web run preview",
     "dev:full": "concurrently \"npm run dev\" \"npm run web:dev\"",
@@ -20,13 +22,14 @@
     "infra:logs": "docker compose -f docker-compose.infra.yml logs -f --tail=150"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.50.0",
     "amqplib": "^1.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "node-cron": "^4.2.1",
-    "redis": "^5.11.0"
+    "redis": "^5.11.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
