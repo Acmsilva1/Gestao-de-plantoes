@@ -1,3 +1,28 @@
+:root {
+    /* Cores Base em OKLCH (Padrão Tailwind 4 / css.md) */
+    --background: oklch(0.176 0.031 151); /* Dark Navy Base */
+    --foreground: oklch(0.975 0.003 240);
+    --primary: oklch(0.690 0.140 145); /* Verde Hospitalar */
+    
+    /* Tokens Pipeline Dashboard */
+    --dash-bg: #1e2235;          /* Navy Blue mais claro solicitado */
+    --dash-panel: #1e2030;       /* Navy Original do Pipeline */
+    --dash-accent-live: #2DE0B9;  /* Teal */
+    --dash-accent-urgent: #E0B92D; /* Amber */
+    --dash-accent-critical: #E02D5F; /* Red */
+    
+    --radius: 0.75rem;
+}
+
+@keyframes glow-pulse {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 2px rgba(45, 224, 185, 0.2)); }
+    50% { filter: brightness(1.15) drop-shadow(0 0 8px rgba(45, 224, 185, 0.5)); }
+}
+
+.animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+}
+
 html,
 body,
 #root {
@@ -5,6 +30,8 @@ body,
     max-width: 100%;
     min-height: 100%;
     margin: 0;
+    background-color: var(--dash-bg);
+    color: var(--foreground);
     overflow-x: hidden;
 }
 
@@ -16,6 +43,7 @@ body,
 
 body {
     overscroll-behavior-x: none;
+    font-family: Inter, sans-serif;
 }
 
 img,

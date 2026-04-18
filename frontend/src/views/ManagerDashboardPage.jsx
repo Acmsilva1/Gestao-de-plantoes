@@ -4,7 +4,7 @@ import { BarChart3, CalendarDays, PieChart as PieIcon, Users } from 'lucide-reac
 import { useAuth } from '../context/AuthContext';
 import { readApiResponse } from '../models/api';
 
-const PIE_COLORS = ['#22c55e', '#f59e0b'];
+const PIE_COLORS = ['#2DE0B9', '#E0B92D'];
 
 const MONTHS = [
     { value: '01', label: 'Janeiro' },
@@ -24,10 +24,10 @@ const MONTHS = [
 const EMPTY_ARRAY = [];
 
 const cardClass =
-    'overflow-hidden rounded-[2rem] border border-slate-700/70 bg-[linear-gradient(150deg,rgba(15,23,42,0.95),rgba(2,6,23,0.92))] p-6 shadow-[0_24px_70px_-28px_rgba(15,23,42,0.9)]';
+    'overflow-hidden rounded-[2rem] border border-slate-700/40 bg-[#1e2030]/80 p-6 shadow-2xl backdrop-blur-xl';
 
 const metricClass =
-    'rounded-2xl border border-slate-700/70 bg-slate-900/60 px-4 py-3 backdrop-blur-sm';
+    'rounded-2xl border border-slate-700/50 bg-[#252a44]/60 px-4 py-3 backdrop-blur-md transition-all duration-300 hover:border-[#2DE0B9]/40';
 
 const areSameIds = (left = [], right = []) =>
     left.length === right.length && left.every((value, index) => String(value) === String(right[index]));
@@ -202,14 +202,14 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
     }, [visibleUnits, selectedUnit]);
 
     return (
-        <div className="animate-in fade-in duration-500 space-y-6">
-            <div className="relative overflow-hidden rounded-[2rem] border border-slate-700/70 bg-[radial-gradient(circle_at_0%_0%,rgba(14,165,233,0.24),transparent_45%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.18),transparent_35%),linear-gradient(160deg,#020617_0%,#0f172a_55%,#111827_100%)] p-6">
-                <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="animate-in fade-in duration-700 space-y-8 p-4 sm:p-0">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/40 bg-[#1e2030]/60 p-8 backdrop-blur-xl shadow-2xl">
+                <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#2DE0B9]/5 blur-3xl" />
+                <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-sky-300/80">Monitoramento</p>
-                        <h2 className="mt-2 text-3xl font-black text-white md:text-4xl">Dashboards de Escala</h2>
-                        <p className="mt-2 text-sm text-slate-300">Visão mensal de alocação e cobertura das escalas por unidade.</p>
+                        <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#2DE0B9]">Monitoramento em Tempo Real</p>
+                        <h2 className="mt-3 text-4xl font-black text-white tracking-tight">Dashboards de Escala</h2>
+                        <p className="mt-2 text-sm text-slate-400 font-medium max-w-lg">Análise profunda de alocação e cobertura hospitalar.</p>
                     </div>
                     {!useSharedFilters ? (
                     <div className="grid w-full max-w-5xl gap-3 sm:grid-cols-4">
@@ -220,7 +220,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                 <select
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 pl-10 pr-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
+                                    className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 pl-10 pr-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                                 >
                                     {MONTHS.map((m) => (
                                         <option key={m.value} value={m.value}>
@@ -235,7 +235,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                             <select
                                 value={selectedYear}
                                 onChange={(e) => setSelectedYear(e.target.value)}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
                                 {yearOptions.map((year) => (
                                     <option key={year} value={year}>
@@ -249,9 +249,8 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                             <select
                                 value={selectedRegional}
                                 onChange={(e) => setSelectedRegional(e.target.value)}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
-                                <option value="">Todas as regionais</option>
                                 {(rawData?.filters?.regionaisDisponiveis || []).map((regional) => (
                                     <option key={regional} value={regional}>
                                         {regional}
@@ -267,7 +266,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                     setSelectedUnit(e.target.value);
                                     if (e.target.value === 'all') setComparisonUnits([]);
                                 }}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(14,165,233,0.2)]"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
                                 <option value="all">Todas as unidades</option>
                                 {visibleUnits.map((unit) => (
@@ -282,21 +281,21 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className={metricClass}>
-                        <p className="text-[10px] uppercase tracking-widest text-slate-400">Ocupadas 1ª quinzena</p>
-                        <p className="mt-1 text-2xl font-black text-sky-300">{rawData.summary?.totalAceitasQ1 ?? 0}</p>
+                    <div className={`${metricClass} animate-glow-pulse border-[#2DE0B9]/20`}>
+                        <p className="text-[10px] uppercase tracking-widest text-[#2DE0B9]/80 font-bold">Ocupadas 1ª quinzena</p>
+                        <p className="mt-1 text-2xl font-black text-[#2DE0B9]">{rawData.summary?.totalAceitasQ1 ?? 0}</p>
                     </div>
-                    <div className={metricClass}>
-                        <p className="text-[10px] uppercase tracking-widest text-slate-400">Ocupadas 2ª quinzena</p>
-                        <p className="mt-1 text-2xl font-black text-emerald-300">{rawData.summary?.totalAceitasQ2 ?? 0}</p>
+                    <div className={`${metricClass} animate-glow-pulse border-[#2DE0B9]/20`}>
+                        <p className="text-[10px] uppercase tracking-widest text-[#2DE0B9]/80 font-bold">Ocupadas 2ª quinzena</p>
+                        <p className="mt-1 text-2xl font-black text-[#2DE0B9]">{rawData.summary?.totalAceitasQ2 ?? 0}</p>
                     </div>
                     <div className={metricClass}>
                         <p className="text-[10px] uppercase tracking-widest text-slate-400">Escalas ocupadas</p>
-                        <p className="mt-1 text-2xl font-black text-fuchsia-300">{rawData.summary?.totalOcupadas ?? 0}</p>
+                        <p className="mt-1 text-2xl font-black text-white">{rawData.summary?.totalOcupadas ?? 0}</p>
                     </div>
                     <div className={metricClass}>
                         <p className="text-[10px] uppercase tracking-widest text-slate-400">Escalas vazias</p>
-                        <p className="mt-1 text-2xl font-black text-amber-300">{rawData.summary?.totalVazias ?? 0}</p>
+                        <p className="mt-1 text-2xl font-black text-[#E0B92D]">{rawData.summary?.totalVazias ?? 0}</p>
                     </div>
                 </div>
 
@@ -379,11 +378,11 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                         <YAxis stroke="#94a3b8" />
                                         <Tooltip content={ChartTooltip} />
                                         <Legend />
-                                        <Bar dataKey="totalOcupadas" fill="#38bdf8" name="Ocupadas" radius={[6, 6, 0, 0]}>
-                                            <LabelList dataKey="totalOcupadas" position="top" fill="#bae6fd" fontSize={11} fontWeight={800} />
+                                        <Bar dataKey="totalOcupadas" fill="#2DE0B9" name="Ocupadas" radius={[6, 6, 0, 0]}>
+                                            <LabelList dataKey="totalOcupadas" position="top" fill="#2DE0B9" fontSize={11} fontWeight={800} />
                                         </Bar>
-                                        <Bar dataKey="totalVazias" fill="#f59e0b" name="Vazias" radius={[6, 6, 0, 0]}>
-                                            <LabelList dataKey="totalVazias" position="top" fill="#fde68a" fontSize={11} fontWeight={800} />
+                                        <Bar dataKey="totalVazias" fill="#E0B92D" name="Vazias" radius={[6, 6, 0, 0]}>
+                                            <LabelList dataKey="totalVazias" position="top" fill="#E0B92D" fontSize={11} fontWeight={800} />
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -412,11 +411,11 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                                         <YAxis stroke="#94a3b8" />
                                         <Tooltip content={ChartTooltip} />
                                         <Legend />
-                                        <Bar dataKey="totalOcupadas" fill="#34d399" name="Ocupadas" radius={[6, 6, 0, 0]}>
-                                            <LabelList dataKey="totalOcupadas" position="top" fill="#bbf7d0" fontSize={11} fontWeight={800} />
+                                        <Bar dataKey="totalOcupadas" fill="#2DE0B9" name="Ocupadas" radius={[6, 6, 0, 0]}>
+                                            <LabelList dataKey="totalOcupadas" position="top" fill="#2DE0B9" fontSize={11} fontWeight={800} />
                                         </Bar>
-                                        <Bar dataKey="totalVazias" fill="#f59e0b" name="Vazias" radius={[6, 6, 0, 0]}>
-                                            <LabelList dataKey="totalVazias" position="top" fill="#fde68a" fontSize={11} fontWeight={800} />
+                                        <Bar dataKey="totalVazias" fill="#E0B92D" name="Vazias" radius={[6, 6, 0, 0]}>
+                                            <LabelList dataKey="totalVazias" position="top" fill="#E0B92D" fontSize={11} fontWeight={800} />
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
