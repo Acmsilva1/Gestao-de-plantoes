@@ -1,12 +1,12 @@
 :root {
-    /* Cores Base em OKLCH (Padrão Tailwind 4 / css.md) */
-    --background: oklch(0.176 0.031 151); /* Dark Navy Base */
-    --foreground: oklch(0.975 0.003 240);
-    --primary: oklch(0.690 0.140 145); /* Verde Hospitalar */
+    /* Cores Base em OKLCH (Sintonizadas para o fundo Navy Soft mais claro) */
+    --background: oklch(0.35 0.04 240); 
+    --foreground: oklch(0.98 0.005 240);
+    --primary: oklch(0.70 0.15 150); 
     
     /* Tokens Pipeline Dashboard */
-    --dash-bg: #1e2235;          /* Navy Blue mais claro solicitado */
-    --dash-panel: #1e2030;       /* Navy Original do Pipeline */
+    --dash-bg: #313755;          /* Navy Blue mais claro e vibrante */
+    --dash-panel: #262a41;       /* Antigo fundo agora serve como base de painéis */
     --dash-accent-live: #2DE0B9;  /* Teal */
     --dash-accent-urgent: #E0B92D; /* Amber */
     --dash-accent-critical: #E02D5F; /* Red */

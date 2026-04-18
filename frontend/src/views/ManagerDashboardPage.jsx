@@ -203,7 +203,7 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
 
     return (
         <div className="animate-in fade-in duration-700 space-y-8 p-4 sm:p-0">
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/40 bg-[#1e2030]/60 p-8 backdrop-blur-xl shadow-2xl">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/40 bg-[#262a41]/60 p-8 backdrop-blur-xl shadow-2xl">
                 <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#2DE0B9]/5 blur-3xl" />
                 <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -212,71 +212,72 @@ export default function ManagerDashboardPage({ embedded = false, sharedFilters =
                         <p className="mt-2 text-sm text-slate-400 font-medium max-w-lg">Análise profunda de alocação e cobertura hospitalar.</p>
                     </div>
                     {!useSharedFilters ? (
-                    <div className="grid w-full max-w-5xl gap-3 sm:grid-cols-4">
-                        <div>
-                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Mês</label>
-                            <div className="relative">
-                                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-400" />
+                        <div className="grid w-full max-w-5xl gap-3 sm:grid-cols-4">
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Mês</label>
+                                <div className="relative">
+                                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2DE0B9]" />
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(e.target.value)}
+                                        className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 pl-10 pr-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
+                                    >
+                                        {MONTHS.map((m) => (
+                                            <option key={m.value} value={m.value}>
+                                                {m.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Ano</label>
                                 <select
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 pl-10 pr-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                    className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                                 >
-                                    {MONTHS.map((m) => (
-                                        <option key={m.value} value={m.value}>
-                                            {m.label}
+                                    {yearOptions.map((year) => (
+                                        <option key={year} value={year}>
+                                            {year}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Regional</label>
+                                <select
+                                    value={selectedRegional}
+                                    onChange={(e) => setSelectedRegional(e.target.value)}
+                                    className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
+                                >
+                                    <option value="">Todas as Regionais</option>
+                                    {(rawData?.filters?.regionaisDisponiveis || []).map((regional) => (
+                                        <option key={regional} value={regional}>
+                                            {regional}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Unidade</label>
+                                <select
+                                    value={selectedUnit}
+                                    onChange={(e) => {
+                                        setSelectedUnit(e.target.value);
+                                        if (e.target.value === 'all') setComparisonUnits([]);
+                                    }}
+                                    className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
+                                >
+                                    <option value="all">Rede Consolidada</option>
+                                    {visibleUnits.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.nome}
                                         </option>
                                     ))}
                                 </select>
                             </div>
                         </div>
-                        <div>
-                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Ano</label>
-                            <select
-                                value={selectedYear}
-                                onChange={(e) => setSelectedYear(e.target.value)}
-                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
-                            >
-                                {yearOptions.map((year) => (
-                                    <option key={year} value={year}>
-                                        {year}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Regional</label>
-                            <select
-                                value={selectedRegional}
-                                onChange={(e) => setSelectedRegional(e.target.value)}
-                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
-                            >
-                                {(rawData?.filters?.regionaisDisponiveis || []).map((regional) => (
-                                    <option key={regional} value={regional}>
-                                        {regional}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Unidade</label>
-                            <select
-                                value={selectedUnit}
-                                onChange={(e) => {
-                                    setSelectedUnit(e.target.value);
-                                    if (e.target.value === 'all') setComparisonUnits([]);
-                                }}
-                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] py-3 px-4 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
-                            >
-                                <option value="all">Todas as unidades</option>
-                                {visibleUnits.map((unit) => (
-                                    <option key={unit.id} value={unit.id}>
-                                        {unit.nome}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
                     ) : null}
                 </div>
 

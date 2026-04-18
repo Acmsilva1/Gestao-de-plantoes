@@ -274,25 +274,25 @@ export default function ManagerVisaoAnaliticaPage() {
     );
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <section className="relative overflow-hidden rounded-[2rem] border border-slate-700/70 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.2),transparent_45%),linear-gradient(160deg,#020617_0%,#0f172a_58%,#111827_100%)] p-6 shadow-2xl">
-                <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="space-y-8 animate-in fade-in duration-700">
+            <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-700/40 bg-[#262a41]/60 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="mb-8 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.35em] text-sky-300/80">Monitoramento BI</p>
-                        <h2 className="mt-2 text-3xl font-black text-white sm:text-4xl">Visão Analítica</h2>
-                        <p className="mt-2 text-sm text-slate-300">Filtro global único para análise macro nas abas de Dashboard e Relatórios.</p>
+                        <p className="text-[11px] font-black uppercase tracking-[0.4em] text-[#2DE0B9]">Monitoramento BI Inteligente</p>
+                        <h2 className="mt-3 text-4xl font-black text-white tracking-tight sm:text-5xl">Visão Analítica</h2>
+                        <p className="mt-2 text-sm text-slate-400 font-medium max-w-lg">Filtro operacional unificado para análise macro de rede hospitalar.</p>
                     </div>
 
-                    <div className="grid w-full max-w-6xl gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid w-full max-w-6xl gap-4 sm:grid-cols-2 xl:grid-cols-5">
                         <div>
                             <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                <CalendarDays size={12} className="text-sky-400" />
+                                <CalendarDays size={12} className="text-[#2DE0B9]" />
                                 Mês
                             </label>
                             <select
                                 value={filters.month}
                                 onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
                                 {MONTHS.map((month) => (
                                     <option key={month.value} value={month.value}>
@@ -307,7 +307,7 @@ export default function ManagerVisaoAnaliticaPage() {
                             <select
                                 value={filters.year}
                                 onChange={(event) => setFilters((current) => ({ ...current, year: event.target.value }))}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
                                 {yearOptions.map((year) => (
                                     <option key={year} value={year}>
@@ -319,7 +319,7 @@ export default function ManagerVisaoAnaliticaPage() {
 
                         <div>
                             <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                <MapPinned size={12} className="text-emerald-400" />
+                                <MapPinned size={12} className="text-[#2DE0B9]" />
                                 Regional
                             </label>
                             <select
@@ -334,7 +334,7 @@ export default function ManagerVisaoAnaliticaPage() {
                                         return { ...current, regional: nextRegional };
                                     });
                                 }}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                                 disabled={!isMaster}
                             >
                                 <option value="">Todas as regionais</option>
@@ -348,13 +348,13 @@ export default function ManagerVisaoAnaliticaPage() {
 
                         <div>
                             <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                <Filter size={12} className="text-amber-400" />
+                                <Filter size={12} className="text-[#E0B92D]" />
                                 Turno
                             </label>
                             <select
                                 value={filters.turno}
                                 onChange={(event) => setFilters((current) => ({ ...current, turno: event.target.value }))}
-                                className="w-full rounded-2xl border border-slate-700 bg-slate-950/90 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                                className="w-full rounded-2xl border border-slate-700 bg-[#1e2235] px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-[#2DE0B9] focus:shadow-[0_0_0_3px_rgba(45,224,185,0.1)]"
                             >
                                 {SHIFT_OPTIONS.map((shift) => (
                                     <option key={shift} value={shift}>
@@ -364,19 +364,19 @@ export default function ManagerVisaoAnaliticaPage() {
                             </select>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3">
+                        <div className="rounded-2xl border border-slate-700/60 bg-[#252a44]/60 px-4 py-3.5 backdrop-blur-md">
                             <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Unidades</div>
                             <div className="mt-1 text-sm font-black text-white">{effectiveUnitIds.length} selecionada(s)</div>
                             {!isMaster ? (
-                                <div className="mt-1 text-xs text-slate-400">Escopo fixo da unidade do gestor</div>
+                                <div className="mt-1 text-xs text-slate-400">Escopo fixo do gestor</div>
                             ) : null}
                         </div>
                     </div>
                 </div>
 
                 {isMaster ? (
-                    <div className="rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4">
-                        <div className="mb-3 text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Comparação multiunidade</div>
+                    <div className="rounded-[2rem] border border-slate-700/40 bg-[#1e2235]/40 p-6">
+                        <div className="mb-4 text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Seletor Multi-unidade</div>
                         <div className="flex flex-wrap gap-2">
                             {visibleUnits.map((unit) => {
                                 const active = effectiveUnitIds.includes(String(unit.id));
@@ -385,10 +385,10 @@ export default function ManagerVisaoAnaliticaPage() {
                                         key={unit.id}
                                         type="button"
                                         onClick={() => toggleUnit(unit.id)}
-                                        className={`rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-tight transition ${
+                                        className={`rounded-xl border px-4 py-2 text-[11px] font-black uppercase tracking-tight transition-all duration-300 ${
                                             active
-                                                ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200'
-                                                : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                                                ? 'border-[#2DE0B9]/50 bg-[#2DE0B9]/20 text-[#2DE0B9] shadow-[0_0_15px_-5px_rgba(45,224,185,0.4)]'
+                                                : 'border-slate-700/60 bg-slate-900/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
                                         }`}
                                     >
                                         {unit.nome}
@@ -399,7 +399,7 @@ export default function ManagerVisaoAnaliticaPage() {
                     </div>
                 ) : null}
 
-                <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-1.5">
+                <div className="mt-8 flex flex-wrap gap-2 rounded-2xl border border-slate-800/60 bg-[#1e2235]/40 p-1.5 w-fit">
                     {availableTabs.map((tab) => {
                         const Icon = tab.icon;
                         const active = selectedTab === tab.key;
@@ -408,8 +408,10 @@ export default function ManagerVisaoAnaliticaPage() {
                                 key={tab.key}
                                 type="button"
                                 onClick={() => setTab(tab.key)}
-                                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition ${
-                                    active ? 'bg-sky-500/20 text-sky-200 border border-sky-400/30' : 'text-slate-400 hover:text-slate-200'
+                                className={`flex items-center gap-2.5 rounded-xl px-5 py-3 text-sm font-black transition-all ${
+                                    active 
+                                        ? 'bg-[#2DE0B9]/15 text-[#2DE0B9] border border-[#2DE0B9]/30 shadow-lg' 
+                                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
                                 }`}
                             >
                                 <Icon size={16} />
@@ -420,17 +422,18 @@ export default function ManagerVisaoAnaliticaPage() {
                 </div>
             </section>
 
-            {loadingUnits ? (
-                <div className="flex h-40 items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/40">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
-                </div>
-            ) : null}
+            <div className="min-h-[500px]">
+                {loadingUnits ? (
+                    <div className="flex h-64 flex-col items-center justify-center rounded-[2.5rem] bg-[#1e2030]/20 border border-slate-800/40 backdrop-blur-sm">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#2DE0B9] border-t-transparent mb-4" />
+                        <p className="text-slate-500 font-bold tracking-widest uppercase text-[10px]">Sincronizando Base Operacional...</p>
+                    </div>
+                ) : null}
 
-            {!loadingUnits && selectedTab === 'dashboard' ? <ManagerDashboardPage embedded sharedFilters={sharedFilters} /> : null}
-            {!loadingUnits && selectedTab === 'relatorios' ? <ManagerRelatoriosPage embedded sharedFilters={sharedFilters} /> : null}
-            {!loadingUnits && selectedTab === 'predicao' ? <ManagerPredicaoPage embedded sharedFilters={sharedFilters} /> : null}
+                {!loadingUnits && selectedTab === 'dashboard' ? <ManagerDashboardPage embedded sharedFilters={sharedFilters} /> : null}
+                {!loadingUnits && selectedTab === 'relatorios' ? <ManagerRelatoriosPage embedded sharedFilters={sharedFilters} /> : null}
+                {!loadingUnits && selectedTab === 'predicao' ? <ManagerPredicaoPage embedded sharedFilters={sharedFilters} /> : null}
+            </div>
         </div>
     );
 }
-
-
