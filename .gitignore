@@ -4,3 +4,4 @@ web/dist/
 dist/
 .codex-logs/
 pipeline_guard_logs/
+backend/data/local/database.sqlite

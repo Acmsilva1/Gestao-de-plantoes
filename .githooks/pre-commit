@@ -3,13 +3,13 @@
 echo "[pre-commit] Pipeline Guard: iniciando inspeção..."
 
 if command -v python >/dev/null 2>&1; then
-  python pipeline_guard.py --once
+  python backend/pipeline_guard.py --once
   status=$?
 elif command -v python3 >/dev/null 2>&1; then
-  python3 pipeline_guard.py --once
+  python3 backend/pipeline_guard.py --once
   status=$?
 elif command -v py >/dev/null 2>&1; then
-  py -3 pipeline_guard.py --once
+  py -3 backend/pipeline_guard.py --once
   status=$?
 else
   echo "[pre-commit] ERRO: Python não encontrado no PATH."

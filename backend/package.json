@@ -1,0 +1,22 @@
+{
+  "name": "gestao-de-plantoes-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "etl": "node scripts/trigger_etl.js",
+    "test:admin-reports": "node scripts/test_admin_reports.js",
+    "debug:managers": "node scripts/debug_managers.js",
+    "sql:run": "node scripts/run-sql-file.mjs"
+  },
+  "dependencies": {
+    "amqplib": "^1.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^4.2.1",
+    "redis": "^5.11.0"
+  }
+}

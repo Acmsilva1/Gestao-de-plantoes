@@ -1,0 +1,2 @@
+﻿id,unidade_id,escala_id,medico_id,data_plantao,turno,status,gestor_respondeu_em,created_at,updated_at,unidade_nome,medico_nome
+e217b87a-e2cf-4f2a-8012-f7ca49e99d65,ba3bb4c6-9705-45f4-adda-eb6c9469c043,f790bdc9-9cf1-4229-8fb1-2d44533770a0,a0b1f849-324f-4f4b-89ea-a58e51430367,2024-08-15,Noite,PENDENTE,,2026-04-09 13:40:32,2026-04-09 13:40:32,Anestesista MG,Aline Duarte [PS Sig - DF]

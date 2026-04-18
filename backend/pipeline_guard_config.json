@@ -1,0 +1,71 @@
+﻿{
+  "watch_roots": [
+    "backend",
+    "frontend/src",
+    "package.json",
+    "backend/package.json",
+    "backend/docs/checkpoint.md"
+  ],
+  "ignore_globs": [
+    ".git/*",
+    "node_modules/*",
+    "frontend/node_modules/*",
+    "frontend/dist/*",
+    "dist/*",
+    ".codex-logs/*",
+    "pipeline_guard_logs/*"
+  ],
+  "scan_files_for_encoding": [
+    "frontend/src/views/ManagerVisaoAnaliticaPage.jsx",
+    "frontend/src/views/ManagerDashboardPage.jsx",
+    "frontend/src/views/ManagerRelatoriosPage.jsx",
+    "backend/controllers/ManagerService.js",
+    "backend/services/CronService.js",
+    "frontend/src/models/api.js"
+  ],
+  "encoding_bad_patterns": [
+    "Ã¡",
+    "Ã¢",
+    "Ã£",
+    "Ã§",
+    "Ã©",
+    "Ãª",
+    "Ã­",
+    "Ã³",
+    "Ã´",
+    "Ãµ",
+    "Ãº",
+    "Ã ",
+    "Â",
+    "ï¿½"
+  ],
+  "commands": [
+    {
+      "name": "backend_syntax_manager_service",
+      "cmd": [
+        "node",
+        "--check",
+        "backend/controllers/ManagerService.js"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "backend_syntax_cron_service",
+      "cmd": [
+        "node",
+        "--check",
+        "backend/services/CronService.js"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "frontend_build",
+      "cmd": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "."
+    }
+  ]
+}

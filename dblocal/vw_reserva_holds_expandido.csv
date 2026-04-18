@@ -1,0 +1,2 @@
+﻿id,disponibilidade_id,medico_id,reservado_ate,fila_ativa,created_at,updated_at,unidade_id,data_plantao,turno,unidade_nome,medico_nome
+8fa41c74-d620-4450-a549-2eb9ed0227ba,0022b7a3-e351-4a8b-a4cd-5eea50b9a752,a0b1f849-324f-4f4b-89ea-a58e51430367,2026-04-09T13:55:31.940Z,0,2026-04-09 13:40:31,2026-04-09 13:40:31,d59c5067-c1d2-4658-acb2-7fb7ebf70fb0,2026-04-07,Noite,PS Barra da Tijuca - RJ,Aline Duarte [PS Sig - DF]
