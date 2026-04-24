@@ -23,7 +23,7 @@ export const env = {
     port: Number(process.env.GDP_API_PORT || process.env.PORT || 3000),
     /** Repositório raiz (pasta que contém `dblocal/`). */
     repoRoot,
-    /** Pasta dos CSVs de tabela (ignora `vw_*.csv` no carregamento). */
+    /** Pasta dblocal: tabelas em `.parquet` (preferido) ou `.csv` (ignora `vw_*` no carregamento). */
     dblocalCsvDir: process.env.GDP_DBLLOCAL_CSV_DIR
         ? path.resolve(process.env.GDP_DBLLOCAL_CSV_DIR)
         : path.join(repoRoot, 'dblocal'),
@@ -40,5 +40,10 @@ export const env = {
      * Demonstração: cliente local CSV só permite SELECT (sem insert/update/delete/upsert/rpc de escrita).
      * Defina GDP_DEMO_READ_ONLY=false para permitir mutações em memória.
      */
-    demoReadOnly: process.env.GDP_DEMO_READ_ONLY !== 'false'
+    demoReadOnly: process.env.GDP_DEMO_READ_ONLY !== 'false',
+    /**
+     * Com `GDP_DEMO_READ_ONLY=false`, após o seed o backend pode gravar todos os `.parquet` de uma vez.
+     * Defina `GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT=true` para não regravar tudo no arranque (mutações via API continuam a persistir tabela a tabela).
+     */
+    dblocalSkipBootParquetSnapshot: process.env.GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT === 'true'
 };

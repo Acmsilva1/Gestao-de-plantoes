@@ -3,6 +3,8 @@ import path from 'path';
 import { parseCsvDocument } from './parseCsv.js';
 import { coerceCell } from './coerce.js';
 import { rowMatches, compareValues } from './match.js';
+import { env } from '../../config/env.js';
+import { openDuckParquetSession, readParquetWithConnection, writeParquetFromPack } from './readParquetDuck.js';
 
 /** Ordem sugerida para export / dependências lógicas. */
 export const TABLE_ORDER = [
@@ -27,9 +29,17 @@ export const TABLE_ORDER = [
     'pedidos_assumir_escala'
 ];
 
+function sortTableNames(names) {
+    const set = new Set(names);
+    const ordered = TABLE_ORDER.filter((t) => set.has(t));
+    const rest = [...names].filter((t) => !TABLE_ORDER.includes(t)).sort();
+    return [...ordered, ...rest];
+}
+
 /**
- * Orquestrador CSV: única fonte de dados em memória (sem SQLite).
- * Lê `dblocal/*.csv` (ignora `vw_*`). Mutável para insert/update/delete da API.
+ * Orquestrador dblocal: única fonte de dados em memória (sem SQLite).
+ * Lê `dblocal/*.parquet` (preferido) ou `dblocal/*.csv` por tabela (ignora `vw_*` no carregamento).
+ * Mutável para insert/update/delete; com `GDP_DEMO_READ_ONLY=false`, `persistTable` grava `.parquet` oficial em `loadedDir`.
  */
 export class DblocalCsvOrchestrator {
     constructor() {
@@ -71,26 +81,74 @@ export class DblocalCsvOrchestrator {
             return this;
         }
 
-        const files = fs.readdirSync(dir).filter((f) => f.endsWith('.csv') && !f.startsWith('vw_'));
+        const baseFiles = fs.readdirSync(dir).filter((f) => !f.startsWith('vw_'));
+        /** @type {Map<string, { csv?: string, parquet?: string }>} */
+        const byTable = new Map();
+        for (const f of baseFiles) {
+            const full = path.join(dir, f);
+            if (f.endsWith('.csv')) {
+                const name = path.basename(f, '.csv');
+                const cur = byTable.get(name) || {};
+                cur.csv = full;
+                byTable.set(name, cur);
+            } else if (f.endsWith('.parquet')) {
+                const name = path.basename(f, '.parquet');
+                const cur = byTable.get(name) || {};
+                cur.parquet = full;
+                byTable.set(name, cur);
+            }
+        }
 
-        for (const file of files) {
-            const tableName = path.basename(file, '.csv');
-            const full = path.join(dir, file);
-            const raw = fs.readFileSync(full, 'utf8');
-            const matrix = parseCsvDocument(raw);
-            if (!matrix.length) continue;
+        const names = sortTableNames([...byTable.keys()]);
+        const needsDuck = names.some((t) => byTable.get(t)?.parquet);
+        let duck = null;
+        if (needsDuck) {
+            try {
+                duck = await openDuckParquetSession();
+            } catch (e) {
+                console.error('[dblocalCsv] Falha ao iniciar DuckDB para Parquet:', e?.message || e);
+                throw e;
+            }
+        }
 
-            const headers = matrix[0].map((h) => String(h || '').trim()).filter(Boolean);
-            const dataRows = matrix.slice(1);
-            const objects = dataRows.map((cells) => {
-                const obj = {};
-                headers.forEach((h, idx) => {
-                    const cell = cells[idx] !== undefined ? cells[idx] : '';
-                    obj[h] = coerceCell(cell, h);
-                });
-                return obj;
-            });
-            this.tables.set(tableName, { columns: [...headers], rows: objects });
+        try {
+            for (const tableName of names) {
+                const src = byTable.get(tableName);
+                if (src?.parquet && duck) {
+                    const objects = await readParquetWithConnection(duck.conn, src.parquet);
+                    const columns =
+                        objects.length > 0
+                            ? Object.keys(objects[0])
+                            : [];
+                    this.tables.set(tableName, { columns, rows: objects });
+                    continue;
+                }
+                if (src?.csv) {
+                    const raw = fs.readFileSync(src.csv, 'utf8');
+                    const matrix = parseCsvDocument(raw);
+                    if (!matrix.length) continue;
+
+                    const headers = matrix[0].map((h) => String(h || '').trim()).filter(Boolean);
+                    const dataRows = matrix.slice(1);
+                    const objects = dataRows.map((cells) => {
+                        const obj = {};
+                        headers.forEach((h, idx) => {
+                            const cell = cells[idx] !== undefined ? cells[idx] : '';
+                            obj[h] = coerceCell(cell, h);
+                        });
+                        return obj;
+                    });
+                    this.tables.set(tableName, { columns: [...headers], rows: objects });
+                }
+            }
+        } finally {
+            if (duck) {
+                try {
+                    await duck.close();
+                } catch (e) {
+                    console.warn('[dblocalCsv] Aviso ao fechar DuckDB:', e?.message || e);
+                }
+            }
         }
 
         return this;
@@ -215,7 +273,7 @@ export class DblocalCsvOrchestrator {
         }
     }
 
-    /** Snapshot para export CSV (linhas clonadas). */
+    /** Snapshot para export / gravação Parquet (linhas clonadas). */
     getExportSnapshot(table) {
         const pack = this.tables.get(table);
         if (!pack) {
@@ -228,5 +286,29 @@ export class DblocalCsvOrchestrator {
                   ? Object.keys(pack.rows[0])
                   : [];
         return { columns: cols, rows: pack.rows.map((r) => this.clone(r)) };
+    }
+
+    /** Grava uma tabela em `{loadedDir}/{nome}.parquet`. Respeita `GDP_DEMO_READ_ONLY` (default: não grava). */
+    async persistTable(tableName) {
+        if (env.demoReadOnly || !this.loadedDir) return;
+        if (!this.tables.has(tableName)) return;
+        const snap = this.getExportSnapshot(tableName);
+        const outPath = path.join(this.loadedDir, `${tableName}.parquet`);
+        await writeParquetFromPack(outPath, snap.columns, snap.rows);
+    }
+
+    async persistTables(tableNames) {
+        const uniq = [...new Set((tableNames || []).filter(Boolean))];
+        for (const t of uniq) {
+            await this.persistTable(t);
+        }
+    }
+
+    /** Grava todas as tabelas carregadas em memória (ex.: após seed). */
+    async persistAllLoadedTables() {
+        if (env.demoReadOnly || !this.loadedDir) return;
+        for (const t of this.listLoadedTables()) {
+            await this.persistTable(t);
+        }
     }
 }

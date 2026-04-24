@@ -1,10 +1,10 @@
 /**
- * O backend já lê apenas `dblocal/*.csv` em memória (sem SQLite).
- * Para aplicar alterações: edite os CSVs em ./dblocal e reinicie a API (`npm run dev`).
+ * O backend lê `dblocal/*.parquet` (ou `.csv` legado) em memória.
+ * Alterações com `GDP_DEMO_READ_ONLY=false` gravam de volta em `.parquet`.
  */
 import process from 'process';
 
 console.log(
-    '[dblocal:import] Modo CSV em memória: não há import para ficheiro .sqlite. Edite dblocal/*.csv e reinicie o servidor.'
+    '[dblocal:import] Não há import para SQLite. Use Parquet em ./dblocal; mutações persistem ao reiniciar a API (modo escrita) ou `npm run dblocal:export`.'
 );
 process.exit(0);

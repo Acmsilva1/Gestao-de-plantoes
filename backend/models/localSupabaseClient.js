@@ -271,6 +271,7 @@ class QueryBuilder {
             if (!copy.id) copy.id = generateId();
             inserted.push(store.insert(this.table, copy));
         }
+        await store.persistTable(this.table);
         return { data: inserted, error: null };
     }
 
@@ -279,12 +280,14 @@ class QueryBuilder {
         const patch = { ...this.payload };
         store.update(this.table, this.conditions, patch);
         const data = store.select(this.table, this.conditions, this.orderBy, this.limitNum);
+        await store.persistTable(this.table);
         return { data, error: null };
     }
 
     async _executeDelete(store) {
         const data = store.select(this.table, this.conditions, [], null);
         store.delete(this.table, this.conditions);
+        await store.persistTable(this.table);
         return { data, error: null };
     }
 
@@ -303,6 +306,7 @@ class QueryBuilder {
             if (!copy.id) copy.id = generateId();
             upserted.push(store.upsert(this.table, copy, conflictTarget));
         }
+        await store.persistTable(this.table);
         return { data: upserted, error: null };
     }
 }
@@ -327,6 +331,7 @@ async function executeRpc(funcName, args) {
                 updated_at: new Date().toISOString()
             });
         }
+        await store.persistTables(['escala', 'pedidos_troca_escala']);
         return { error: null };
     }
 
@@ -346,6 +351,7 @@ async function executeRpc(funcName, args) {
                 updated_at: new Date().toISOString()
             });
         }
+        await store.persistTables(['escala', 'pedidos_assumir_escala']);
         return { error: null };
     }
 

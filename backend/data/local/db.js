@@ -20,7 +20,8 @@ export function generateId() {
 }
 
 /**
- * Orquestrador CSV em memória (sem SQLite). Primeira chamada carrega `dblocal/` + seed sintético.
+ * Orquestrador dblocal em memória (Parquet/CSV). Primeira chamada carrega `dblocal/` + seed sintético.
+ * Com `GDP_DEMO_READ_ONLY=false`, após o seed o estado é gravado em `.parquet` (fonte oficial local).
  */
 export async function getCsvStore() {
     if (csvStore) {
@@ -33,6 +34,14 @@ export async function getCsvStore() {
         await runLocalSyntheticSeedIntoStore(csvStore);
     } catch (err) {
         console.warn('[gdp-db] Seed sintético local ignorado:', err?.message || err);
+    }
+
+    if (!env.dblocalSkipBootParquetSnapshot) {
+        try {
+            await csvStore.persistAllLoadedTables();
+        } catch (e) {
+            console.warn('[gdp-db] Aviso ao gravar dblocal Parquet após seed:', e?.message || e);
+        }
     }
 
     return csvStore;
