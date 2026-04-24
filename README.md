@@ -2,13 +2,17 @@
 
 Sistema robusto para orquestra??o de escalas m?dicas, integrando predi??o de demanda baseada em hist?rico de atendimento e gest?o bilateral de trocas.
 
-## Estrutura do reposit?rio
+## Estrutura do repositório
 
-- **`frontend/`** ? SPA (Vite + React); scripts na raiz com npm workspaces.
-- **`backend/`** ? API Express, utilit?rios, Docker Compose de infra, pipeline Python e documenta??o em **`backend/docs/`** (checkpoint, WhatsApp, pipeline guard); guia para agentes: **`agents.md`** na raiz.
-- **Raiz** ? `package.json` com workspaces, `README.md`, `iniciar-gestao-plantoes.bat`, **`DB local/`**, `.env`.
+- **`web/`** — SPA (Vite + React); workspace npm `web`.
+- **`api/`** — API Express (Node ESM), serviços, scripts; **`api/data/local/`** — Parquet/CSV, DuckDB em memória, `db.js`, seeds SQL (override: `GDP_DBLLOCAL_CSV_DIR`).
+- **`infra/`** — `docker-compose.infra.yml`, `env.example`.
+- **`scripts/`** — `pipeline_guard.py` (validação contínua).
+- **Raiz** — `package.json` (workspaces `api`, `web`), `README.md`, `pipeline_guard_config.json`, `.env`.
 
-## ??? Arquitetura e Servi?os (backend/)
+Documentação modular: [docs/PIPELINE_E_ARQUITETURA.md](docs/PIPELINE_E_ARQUITETURA.md), [doc/documentacao.md](doc/documentacao.md).
+
+## Arquitetura e serviços (API)
 
 O projeto utiliza uma arquitetura baseada em **Servi?os Modulares**, onde cada dom?nio de neg?cio ? isolado para garantir manuten??es limpas e escalabilidade.
 
@@ -94,7 +98,7 @@ Em desenvolvimento para transformar o engajamento:
 - **PDF Autom?tico**: Envio individual das escalas mensais assim que liberadas.
 - **Lembrete de Jornada**: Mensagens autom?ticas pr?-plant?o para redu??o de faltas.
 
-Veja o detalhamento completo em **[WHATSAPP.md](./backend/docs/WHATSAPP.md)**.
+Documentação WhatsApp (se existir no repositório): procurar `WHATSAPP.md` em `doc/` ou anexos do projecto.
 
 ---
 
@@ -105,12 +109,19 @@ Veja o detalhamento completo em **[WHATSAPP.md](./backend/docs/WHATSAPP.md)**.
 npm install
 ```
 
-Instala a raiz e os workspaces `backend/` e `frontend/`. O agendamento em segundo plano usa `node-cron` em `backend/package.json`.
+Instala a raiz e os workspaces `api/` e `web/`. O agendamento em segundo plano usa `node-cron` em `api/package.json`.
 
 ### Desenvolvimento
 ```bash
 # Sobe API (3000) e Web (5173) simultaneamente
 npm run dev:full
+```
+
+### Qualidade (CI local)
+```bash
+npm run check   # lint (web) + test (api) + build (web)
+npm test
+npm run lint
 ```
 
 ---

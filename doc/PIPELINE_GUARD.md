@@ -17,12 +17,12 @@ npm run hooks:install
 
 ## O que é validado
 
-1. Sintaxe do backend:
-- `node --check backend/controllers/ManagerService.js`
-- `node --check backend/services/CronService.js`
+1. Sintaxe da API:
+- `node --check api/controllers/ManagerService.js`
+- `node --check api/services/CronService.js`
 
-2. Build do frontend:
-- `npm run build` na raiz do repositório (compila `frontend/`)
+2. Build da web:
+- `npm run build` na raiz do repositório (compila `web/`)
 
 3. Scanner de caracteres corrompidos (mojibake):
 - procura padrões como `Ã` e `�` em arquivos críticos da Visão Analítica e serviços.
@@ -40,7 +40,7 @@ Os logs são gravados automaticamente em:
 Após `npm run hooks:install`, todo `git commit` executa automaticamente:
 
 ```bash
-python backend/pipeline_guard.py --once
+python scripts/pipeline_guard.py --once
 ```
 
 Se houver falha na inspeção, o commit é bloqueado.
@@ -57,7 +57,7 @@ Quando houver falha:
 
 ## Configuração
 
-Arquivo: `backend/pipeline_guard_config.json` (o script `backend/pipeline_guard.py` resolve a raiz do monorepo automaticamente).
+Arquivo: `pipeline_guard_config.json` na raiz (o script `scripts/pipeline_guard.py` resolve o monorepo automaticamente).
 
 Nele você pode ajustar:
 - caminhos monitorados (`watch_roots`)

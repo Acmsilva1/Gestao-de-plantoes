@@ -1,0 +1,59 @@
+﻿{
+  "watch_roots": [
+    "api",
+    "web/src",
+    "package.json",
+    "api/package.json",
+    "doc/documentacao.md"
+  ],
+  "ignore_globs": [
+    ".git/*",
+    "node_modules/*",
+    "web/node_modules/*",
+    "web/dist/*",
+    "dist/*",
+    ".codex-logs/*",
+    "pipeline_guard_logs/*"
+  ],
+  "scan_files_for_encoding": [
+    "web/src/views/ManagerVisaoAnaliticaPage.jsx",
+    "web/src/views/ManagerDashboardPage.jsx",
+    "web/src/views/ManagerRelatoriosPage.jsx",
+    "api/controllers/ManagerService.js",
+    "api/services/CronService.js",
+    "web/src/models/api.js"
+  ],
+  "encoding_bad_patterns": [
+    "Ã¡",
+    "Ã¢",
+    "Ã£",
+    "Ã§",
+    "Ã©",
+    "Ãª",
+    "Ã­",
+    "Ã³",
+    "Ã´",
+    "Ãµ",
+    "Ãº",
+    "Ã ",
+    "Â",
+    "ï¿½"
+  ],
+  "commands": [
+    {
+      "name": "api_syntax_manager_service",
+      "cmd": ["node", "--check", "api/controllers/ManagerService.js"],
+      "cwd": "."
+    },
+    {
+      "name": "api_syntax_cron_service",
+      "cmd": ["node", "--check", "api/services/CronService.js"],
+      "cwd": "."
+    },
+    {
+      "name": "web_build",
+      "cmd": ["npm", "run", "build"],
+      "cwd": "."
+    }
+  ]
+}

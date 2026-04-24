@@ -3,8 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const backendRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(backendRoot, '..');
+const apiRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(apiRoot, '..');
 const rootEnvPath = path.resolve(repoRoot, '.env');
 
 dotenv.config({ path: rootEnvPath, override: true });
@@ -21,12 +21,12 @@ export const hasDatabaseEnv = () => true;
 export const env = {
     /** GDP_API_PORT prioriza modo paralelo (ex.: .bat com porta distinta do Hospital BI). */
     port: Number(process.env.GDP_API_PORT || process.env.PORT || 3000),
-    /** Repositório raiz (pasta que contém `dblocal/`). */
+    /** Repositório raiz (monorepo). */
     repoRoot,
-    /** Pasta dblocal: tabelas em `.parquet` (preferido) ou `.csv` (ignora `vw_*` no carregamento). */
+    /** Pasta de dados DuckDB/Parquet dentro da API: `api/data/local/`. */
     dblocalCsvDir: process.env.GDP_DBLLOCAL_CSV_DIR
         ? path.resolve(process.env.GDP_DBLLOCAL_CSV_DIR)
-        : path.join(repoRoot, 'dblocal'),
+        : path.join(apiRoot, 'data', 'local'),
     enableRedis: process.env.ENABLE_REDIS === 'true' || process.env.ENABLE_REDIS === '1',
     redisUrl: process.env.REDIS_URL || '',
     redisPrefix: process.env.REDIS_PREFIX || 'gdp',
@@ -42,7 +42,7 @@ export const env = {
      */
     demoReadOnly: process.env.GDP_DEMO_READ_ONLY !== 'false',
     /**
-     * Com `GDP_DEMO_READ_ONLY=false`, após o seed o backend pode gravar todos os `.parquet` de uma vez.
+     * Com `GDP_DEMO_READ_ONLY=false`, após o seed a API pode gravar todos os `.parquet` de uma vez.
      * Defina `GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT=true` para não regravar tudo no arranque (mutações via API continuam a persistir tabela a tabela).
      */
     dblocalSkipBootParquetSnapshot: process.env.GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT === 'true'

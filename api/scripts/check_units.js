@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..', '..');
-const dbUrl = pathToFileURL(path.join(root, 'backend', 'data', 'local', 'db.js')).href;
+const dbUrl = pathToFileURL(path.join(root, 'api', 'data', 'local', 'db.js')).href;
 
 async function check() {
     const { getCsvStore } = await import(dbUrl);

@@ -23,28 +23,28 @@ from typing import Dict, Iterable, List, Tuple
 
 DEFAULT_CONFIG = {
     "watch_roots": [
-        "backend",
-        "frontend/src",
+        "api",
+        "web/src",
         "package.json",
-        "backend/package.json",
-        "backend/docs/checkpoint.md",
+        "api/package.json",
+        "doc/documentacao.md",
     ],
     "ignore_globs": [
         ".git/*",
         "node_modules/*",
-        "frontend/node_modules/*",
-        "frontend/dist/*",
+        "web/node_modules/*",
+        "web/dist/*",
         "dist/*",
         ".codex-logs/*",
         "pipeline_guard_logs/*",
     ],
     "scan_files_for_encoding": [
-        "frontend/src/views/ManagerVisaoAnaliticaPage.jsx",
-        "frontend/src/views/ManagerDashboardPage.jsx",
-        "frontend/src/views/ManagerRelatoriosPage.jsx",
-        "backend/controllers/ManagerService.js",
-        "backend/services/CronService.js",
-        "frontend/src/models/api.js",
+        "web/src/views/ManagerVisaoAnaliticaPage.jsx",
+        "web/src/views/ManagerDashboardPage.jsx",
+        "web/src/views/ManagerRelatoriosPage.jsx",
+        "api/controllers/ManagerService.js",
+        "api/services/CronService.js",
+        "web/src/models/api.js",
     ],
     "encoding_bad_patterns": [
         "Ã¡",
@@ -64,17 +64,17 @@ DEFAULT_CONFIG = {
     ],
     "commands": [
         {
-            "name": "backend_syntax_manager_service",
-            "cmd": ["node", "--check", "backend/controllers/ManagerService.js"],
+            "name": "api_syntax_manager_service",
+            "cmd": ["node", "--check", "api/controllers/ManagerService.js"],
             "cwd": ".",
         },
         {
-            "name": "backend_syntax_cron_service",
-            "cmd": ["node", "--check", "backend/services/CronService.js"],
+            "name": "api_syntax_cron_service",
+            "cmd": ["node", "--check", "api/services/CronService.js"],
             "cwd": ".",
         },
         {
-            "name": "frontend_build",
+            "name": "web_build",
             "cmd": ["npm", "run", "build"],
             "cwd": ".",
         },
@@ -309,10 +309,10 @@ def get_fix_hint(result: dict) -> str:
         return "Falha de permissao no ambiente. Execute o comando fora do sandbox/restricao."
     if "eaddrinuse" in blob or "porta" in blob:
         return "Porta em uso. Finalize processo antigo ou altere PORT no .env."
-    if name == "frontend_build":
-        return "Build do frontend falhou. Verifique o primeiro erro de compilacao no log detalhado."
-    if name.startswith("backend_syntax"):
-        return "Check de backend falhou. Corrija o arquivo de servico informado."
+    if name == "web_build":
+        return "Build da web falhou. Verifique o primeiro erro de compilacao no log detalhado."
+    if name.startswith("api_syntax"):
+        return "Check da API falhou. Corrija o arquivo de servico informado."
     return "Verifique stderr/stdout do check no events.jsonl para o detalhe exato."
 
 
@@ -462,10 +462,10 @@ def watch_loop(root: Path, cfg: dict, interval_sec: float, jsonl_log: Path, txt_
 
 
 def resolve_repo_root(script_dir: Path) -> Path:
-    """Quando o script está em backend/, a raiz do monorepo é o diretório pai."""
+    """Quando o script está em scripts/, a raiz do monorepo é o diretório pai."""
     script_dir = script_dir.resolve()
     parent = script_dir.parent
-    if (parent / "frontend" / "package.json").is_file() and (parent / "package.json").is_file():
+    if (parent / "web" / "package.json").is_file() and (parent / "package.json").is_file():
         return parent
     return script_dir
 
@@ -487,7 +487,7 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root = resolve_repo_root(script_dir)
     cfg_arg = Path(args.config)
-    cfg_path = cfg_arg if cfg_arg.is_absolute() else (script_dir / cfg_arg)
+    cfg_path = cfg_arg if cfg_arg.is_absolute() else (repo_root / cfg_arg)
     cfg = load_config(cfg_path)
 
     logs_dir = repo_root / "pipeline_guard_logs"

@@ -1,5 +1,5 @@
 -- Escala sintética: abril e maio do ANO CORRENTE (strftime('%Y','now')).
--- Executar: node backend/scripts/run-sql-file.mjs "backend/data/local/seed_escala_abril_maio.sql"
+-- Executar: node api/scripts/run-sql-file.mjs "api/data/local/seed_escala_abril_maio.sql"
 
 BEGIN TRANSACTION;
 

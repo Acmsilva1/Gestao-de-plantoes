@@ -245,7 +245,7 @@ export default function LoginView() {
                         </button>
                         <p className="text-center text-xs text-slate-500">
                             Lista vem da API quando existir; senão use <code className="text-slate-400">FALLBACK_MEDICO_PROFILES</code> em{' '}
-                            <code className="text-slate-400">frontend/src/devTestProfiles.js</code>.
+                            <code className="text-slate-400">web/src/devTestProfiles.js</code>.
                         </p>
                     </div>
                 )}

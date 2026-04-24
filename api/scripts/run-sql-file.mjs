@@ -4,6 +4,6 @@
 import process from 'process';
 
 console.error(
-    '[sql:run] SQLite em ficheiro foi removido. Dados locais: CSV em ./dblocal + orquestrador em memória.'
+    '[sql:run] SQLite em ficheiro foi removido. Dados locais: Parquet/CSV em api/data/local + orquestrador em memória.'
 );
 process.exit(1);

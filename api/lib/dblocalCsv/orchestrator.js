@@ -38,7 +38,7 @@ function sortTableNames(names) {
 
 /**
  * Orquestrador dblocal: única fonte de dados em memória (sem SQLite).
- * Lê `dblocal/*.parquet` (preferido) ou `dblocal/*.csv` por tabela (ignora `vw_*` no carregamento).
+ * Lê `*.parquet` (preferido) ou `*.csv` por tabela na pasta configurada (ignora `vw_*` no carregamento).
  * Mutável para insert/update/delete; com `GDP_DEMO_READ_ONLY=false`, `persistTable` grava `.parquet` oficial em `loadedDir`.
  */
 export class DblocalCsvOrchestrator {
@@ -70,7 +70,7 @@ export class DblocalCsvOrchestrator {
     }
 
     /**
-     * @param {string} dir caminho absoluto da pasta dblocal
+     * @param {string} dir caminho absoluto da pasta de dados (ex.: api/data/local)
      */
     async loadFromDirectory(dir) {
         this.tables = new Map();

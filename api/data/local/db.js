@@ -20,7 +20,7 @@ export function generateId() {
 }
 
 /**
- * Orquestrador dblocal em memória (Parquet/CSV). Primeira chamada carrega `dblocal/` + seed sintético.
+ * Orquestrador dblocal em memória (Parquet/CSV). Primeira chamada carrega `api/data/local/` + seed sintético.
  * Com `GDP_DEMO_READ_ONLY=false`, após o seed o estado é gravado em `.parquet` (fonte oficial local).
  */
 export async function getCsvStore() {

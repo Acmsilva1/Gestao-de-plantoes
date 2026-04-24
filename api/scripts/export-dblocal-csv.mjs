@@ -1,5 +1,5 @@
 /**
- * Exporta o estado em memória (orquestrador + seed) para ./dblocal em Parquet.
+ * Exporta o estado em memória (orquestrador + seed) para `api/data/local/` em Parquet.
  * - Um `.parquet` por tabela base
  * - `vw_*.parquet` a partir de joins em JS (VIEW_EXPORT_BUILDERS)
  *
@@ -14,9 +14,10 @@ import { writeParquetFromPack } from '../lib/dblocalCsv/readParquetDuck.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
-const outDir = path.join(repoRoot, 'dblocal');
+const apiRoot = path.resolve(__dirname, '..');
+const outDir = path.join(apiRoot, 'data', 'local');
 
-const dbModuleUrl = pathToFileURL(path.join(repoRoot, 'backend', 'data', 'local', 'db.js')).href;
+const dbModuleUrl = pathToFileURL(path.join(apiRoot, 'data', 'local', 'db.js')).href;
 const { getCsvStore } = await import(dbModuleUrl);
 
 async function main() {

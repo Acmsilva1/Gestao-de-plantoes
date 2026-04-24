@@ -1,6 +1,6 @@
 # Documentação técnica — GESTÃO DE PLANTÕES (repositório agregado)
 
-Corpo técnico, impessoal. Âmbitos: **[B]** `backend/`, **[F]** `frontend/`, **[T]** contrato transversal. O repositório não segue literalmente `api/` e `web/`; os caminhos reais indicam-se abaixo.
+Corpo técnico, impessoal. Âmbitos: **[B]** `api/` (servidor Node), **[F]** `web/` (SPA Vite + React), **[T]** contrato transversal. Layout modular alinhado a workspaces npm (`api`, `web`); ver também [docs/PIPELINE_E_ARQUITETURA.md](../docs/PIPELINE_E_ARQUITETURA.md).
 
 ## 0. Identificação do artefato **[T]**
 
@@ -8,7 +8,7 @@ Corpo técnico, impessoal. Âmbitos: **[B]** `backend/`, **[F]** `frontend/`, **
 |--------|--------|
 | **DOC-ID** | `GDP-WEB-CORE-TEC-R01` |
 | **Módulo** | Plataforma de gestão de plantões médicos (escala, trocas, cancelamentos, relatórios, predição operacional). |
-| **Repositório** | `Gestao-de-plantoes` (monorepo npm workspaces: `backend/`, `frontend/`). |
+| **Repositório** | `Gestao-de-plantoes` (monorepo npm workspaces: `api/`, `web/`). |
 | **Plano** | Não aplicável. Não existe ficheiro `PLANO_*.md` na raiz do repositório. |
 | **Identificação de artefatos** | Não aplicável. Não existe `IDENTIFICACAO_PADRAO.md` na raiz do repositório. |
 
@@ -18,13 +18,13 @@ Corpo técnico, impessoal. Âmbitos: **[B]** `backend/`, **[F]** `frontend/`, **
 
 O sistema expõe uma SPA React (Vite) consumindo uma API Express em Node. Os perfis de utilização são: **médico** (calendário, agenda, pedidos de troca, assumir vaga, cancelamento), **gestor** (acessos, editor de escala, modelos, ciência de trocas/assumir, decisão de cancelamentos, dashboards e relatórios analíticos) e **administrativo** (relatórios de produtividade, trocas e cancelamentos com exportação). O backend integra serviços de ETL, predição, calibração, agendamento (`CronService`), cache Redis e fila RabbitMQ opcionais, e persiste dados operacionais através da camada **dblocal** (Parquet/CSV em memória com orquestrador DuckDB). Utilizadores impactados: corpo clínico, gestão de unidade/rede e equipas de faturamento/auditoria que consomem exportações.
 
-Dependências externas relevantes: ficheiros em `dblocal/` (ou caminho `GDP_DBLLOCAL_CSV_DIR`), infra opcional Redis/RabbitMQ, e documentação complementar em `README.md`, `backend/docs/`, `doc/PIPELINE_GUARD.md`.
+Dependências externas relevantes: ficheiros em `api/data/local/` (ou caminho `GDP_DBLLOCAL_CSV_DIR`), infra opcional Redis/RabbitMQ, e documentação complementar em `README.md`, `doc/`, `doc/PIPELINE_GUARD.md`, `docs/PIPELINE_E_ARQUITETURA.md`.
 
 ---
 
 ## 2. Superfícies, rotas e estrutura de navegação **[F]**
 
-| ID interno | Rota SPA | Componente raiz (`frontend/src/...`) | Nota |
+| ID interno | Rota SPA | Componente raiz (`web/src/...`) | Nota |
 |------------|-----------|----------------------------------------|------|
 | `LOGIN` | `/` | `views/LoginView.jsx` | Entrada pública; escolha de perfil e redirecionamento. |
 | `MED` | `/medico/*` | `views/DoctorView.jsx` | Protegida (`PrivateRoute`, `perfil === 'medico'`). |
@@ -39,7 +39,7 @@ Não aplicável. Não existe registo formal de biblioteca de componentes “ofic
 
 ## 3. Interface (frontend) **[F]**
 
-A montagem da aplicação ocorre em `frontend/src/main.jsx` (React 18, `BrowserRouter` em `App.jsx`). O estado de sessão (`session`, `login`, `logout`, `loading`) reside em `context/AuthContext.jsx`, com persistência em `localStorage` (`maestro-session`). Não há camada `web/features/` nominal; a organização é por **`views/`** (páginas), **`components/`** (UI partilhada ou por domínio) e **`models/api.js`** (`readApiResponse` para normalizar respostas `fetch`).
+A montagem da aplicação ocorre em `web/src/main.jsx` (React 18, `BrowserRouter` em `App.jsx`). O estado de sessão (`session`, `login`, `logout`, `loading`) reside em `context/AuthContext.jsx`, com persistência em `localStorage` (`maestro-session`). Não há camada `web/features/` nominal; a organização é por **`views/`** (páginas), **`components/`** (UI partilhada ou por domínio) e **`models/api.js`** (`readApiResponse` para normalizar respostas `fetch`).
 
 Integração HTTP: chamadas relativas a `/api/...`; em desenvolvimento o `vite.config.js` define `server.proxy['/api']` para `http://127.0.0.1:${GDP_API_PORT||PORT||3000}`. O consumo está distribuído pelas views e componentes (por exemplo `LoginView` chama `/api/medicos` e `/api/manager/perfis`; páginas de gestor e médico chamam rotas alinhadas ao inventário da secção 4).
 
@@ -49,7 +49,7 @@ Fluxo transversal **[F]** → **[B]**: a UI dispara `fetch`/`readApiResponse`; o
 
 ## 4. Backend, API e processamento **[B]**
 
-O servidor arranca em `backend/server.js` (Express, CORS, JSON). Middleware em `/api` verifica disponibilidade de configuração de base (`hasDatabaseEnv` em `config/env.js`); rotas não encontradas respondem 404 JSON. Há serviço de ficheiros estáticos para `frontend/dist` quando existe build de produção.
+O servidor arranca em `api/server.js` (Express, CORS, JSON). Middleware em `/api` verifica disponibilidade de configuração de base (`hasDatabaseEnv` em `config/env.js`); rotas não encontradas respondem 404 JSON. Há serviço de ficheiros estáticos para `web/dist` quando existe build de produção.
 
 Controllers principais: **`controllers/DirecionadorService.js`** (médico, vagas públicas), **`controllers/ManagerService.js`** (gestor), **`controllers/AdminController.js`** (admin). A lógica de negócio extensa encontra-se em **`services/`** (por exemplo `PredictionEngine`, `CalibrationService`, `SchedulerService`, `CronService`, `DataTransportService`, `AdminService`, filas e cache).
 
@@ -96,13 +96,13 @@ Controllers principais: **`controllers/DirecionadorService.js`** (médico, vagas
 
 ## 5. Persistência, dados e consultas **[B]**
 
-A persistência operacional em modo demonstração/local passa por **`backend/data/local/db.js`**: singleton **`DblocalCsvOrchestrator`** (`lib/dblocalCsv/`), carregamento a partir de `env.dblocalCsvDir` (por omissão `dblocal/` na raiz do repositório), integração DuckDB, seed sintético opcional (`seed.js`) e escrita Parquet condicionada a `GDP_DEMO_READ_ONLY` e `GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT`. Existência de esquemas de referência em `backend/schema/` (por exemplo `db_schema_inference.json`, `supabase_schema.json`).
+A persistência operacional em modo demonstração/local passa por **`api/data/local/db.js`**: singleton **`DblocalCsvOrchestrator`** (`lib/dblocalCsv/`), carregamento a partir de `env.dblocalCsvDir` (por omissão **`api/data/local/`**), integração DuckDB, seed sintético opcional (`seed.js`) e escrita Parquet condicionada a `GDP_DEMO_READ_ONLY` e `GDP_DBLLOCAL_SKIP_BOOT_PARQUET_SNAPSHOT`. Existência de esquemas de referência em `api/schema/` (por exemplo `db_schema_inference.json`, `supabase_schema.json`).
 
 ### Mapeamento de dados (exemplos)
 
 | Área UI (ID §2) | Entrada de dados | Ficheiro backend / frontend | Objeto ou origem de dados |
 |-----------------|------------------|----------------------------|---------------------------|
-| `LOGIN` | Seleção de médico/gestor | `frontend/src/views/LoginView.jsx` → `GET /api/medicos`, `GET /api/manager/perfis` | Tabelas carregadas no store dblocal conforme orquestrador |
+| `LOGIN` | Seleção de médico/gestor | `web/src/views/LoginView.jsx` → `GET /api/medicos`, `GET /api/manager/perfis` | Tabelas carregadas no store dblocal conforme orquestrador |
 | `MED` | Calendário e pedidos | `DoctorView.jsx` + chamadas `/api/medicos/...` | Linhas de escala, pedidos de troca/cancelamento no modelo local |
 | `GEST` | Editor de escala | `ManagerEscalaEditorPage.jsx` etc. → `/api/manager/escala*` | Persistência via orquestrador em ficheiros Parquet/CSV |
 | `GEST` | Dashboard / BI | `ManagerVisaoAnaliticaPage.jsx` → `/api/manager/dashboard-summary`, `analise-atendimento` | Agregados e séries derivadas dos dados locais |
@@ -115,8 +115,8 @@ SQL no browser: Não aplicável. Não há execução SQL no cliente; consultas o
 ## 6. Segurança e conformidade (LGPD) **[T]**
 
 - **Autenticação na UI**: o fluxo de login documentado na interface indica ausência de palavra-passe nesta versão de demonstração; a sessão é um objeto JSON em `localStorage`, identificador `maestro-session`. Não constitui autenticação forte nem adequada a produção sem camadas adicionais (OAuth, sessão servidor, HTTPS obrigatório).
-- **Autorização**: separação por `perfil` no router (`PrivateRoute`); o servidor deve validar identidade e autorização em cada rota sensível — qualquer omissão no backend expõe dados (revisão periódica recomendada).
-- **Dados pessoais**: nomes, CRM, especialidade, unidade e identificadores de profissionais transitam na API e na UI; tratam-se como dados clínicos/identificativos sujeitos a LGPD em ambiente real. O `README.md` refere anonimização no pipeline ETL de produção; o modo local depende do conteúdo carregado em `dblocal/`.
+- **Autorização**: separação por `perfil` no router (`PrivateRoute`); o servidor deve validar identidade e autorização em cada rota sensível — qualquer omissão na API expõe dados (revisão periódica recomendada).
+- **Dados pessoais**: nomes, CRM, especialidade, unidade e identificadores de profissionais transitam na API e na UI; tratam-se como dados clínicos/identificativos sujeitos a LGPD em ambiente real. O `README.md` refere anonimização no pipeline ETL de produção; o modo local depende do conteúdo carregado em **`api/data/local/`**.
 - **Medidas**: uso de HTTPS em produção, políticas de retenção, minimização de campos nas exportações administrativas e controlos de acesso por perfil institucional devem ser definidos fora deste documento quando o deploy for além de demonstração.
 
 ---
@@ -125,20 +125,20 @@ SQL no browser: Não aplicável. Não há execução SQL no cliente; consultas o
 
 | Tema | Detalhe |
 |------|---------|
-| Workspaces | Raiz `package.json`: workspaces `backend`, `frontend`; scripts `dev:full` (API + Vite), `dev`, `build`, `infra:*` para Docker opcional. |
+| Workspaces | Raiz `package.json`: workspaces `api`, `web`; scripts `dev:full` (API + Vite), `dev`, `build`, `infra:*` para Docker opcional. |
 | Portas | API: `GDP_API_PORT` ou `PORT` ou `3000`. Frontend Vite: `5173` (configurável na linha de comando). |
-| Variáveis | Ver `backend/config/env.js` e `README.md`: `ENABLE_REDIS`, `REDIS_URL`, `ENABLE_QUEUE`, `RABBITMQ_URL`, `GDP_DBLLOCAL_CSV_DIR`, `GDP_DEMO_READ_ONLY`, `DISABLE_PREDICTOR_SCHEDULER`, entre outras. |
-| Frontend build | `frontend/vite.config.js`; variáveis `VITE_*` não são obrigatórias para o proxy (usa `loadEnv` para `PORT` alinhado à API). |
-| Migrations SQL | O repositório referencia migrações em `model/` no `README.md` (ex.: ajustes de FK); operação `npm run sql:run -w gestao-de-plantoes-backend` para ficheiros SQL pontuais. |
-| Pipeline | `pipeline:watch` / `pipeline:once` na raiz; configuração em `backend/pipeline_guard_config.json`; documentação em `doc/PIPELINE_GUARD.md`. |
+| Variáveis | Ver `api/config/env.js`, `infra/env.example` e `README.md`: `ENABLE_REDIS`, `REDIS_URL`, `ENABLE_QUEUE`, `RABBITMQ_URL`, `GDP_DBLLOCAL_CSV_DIR`, `GDP_DEMO_READ_ONLY`, `DISABLE_PREDICTOR_SCHEDULER`, entre outras. |
+| Web build | `web/vite.config.js`; variáveis `VITE_*` não são obrigatórias para o proxy (usa `loadEnv` para `PORT` alinhado à API). |
+| Migrations SQL | O repositório referencia migrações em `model/` no `README.md` (ex.: ajustes de FK); operação `npm run sql:run -w api` para ficheiros SQL pontuais. |
+| Pipeline | `pipeline:watch` / `pipeline:once` na raiz; configuração em `pipeline_guard_config.json`; documentação em `doc/PIPELINE_GUARD.md`. |
 | CI | Não aplicável. Não há ficheiro de pipeline CI referenciado na raiz analisada para este documento. |
 
 ---
 
 ## 8. Observações técnicas e registo de revisão **[T]**
 
-- O layout do código é **híbrido**: backend em `controllers/` + `services/` (não `api/features/<domínio>`); frontend em `views/` + `components/` (não `web/features/`). O mapeamento **[B]/[F]/[T]** mantém-se conceptualmente.
+- O layout do repositório usa pastas **`api/`** e **`web/`**; dentro da API a organização continua em `controllers/` + `services/` (não `api/features/<domínio>`); na web, `views/` + `components/`. O mapeamento **[B]/[F]/[T]** mantém-se conceptualmente.
 - A rota `POST /api/manager/trocas/:pedidoId/decidir` permanece registada como `410`, coerente com o fluxo em que trocas entre médicos não exigem aprovação do gestor (`README.md`, atualizações 2026-04-03).
-- Riscos: sessão apenas no cliente; dados locais sensíveis em disco se `dblocal/` contiver informação real; Redis/RabbitMQ desligados não impedem o modo de desenvolvimento descrito no `README.md`.
+- Riscos: sessão apenas no cliente; dados locais sensíveis em disco se **`api/data/local/`** contiver informação real; Redis/RabbitMQ desligados não impedem o modo de desenvolvimento descrito no `README.md`.
 
 Documento revisado em 2026-04-24 — `GDP-WEB-CORE-TEC-R01`.

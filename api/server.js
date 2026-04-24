@@ -72,7 +72,11 @@ import {
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distPath = path.join(__dirname, '../frontend/dist');
+const __serverFile = fileURLToPath(import.meta.url);
+const distPath = path.join(__dirname, '../web/dist');
+const isDirectRun =
+    Boolean(process.argv[1]) &&
+    path.resolve(process.argv[1]) === path.resolve(__serverFile);
 
 app.use(cors());
 app.use(express.json());
@@ -186,44 +190,46 @@ app.use((err, req, res, next) => {
     });
 });
 
-if (fs.existsSync(distPath)) {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+if (isDirectRun) {
+    if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (req, res) => {
+            res.sendFile(path.join(distPath, 'index.html'));
+        });
+    }
+
+    const server = app.listen(env.port, () => {
+        console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
+
+        // Pre-aquecimento não bloqueante para aproximar comportamento de produção
+        if (env.enableRedis) {
+            cacheService.ensureClient().catch(() => {});
+        }
+        if (env.enableQueue) {
+            queueService.ensureChannel().catch(() => {});
+        }
+
+        if (hasDatabaseEnv() && !env.disablePredictorScheduler) {
+            startPredictionScheduler();
+            cronService.start(); // Inicia o transporte de dados (6h e 18h)
+        } else if (hasDatabaseEnv() && env.disablePredictorScheduler) {
+            console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) - módulo médico / sem predição');
+        }
+    });
+
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(
+                `[ERRO] Porta ${env.port} ja esta em uso (outro Node/servidor ou instancia antiga).\n` +
+                    `  - Encerre o processo que usa essa porta, ou\n` +
+                    `  - Defina outra porta no .env, por exemplo: PORT=3001`
+            );
+        } else {
+            console.error('[ERRO] ao abrir o servidor:', err.message);
+        }
+        process.exit(1);
     });
 }
-
-const server = app.listen(env.port, () => {
-    console.log(`GESTAO DE PLANTOES rodando na porta ${env.port}`);
-
-    // Pre-aquecimento não bloqueante para aproximar comportamento de produção
-    if (env.enableRedis) {
-        cacheService.ensureClient().catch(() => {});
-    }
-    if (env.enableQueue) {
-        queueService.ensureChannel().catch(() => {});
-    }
-
-    if (hasDatabaseEnv() && !env.disablePredictorScheduler) {
-        startPredictionScheduler();
-        cronService.start(); // Inicia o transporte de dados (6h e 18h)
-    } else if (hasDatabaseEnv() && env.disablePredictorScheduler) {
-        console.log('[scheduler] desligado (DISABLE_PREDICTOR_SCHEDULER=1) - módulo médico / sem predição');
-    }
-});
-
-server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(
-            `[ERRO] Porta ${env.port} ja esta em uso (outro Node/servidor ou instancia antiga).\n` +
-                `  - Encerre o processo que usa essa porta, ou\n` +
-                `  - Defina outra porta no .env, por exemplo: PORT=3001`
-        );
-    } else {
-        console.error('[ERRO] ao abrir o servidor:', err.message);
-    }
-    process.exit(1);
-});
 
 export default app;
 
