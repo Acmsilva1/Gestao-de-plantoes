@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{ session, login, logout, loading }}>
             {loading ? (
-                <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+                <div className="app-shell-bg flex min-h-screen items-center justify-center text-sm text-slate-300">
                     A carregar sessão…
                 </div>
             ) : (

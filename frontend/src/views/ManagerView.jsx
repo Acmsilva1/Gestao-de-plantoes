@@ -179,7 +179,7 @@ function GestorChrome() {
     const mainInnerClass = isEscalaRoute ? 'mx-auto w-full max-w-none' : 'mx-auto max-w-7xl lg:max-w-[100rem]';
 
     return (
-        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.15),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100 lg:flex">
+        <div className="app-shell-bg min-h-screen overflow-x-hidden text-slate-100 lg:flex">
             {/* Suggestion Banner */}
             {showPasswordSuggestion && (
                 <div className="fixed inset-x-0 top-0 z-[60] flex flex-col gap-3 bg-sky-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -195,10 +195,10 @@ function GestorChrome() {
             )}
 
             {/* Sidebar */}
-            <aside className="flex w-full flex-col border-b border-slate-800 bg-slate-900/50 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-sm lg:w-64 lg:min-w-64 lg:max-h-screen lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-6">
+            <aside className="flex w-full flex-col border-b border-white/10 bg-slate-950/40 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl lg:w-64 lg:min-w-64 lg:max-h-screen lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-6">
                 <div className="mb-4 shrink-0 lg:mb-10">
-                    <p className="mb-2 text-xs uppercase tracking-[0.3em] text-sky-400/80">GESTÃO DE PLANTÕES</p>
-                    <h1 className="text-2xl font-black tracking-tight text-white">Central do Gestor</h1>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.32em] text-sky-300/90">GESTÃO DE PLANTÕES</p>
+                    <h1 className="app-hero-title app-hero-title--compact text-white">Central do Gestor</h1>
                 </div>
 
                 <nav className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:flex-col">
@@ -303,7 +303,7 @@ function GestorChrome() {
 
             {/* Main Content Area */}
             <main className="min-w-0 flex flex-1 flex-col overflow-y-auto">
-                <header className="sticky top-0 z-20 flex flex-col items-stretch gap-3 border-b border-slate-800 bg-slate-900/60 px-4 py-4 backdrop-blur-md sm:flex-row sm:items-center sm:justify-end sm:px-6 lg:px-10 lg:py-5">
+                <header className="sticky top-0 z-20 flex flex-col items-stretch gap-3 border-b border-white/10 bg-slate-950/45 px-4 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-end sm:px-6 lg:px-10 lg:py-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <button
                             onClick={() => setShowProfileModal(true)}

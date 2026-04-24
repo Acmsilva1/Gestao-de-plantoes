@@ -1075,7 +1075,7 @@ export default function DoctorView() {
     const unitNomeCalendario = calendar?.unit?.nome || session.unidadeFixaNome;
 
     return (
-        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] text-slate-100">
+        <div className="app-shell-bg min-h-screen overflow-x-hidden text-slate-100">
             {showPasswordSuggestion && (
                 <div className="flex flex-col gap-3 bg-emerald-500/90 px-4 py-3 text-slate-950 animate-in slide-in-from-top duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p className="flex items-start gap-2 text-sm font-bold sm:items-center">
@@ -1105,10 +1105,10 @@ export default function DoctorView() {
             )}
 
             <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
-                <header className="mb-10 flex flex-col gap-4 border-b border-emerald-500/20 pb-6 md:flex-row md:items-end md:justify-between">
+                <header className="mb-10 flex flex-col gap-4 rounded-3xl border border-white/10 bg-slate-950/35 p-6 shadow-lg shadow-black/30 backdrop-blur-xl md:flex-row md:items-end md:justify-between">
                     <div className="flex flex-col gap-1">
-                        <p className="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
-                        <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Escala da unidade</h1>
+                        <p className="mb-2 text-sm font-bold uppercase tracking-[0.32em] text-emerald-300/85">GESTÃO DE PLANTÕES</p>
+                        <h1 className="app-hero-title app-hero-title--compact text-white">Escala da unidade</h1>
 
                         <div className="mt-4 flex flex-wrap items-center gap-4">
                             <div className="text-xs font-bold uppercase tracking-widest text-slate-400">Unidade</div>

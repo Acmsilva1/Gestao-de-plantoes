@@ -1,12 +1,12 @@
 :root {
-    /* Cores Base em OKLCH (Sintonizadas para o fundo Navy Soft mais claro) */
-    --background: oklch(0.35 0.04 240); 
-    --foreground: oklch(0.98 0.005 240);
-    --primary: oklch(0.70 0.15 150); 
-    
-    /* Tokens Pipeline Dashboard */
-    --dash-bg: #313755;          /* Navy Blue mais claro e vibrante */
-    --dash-panel: #262a41;       /* Antigo fundo agora serve como base de painéis */
+    /* Base escura com matiz azul — confortável para vidro e contraste */
+    --background: oklch(0.22 0.05 250);
+    --foreground: oklch(0.96 0.01 250);
+    --primary: oklch(0.70 0.15 150);
+
+    /* Tokens Pipeline / shell */
+    --dash-bg: #0f2840;
+    --dash-panel: rgba(15, 23, 42, 0.45);
     --dash-accent-live: #2DE0B9;  /* Teal */
     --dash-accent-urgent: #E0B92D; /* Amber */
     --dash-accent-critical: #E02D5F; /* Red */
@@ -21,6 +21,55 @@
 
 .animate-glow-pulse {
     animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Fundo app: azul-noite + halos (base para efeito vidro) */
+.app-shell-bg {
+    background-color: #0a1628;
+    background-image:
+        radial-gradient(ellipse 110% 75% at 50% -18%, rgba(56, 189, 248, 0.28), transparent 58%),
+        radial-gradient(ellipse 55% 45% at 100% 8%, rgba(16, 185, 129, 0.14), transparent 52%),
+        radial-gradient(ellipse 50% 40% at 0% 100%, rgba(99, 102, 241, 0.12), transparent 50%),
+        linear-gradient(180deg, #050b14 0%, #0f2840 46%, #0a1628 100%);
+}
+
+.app-shell-bg--admin {
+    background-image:
+        radial-gradient(ellipse 100% 70% at 50% -15%, rgba(167, 139, 250, 0.32), transparent 58%),
+        radial-gradient(ellipse 55% 45% at 100% 8%, rgba(56, 189, 248, 0.12), transparent 52%),
+        linear-gradient(180deg, #050b14 0%, #142044 46%, #0a1628 100%);
+}
+
+/* Painel vidro (login, cartões flutuantes) */
+.glass-panel {
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* Título principal — brilho e profundidade */
+.app-hero-title {
+    font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: #fff;
+    text-shadow:
+        0 0 52px rgba(34, 211, 238, 0.5),
+        0 0 100px rgba(16, 185, 129, 0.18),
+        0 4px 22px rgba(0, 0, 0, 0.75);
+}
+
+.app-hero-title--compact {
+    font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+    letter-spacing: -0.03em;
+    text-shadow:
+        0 0 36px rgba(34, 211, 238, 0.38),
+        0 3px 16px rgba(0, 0, 0, 0.65);
 }
 
 html,

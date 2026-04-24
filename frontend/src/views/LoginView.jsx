@@ -167,15 +167,17 @@ export default function LoginView() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.24),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] px-6 py-10 text-slate-100">
-            <header className="mb-10 text-center">
-                <p className="mb-3 text-sm uppercase tracking-[0.35em] text-emerald-300/70">GESTÃO DE PLANTÕES</p>
-                <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">Central de Acessos</h1>
-                <p className="mx-auto mt-4 max-w-lg text-base text-slate-300">Escolha o perfil e abra o módulo. Não há senha nesta versão.</p>
+        <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center px-6 py-10 text-slate-100">
+            <header className="relative z-[1] mb-10 text-center">
+                <p className="mb-3 text-sm font-bold uppercase tracking-[0.38em] text-cyan-300/85">GESTÃO DE PLANTÕES</p>
+                <h1 className="app-hero-title">Central de Acessos</h1>
+                <p className="mx-auto mt-5 max-w-lg text-base text-slate-400">
+                    Escolha o perfil e abra o módulo. Não há senha nesta versão.
+                </p>
             </header>
 
-            <div className="w-full max-w-md rounded-[2rem] border border-slate-800 bg-slate-900/75 p-8 shadow-2xl shadow-slate-950/40">
-                <div className="mb-8 flex rounded-2xl bg-slate-950 p-1">
+            <div className="glass-panel relative z-[1] w-full max-w-md rounded-[2rem] p-8">
+                <div className="mb-8 flex rounded-2xl border border-white/5 bg-slate-950/50 p-1 backdrop-blur-md">
                     <button
                         type="button"
                         onClick={() => setActiveTab('medico')}

@@ -183,15 +183,15 @@ export default function AdminView() {
     const hasResults = isProductivity ? !!summary : rawData.length > 0;
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-            <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-900/60 px-6 py-4 backdrop-blur-md">
+        <div className="app-shell-bg app-shell-bg--admin min-h-screen text-slate-100 font-sans">
+            <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/45 px-6 py-4 backdrop-blur-xl">
                 <div className="flex flex-wrap items-center justify-between gap-4 max-w-7xl mx-auto">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
                             <FileText className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-black tracking-tight uppercase">Módulo Administrativo</h1>
+                            <h1 className="app-hero-title app-hero-title--compact uppercase tracking-tight text-white">Módulo Administrativo</h1>
                             <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest">Relatórios e Faturamento</p>
                         </div>
                     </div>
