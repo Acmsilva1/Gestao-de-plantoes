@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { readApiResponse } from '../models/api';
-import { useAuth } from '../context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
 
 const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',

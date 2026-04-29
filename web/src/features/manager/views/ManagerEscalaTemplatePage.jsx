@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutTemplate, Plus, Trash2, X, Save, Edit3, Check } from 'lucide-react';
-import { readApiResponse } from '../models/api';
-import { useAuth } from '../context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
 
 const UNIT_SHIFT_ORDER = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
 const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];

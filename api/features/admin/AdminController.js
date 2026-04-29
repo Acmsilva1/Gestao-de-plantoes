@@ -1,4 +1,4 @@
-import { adminService } from '../services/AdminService.js';
+import { adminService } from '../../services/AdminService.js';
 
 export const getAdminProductivityReport = async (req, res) => {
     try {

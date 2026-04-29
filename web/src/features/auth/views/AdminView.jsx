@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import DateRangePicker from '../components/DateRangePicker';
+import { useAuth } from '../../../shared/context/AuthContext';
+import DateRangePicker from '../../../shared/components/DateRangePicker';
 import { UserCog, LogOut, Lock, Download, Search, Users, FileText } from 'lucide-react';
 
 const AdminProfileModal = ({ admin, onClose, onUpdate }) => {

@@ -1,11 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginView from './views/LoginView';
-import DoctorView from './views/DoctorView';
-import ManagerView from './views/ManagerView';
-import AdminView from './views/AdminView';
-import PwaInstallPrompt from './components/PwaInstallPrompt';
+import { AuthProvider, useAuth } from './shared/context/AuthContext';
+import LoginView from './features/auth/views/LoginView';
+import DoctorView from './features/doctor/views/DoctorView';
+import ManagerView from './features/manager/views/ManagerView';
+import AdminView from './features/auth/views/AdminView';
+import PwaInstallPrompt from './shared/components/PwaInstallPrompt';
 
 const PrivateRoute = ({ children, requiredPerfil = 'medico' }) => {
     const { session, loading } = useAuth();

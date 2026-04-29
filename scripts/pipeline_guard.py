@@ -42,7 +42,7 @@ DEFAULT_CONFIG = {
         "web/src/views/ManagerVisaoAnaliticaPage.jsx",
         "web/src/views/ManagerDashboardPage.jsx",
         "web/src/views/ManagerRelatoriosPage.jsx",
-        "api/controllers/ManagerService.js",
+        "api/features/manager/ManagerService.js",
         "api/services/CronService.js",
         "web/src/models/api.js",
     ],
@@ -65,7 +65,7 @@ DEFAULT_CONFIG = {
     "commands": [
         {
             "name": "api_syntax_manager_service",
-            "cmd": ["node", "--check", "api/controllers/ManagerService.js"],
+            "cmd": ["node", "--check", "api/features/manager/ManagerService.js"],
             "cwd": ".",
         },
         {

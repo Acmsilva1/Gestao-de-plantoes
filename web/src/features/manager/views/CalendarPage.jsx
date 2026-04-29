@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import ManagerCalendar from '../components/Manager/ManagerCalendar';
+import ManagerCalendar from '../components/ManagerCalendar';
 
 export default function CalendarPage() {
     const [units, setUnits] = useState([]);

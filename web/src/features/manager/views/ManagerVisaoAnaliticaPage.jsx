@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, CalendarDays, FileText, Filter, MapPinned, TrendingUp } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { readApiResponse } from '../models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerRelatoriosPage from './ManagerRelatoriosPage';
 import ManagerPredicaoPage from './ManagerPredicaoPage';

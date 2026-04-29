@@ -25,8 +25,8 @@ import {
     Legend,
     LabelList
 } from 'recharts';
-import { useAuth } from '../context/AuthContext';
-import { readApiResponse } from '../models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
 
 const MONTHS = [
     { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' },

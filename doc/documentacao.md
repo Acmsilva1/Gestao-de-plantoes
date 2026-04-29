@@ -26,10 +26,10 @@ Dependências externas relevantes: ficheiros em `api/data/local/` (ou caminho `G
 
 | ID interno | Rota SPA | Componente raiz (`web/src/...`) | Nota |
 |------------|-----------|----------------------------------------|------|
-| `LOGIN` | `/` | `views/LoginView.jsx` | Entrada pública; escolha de perfil e redirecionamento. |
-| `MED` | `/medico/*` | `views/DoctorView.jsx` | Protegida (`PrivateRoute`, `perfil === 'medico'`). |
-| `GEST` | `/gestor/*` | `views/ManagerView.jsx` | Protegida (`perfil === 'gestor'`); sub-rotas internas via `react-router-dom`. |
-| `ADM` | `/admin/*` | `views/AdminView.jsx` | Protegida (`perfil === 'admin'`). |
+| `LOGIN` | `/` | `features/auth/views/LoginView.jsx` | Entrada pública; escolha de perfil e redirecionamento. |
+| `MED` | `/medico/*` | `features/doctor/views/DoctorView.jsx` | Protegida (`PrivateRoute`, `perfil === 'medico'`). |
+| `GEST` | `/gestor/*` | `features/manager/views/ManagerView.jsx` | Protegida (`perfil === 'gestor'`); sub-rotas internas via `react-router-dom`. |
+| `ADM` | `/admin/*` | `features/auth/views/AdminView.jsx` | Protegida (`perfil === 'admin'`). |
 
 ### 2.1 Elementos de UI oficiais em relação às superfícies
 
@@ -39,7 +39,7 @@ Não aplicável. Não existe registo formal de biblioteca de componentes “ofic
 
 ## 3. Interface (frontend) **[F]**
 
-A montagem da aplicação ocorre em `web/src/main.jsx` (React 18, `BrowserRouter` em `App.jsx`). O estado de sessão (`session`, `login`, `logout`, `loading`) reside em `context/AuthContext.jsx`, com persistência em `localStorage` (`maestro-session`). Não há camada `web/features/` nominal; a organização é por **`views/`** (páginas), **`components/`** (UI partilhada ou por domínio) e **`models/api.js`** (`readApiResponse` para normalizar respostas `fetch`).
+A montagem da aplicação ocorre em `web/src/main.jsx` (React 18, `BrowserRouter` em `App.jsx`). O estado de sessão (`session`, `login`, `logout`, `loading`) reside em **`shared/context/AuthContext.jsx`**, com persistência em `localStorage` (`maestro-session`). A UI de negócio está em **`web/src/features/<domínio>/`** (auth, doctor, manager); código transversal em **`web/src/shared/`** (`models/api.js`, `components/`, `devTestProfiles.js`).
 
 Integração HTTP: chamadas relativas a `/api/...`; em desenvolvimento o `vite.config.js` define `server.proxy['/api']` para `http://127.0.0.1:${GDP_API_PORT||PORT||3000}`. O consumo está distribuído pelas views e componentes (por exemplo `LoginView` chama `/api/medicos` e `/api/manager/perfis`; páginas de gestor e médico chamam rotas alinhadas ao inventário da secção 4).
 
@@ -51,7 +51,7 @@ Fluxo transversal **[F]** → **[B]**: a UI dispara `fetch`/`readApiResponse`; o
 
 O servidor arranca em `api/server.js` (Express, CORS, JSON). Middleware em `/api` verifica disponibilidade de configuração de base (`hasDatabaseEnv` em `config/env.js`); rotas não encontradas respondem 404 JSON. Há serviço de ficheiros estáticos para `web/dist` quando existe build de produção.
 
-Controllers principais: **`controllers/DirecionadorService.js`** (médico, vagas públicas), **`controllers/ManagerService.js`** (gestor), **`controllers/AdminController.js`** (admin). A lógica de negócio extensa encontra-se em **`services/`** (por exemplo `PredictionEngine`, `CalibrationService`, `SchedulerService`, `CronService`, `DataTransportService`, `AdminService`, filas e cache).
+Controllers principais: **`features/direcionador/DirecionadorService.js`** (médico, vagas públicas), **`features/manager/ManagerService.js`** (gestor), **`features/admin/AdminController.js`** (admin). A lógica de negócio extensa encontra-se em **`services/`** (por exemplo `PredictionEngine`, `CalibrationService`, `SchedulerService`, `CronService`, `DataTransportService`, `AdminService`, filas e cache).
 
 ### Inventário de API (resumo por superfície / módulo)
 
@@ -102,7 +102,7 @@ A persistência operacional em modo demonstração/local passa por **`api/data/l
 
 | Área UI (ID §2) | Entrada de dados | Ficheiro backend / frontend | Objeto ou origem de dados |
 |-----------------|------------------|----------------------------|---------------------------|
-| `LOGIN` | Seleção de médico/gestor | `web/src/views/LoginView.jsx` → `GET /api/medicos`, `GET /api/manager/perfis` | Tabelas carregadas no store dblocal conforme orquestrador |
+| `LOGIN` | Seleção de médico/gestor | `web/src/features/auth/views/LoginView.jsx` → `GET /api/medicos`, `GET /api/manager/perfis` | Tabelas carregadas no store dblocal conforme orquestrador |
 | `MED` | Calendário e pedidos | `DoctorView.jsx` + chamadas `/api/medicos/...` | Linhas de escala, pedidos de troca/cancelamento no modelo local |
 | `GEST` | Editor de escala | `ManagerEscalaEditorPage.jsx` etc. → `/api/manager/escala*` | Persistência via orquestrador em ficheiros Parquet/CSV |
 | `GEST` | Dashboard / BI | `ManagerVisaoAnaliticaPage.jsx` → `/api/manager/dashboard-summary`, `analise-atendimento` | Agregados e séries derivadas dos dados locais |
@@ -137,7 +137,7 @@ SQL no browser: Não aplicável. Não há execução SQL no cliente; consultas o
 
 ## 8. Observações técnicas e registo de revisão **[T]**
 
-- O layout do repositório usa pastas **`api/`** e **`web/`**; dentro da API a organização continua em `controllers/` + `services/` (não `api/features/<domínio>`); na web, `views/` + `components/`. O mapeamento **[B]/[F]/[T]** mantém-se conceptualmente.
+- O layout do repositório usa pastas **`api/`** e **`web/`**; na API os handlers HTTP de domínio estão em **`api/features/<domínio>/`** (direcionador, manager, admin) e serviços transversais em `services/`, `models/`, etc. Na web: **`web/src/features/<domínio>/`** + **`web/src/shared/`**. O mapeamento **[B]/[F]/[T]** mantém-se conceptualmente.
 - A rota `POST /api/manager/trocas/:pedidoId/decidir` permanece registada como `410`, coerente com o fluxo em que trocas entre médicos não exigem aprovação do gestor (`README.md`, atualizações 2026-04-03).
 - Riscos: sessão apenas no cliente; dados locais sensíveis em disco se **`api/data/local/`** contiver informação real; Redis/RabbitMQ desligados não impedem o modo de desenvolvimento descrito no `README.md`.
 

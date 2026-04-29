@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { readApiResponse } from '../models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
 
 const UNIT_SHIFT_ORDER = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
 

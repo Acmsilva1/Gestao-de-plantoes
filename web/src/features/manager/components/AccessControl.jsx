@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../shared/context/AuthContext';
 import { Users, CheckCircle, Search, Save, AlertTriangle } from 'lucide-react';
-import { readApiResponse } from '../../models/api';
+import { readApiResponse } from '../../../shared/models/api';
 
 /** Valor do select "Consulta por unidade" para listar todas as unidades (só gestor master) */
 const FILTER_TODAS_UNIDADES = '__ALL_UNITS__';

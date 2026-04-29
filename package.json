@@ -10,7 +10,7 @@
     "build": "npm run build -w web",
     "dev": "npm run dev -w api",
     "start": "npm run start -w api",
-    "dev:web": "npm run dev -w web -- --host localhost --port 5173 --strictPort",
+    "dev:web": "npm run dev -w web -- --host localhost --port 5180 --strictPort",
     "dev:web:5180": "npm run dev -w web -- --host 127.0.0.1 --port 5180 --strictPort",
     "dev:full:5180": "concurrently -n api,web -c blue,magenta \"npm run dev\" \"npm run dev:web:5180\"",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:web\"",

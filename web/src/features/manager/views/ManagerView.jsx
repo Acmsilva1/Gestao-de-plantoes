@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { Users, LogOut, ShieldCheck, Lock, UserCog, ArrowLeftRight, CalendarRange, LayoutDashboard, LayoutTemplate, Ban } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import ManagerAccess from '../components/Manager/AccessControl';
+import { useAuth } from '../../../shared/context/AuthContext';
+import ManagerAccess from '../components/AccessControl';
 import ManagerTrocasPage from './ManagerTrocasPage';
 import ManagerCancelamentosPage from './ManagerCancelamentosPage';
 import ManagerEscalaEditorPage from './ManagerEscalaEditorPage.jsx';
 import ManagerEscalaTemplatePage from './ManagerEscalaTemplatePage.jsx';
 import ManagerVisaoAnaliticaPage from './ManagerVisaoAnaliticaPage.jsx';
-import { readApiResponse } from '../models/api';
+import { readApiResponse } from '../../../shared/models/api';
 
 const ManagerProfileModal = ({ manager, onClose, onUpdate }) => {
     const [loading, setLoading] = useState(false);

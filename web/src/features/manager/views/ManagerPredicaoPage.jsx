@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import { TrendingUp, AlertTriangle, CheckCircle2, BarChart3 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { readApiResponse } from '../models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
 
 const SHIFT_COLORS = {
     manha: '#2DE0B9',     // Teal

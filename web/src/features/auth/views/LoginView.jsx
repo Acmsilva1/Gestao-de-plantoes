@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { FALLBACK_MEDICO_PROFILES, GESTOR_PROFILES, ADMIN_PROFILES } from '../devTestProfiles.js';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { FALLBACK_MEDICO_PROFILES, GESTOR_PROFILES, ADMIN_PROFILES } from '../../../shared/devTestProfiles.js';
 
 const parseJson = async (response) => {
     const raw = await response.text();
@@ -245,7 +245,7 @@ export default function LoginView() {
                         </button>
                         <p className="text-center text-xs text-slate-500">
                             Lista vem da API quando existir; senão use <code className="text-slate-400">FALLBACK_MEDICO_PROFILES</code> em{' '}
-                            <code className="text-slate-400">web/src/devTestProfiles.js</code>.
+                            <code className="text-slate-400">web/src/shared/devTestProfiles.js</code>.
                         </p>
                     </div>
                 )}

@@ -18,7 +18,7 @@ npm run hooks:install
 ## O que é validado
 
 1. Sintaxe da API:
-- `node --check api/controllers/ManagerService.js`
+- `node --check api/features/manager/ManagerService.js`
 - `node --check api/services/CronService.js`
 
 2. Build da web:

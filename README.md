@@ -10,7 +10,9 @@ Sistema robusto para orquestra??o de escalas m?dicas, integrando predi??o de dem
 - **`scripts/`** — `pipeline_guard.py` (validação contínua).
 - **Raiz** — `package.json` (workspaces `api`, `web`), `README.md`, `pipeline_guard_config.json`, `.env`.
 
-Documentação modular: [docs/PIPELINE_E_ARQUITETURA.md](docs/PIPELINE_E_ARQUITETURA.md), [doc/documentacao.md](doc/documentacao.md).
+Documentação modular: [docs/PIPELINE_E_ARQUITETURA.md](docs/PIPELINE_E_ARQUITETURA.md), [doc/documentacao.md](doc/documentacao.md), [mudanca_arquitetura.md](mudanca_arquitetura.md), **[agents.md](agents.md)** (Cursor / **Checkpoint**).
+
+**Arquitetura de pastas (alinhada ao padrão workspace):** `web/src/features/{auth,doctor,manager}/`, `web/src/shared/`; `api/features/{direcionador,manager,admin}/`; scripts e pipeline em `scripts/pipeline_guard.py`. Dev web: porta **5180** (`vite --strictPort`).
 
 ## Arquitetura e serviços (API)
 

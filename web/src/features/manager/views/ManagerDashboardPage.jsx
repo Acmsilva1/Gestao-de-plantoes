@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import { BarChart3, CalendarDays, PieChart as PieIcon, Users } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { readApiResponse } from '../models/api';
+import { useAuth } from '../../../shared/context/AuthContext';
+import { readApiResponse } from '../../../shared/models/api';
 
 const PIE_COLORS = ['#2DE0B9', '#E0B92D'];
 

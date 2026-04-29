@@ -25,7 +25,7 @@ import {
     selectShift,
     postPedidoCancelamento,
     getDoctorFutureShiftsForSwap
-} from './controllers/DirecionadorService.js';
+} from './features/direcionador/DirecionadorService.js';
 import {
     getHistoricalAnalyticalData,
     getDashboardSummary,
@@ -59,7 +59,7 @@ import {
     postClearMonthScale,
     getCancelamentosPendentesGestor,
     postDecidirCancelamentoGestor
-} from './controllers/ManagerService.js';
+} from './features/manager/ManagerService.js';
 import {
     getAdminProductivityReport,
     getAdminProductivitySummary,
@@ -68,7 +68,7 @@ import {
     getAdminUnits,
     getAdminDoctors,
     updateAdminProfile
-} from './controllers/AdminController.js';
+} from './features/admin/AdminController.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
